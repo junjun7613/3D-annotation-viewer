@@ -6,7 +6,7 @@ import { useAuthState } from "react-firebase-hooks/auth";
 import * as THREE from 'three'
 import { OrbitControls } from 'three-stdlib'
 import { GLTFLoader } from 'three-stdlib'
-import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer'
+import { CSS2DRenderer, CSS2DObject } from 'three-stdlib'
 
 import db from '@/lib/firebase/firebase'
 import {
