@@ -532,6 +532,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({ annotationsVisible, annotatio
                     const screenPosition = new THREE.Vector3(intersectedPoint.x, intersectedPoint.y, intersectedPoint.z).project(camera);
                     const x = (screenPosition.x * 0.5 + 0.5) * sizes.width;
                     const y = (screenPosition.y * -0.5 + 0.5) * sizes.height;
+                    console.log(x, y);
                     setAnnotationPosition(new THREE.Vector3(x, y, 0));
 
                     //　カメラの位置を取得
