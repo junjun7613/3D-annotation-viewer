@@ -202,13 +202,6 @@ const Home: NextPage = () => {
     setManifestUrl(event.target.value)
   }
 
-  /*
-  const handleButtonClick = () => {
-    // handleManifestUrlChangeを実行
-    handleManifestUrlChange({ target: { value: manifestUrl } } as React.ChangeEvent<HTMLInputElement>);
-  }
-    */
-
   const handleInfoPanelContentChange = (content: { id: string, title: string, description: string, media: [] }) => {
     console.log(content)
     setInfoPanelContent(content);

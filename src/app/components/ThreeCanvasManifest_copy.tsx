@@ -81,9 +81,6 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({ annotationsVisible, annotatio
   const targetManifest = useRef<string | null>(null);
   const tagetCanvas = useRef<string | null>(null);
 
-  // json dataを格納するための変数
-  //const [manifest, setManifest] = useState([]);
-
   const handleInfoPanelContentChange = (content: { id: string, creator: string, title: string, description: string, media: [], wikidata: [], bibliography:[] }) => {
     setInfoPanelContent(content);
   }
@@ -198,25 +195,10 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({ annotationsVisible, annotatio
         )
 
         // アノテーションの読み込み
-        //fetch('/data/annotations/nefertiti-manifest.json')
         getAnnotations()
-          /*
-          .then(response => {
-            if (!response.ok) {
-              throw new Error('Network response was not ok')
-            }
-            return response.json()
-          })
-            */
           .then(data => {
-            /*
-            if (!data.items[0].items[1].items) {
-              throw new Error('Invalid data format')
-            }
-            */
 
             // manifestにdataを格納
-            //setManifest(data.items[0].items[1].items);
             console.log(data);
 
             const sprites: THREE.Sprite[] = []
@@ -350,10 +332,6 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({ annotationsVisible, annotatio
                 const intersectedObject = intersects[0].object;
                 console.log('Sprite clicked:', intersectedObject)
 
-                // intersectedObjectからcamPosを取得
-                //const camPos = intersectedObject.userData.camPos;
-                //const lookAt = intersectedObject.position;
-
                 /*
                 // カメラの位置をcamPosにスムーズに移動
                 camera.position.set(camPos[0], camPos[1], camPos[2]);
@@ -474,7 +452,6 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({ annotationsVisible, annotatio
                 // オフセットを計算
                 const normal = intersects[0].face?.normal.clone().applyMatrix4(intersects[0].object.matrixWorld).normalize();
                 console.log('Normal:', normal);
-                //const offset = normal?.multiplyScalar(0.08); // オフセットの距離を調整
 
                 if (!annotationModeRef.current) {
                   const cameraDirection = new THREE.Vector3();
@@ -509,7 +486,6 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({ annotationsVisible, annotatio
                   const offset = cameraDirection.multiplyScalar(-0.005); // オフセットの距離を調整
                   const newPoint = intersectedPoint.clone().add(offset);
                   console.log(newPoint);
-                  //const ZCoordinate = newPoint.z;
 
                   polygonVertices.current.push(newPoint);
                   console.log(polygonVertices.current);
@@ -621,31 +597,6 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({ annotationsVisible, annotatio
         const scale = distance * 0.05; // 距離に反比例してスケールを調整
         sprite.scale.set(scale, scale, scale);
       });
-
-      /*
-      /// レイキャストの頻度を減らす
-      if (raycastCounter % 100 === 0) { // 10フレームごとにレイキャストを行う
-        const raycaster = new THREE.Raycaster();
-        spritesRef.current.forEach(sprite => {
-          const direction = new THREE.Vector3();
-          camera.getWorldDirection(direction);
-          raycaster.set(sprite.position, direction.negate());
-          raycaster.camera = camera; // Raycasterのcameraプロパティを設定
-
-          const intersects = raycaster.intersectObjects(scene.children, true);
-          if (intersects.length > 0 && intersects[0].object !== sprite) {
-            
-              sprite.material.opacity = 0.2; // スプライトの前面にオブジェクトが存在する場合
-  
-          } else {
-            if (sprite.material.opacity !== 1) {
-              sprite.material.opacity = 1; // スプライトの前面にオブジェクトが存在しない場合
-            }
-          }
-        });
-      }
-      raycastCounter++;
-      */
 
       // 情報パネルの位置を更新
       // 選択されたスプライトがある場合には、情報パネルの位置をスプライトの位置に設定, 選択されたポリゴンがある場合には、情報パネルの位置をポリゴンの位置に設定
