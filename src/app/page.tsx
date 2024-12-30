@@ -507,7 +507,7 @@ const Home: NextPage = () => {
                       marginBottom:'10px'
                     }}>+</button>
                   </div>
-                  <div style={{marginTop: "10px", overflowY: 'auto', maxHeight: '200px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '5px' }}>
+                  <div style={{marginTop: "10px", overflowY: 'auto', maxHeight: '200px', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '5px' }}>
                     {infoPanelContent.media && infoPanelContent.media.length > 0 ? (
                       infoPanelContent.media.map((mediaItem, index) => (
                         <div key={index}>
@@ -614,7 +614,7 @@ const Home: NextPage = () => {
                     {infoPanelContent.bibliography && infoPanelContent.bibliography.length > 0 ? (
                       infoPanelContent.bibliography.map((bibItem, index) => (
                         <div key={index}>
-                          <p>
+                          <div>
                             <FaBook style={{ marginRight: '5px', display: 'inline' }} />
                             <span style={{fontSize: '12px'}}>{bibItem.author} ({bibItem.year}): {bibItem.title}</span>
                             <div>
@@ -642,7 +642,7 @@ const Home: NextPage = () => {
                                 <FaTrashAlt/>
                               </button>
                               </div>
-                          </p>
+                          </div>
                         </div>
                       ))
                     ) : null}
