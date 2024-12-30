@@ -1029,7 +1029,7 @@ const Home: NextPage = () => {
                                 cursor: 'pointer',
                                 fontSize: '16px',
                                 marginBottom: '5px',
-                                marginTop: '20px',
+                                marginTop: '10px',
                                 marginRight: '10px'
                               }}>
                                 <FaTrashAlt/>
