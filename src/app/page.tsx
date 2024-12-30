@@ -32,7 +32,47 @@ const Home: NextPage = () => {
   const [annotationMode, setAnnotationMode] = useState(false)
   const [manifestUrl, setManifestUrl] = useState<string>('')
   // infoPanelContentという連想配列を作成
-  const [infoPanelContent, setInfoPanelContent] = useState({id: '', creator: '', title: '', description: '', media: [], wikidata: [], bibliography: []})
+
+  interface MediaItem {
+    type: string;
+    source: string;
+    caption: string;
+  }
+
+  interface WikidataItem {
+    label: string;
+    uri: string;
+    wikipedia?: string;
+  }
+
+  interface BibliographyItem {
+    author: string;
+    title: string;
+    year: string;
+    page?: string;
+    pdf?: string;
+  }
+
+  interface InfoPanelContent {
+    id: string;
+    creator: string;
+    title: string;
+    description: string;
+    media: MediaItem[];
+    wikidata: WikidataItem[];
+    bibliography: BibliographyItem[];
+  }
+
+  const [infoPanelContent, setInfoPanelContent] = useState<InfoPanelContent>({
+    id: '',
+    creator: '',
+    title: '',
+    description: '',
+    media: [],
+    wikidata: [],
+    bibliography: []
+  });
+  //const [infoPanelContent, setInfoPanelContent] = useState({id: '', creator: '', title: '', description: '', media: [], wikidata: [], bibliography: []})
 
   const [isMediaDialogOpen, setIsMediaDialogOpen] = useState(false);
   const [isBibDialogOpen, setIsBibDialogOpen] = useState(false);
@@ -202,7 +242,7 @@ const Home: NextPage = () => {
     setManifestUrl(event.target.value)
   }
 
-  const handleInfoPanelContentChange = (content: { id: string, title: string, description: string, media: [] }) => {
+  const handleInfoPanelContentChange = (content: { id: string, creator: string, title: string, description: string, media: [], wikidata: [], bibliography: [] }) => {
     console.log(content)
     setInfoPanelContent(content);
   }
@@ -234,7 +274,7 @@ const Home: NextPage = () => {
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
         const origData = docSnap.data();
-        const newMedia = origData.media.filter((_, i) => i !== index)
+        const newMedia = origData.media.filter((_: any, i: number) => i !== index)
         await updateDoc(docRef, {
           media: newMedia
         });
@@ -262,7 +302,7 @@ const Home: NextPage = () => {
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
         const origData = docSnap.data();
-        const newBib = origData.bibliography.filter((_, i) => i !== index)
+        const newBib = origData.bibliography.filter((_: any, i: number) => i !== index)
         await updateDoc(docRef, {
           bibliography: newBib
         });
@@ -290,7 +330,7 @@ const Home: NextPage = () => {
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
         const origData = docSnap.data();
-        const newWiki = origData.wikidata.filter((_, i) => i !== index)
+        const newWiki = origData.wikidata.filter((_: any, i: number) => i !== index)
         await updateDoc(docRef, {
           wikidata: newWiki
         });
@@ -341,7 +381,7 @@ const Home: NextPage = () => {
 
   const handleWikidataOpenDialog = () => {
     if (infoPanelContent.creator == user?.uid) {
-      setWikidata(infoPanelContent.wikidata);
+      setWikidata(infoPanelContent.wikidata.join(','));
       setIsWikidataDialogOpen(true);
     } else {
       alert('You are not the creator of this annotation.')
