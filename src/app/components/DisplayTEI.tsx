@@ -10,22 +10,22 @@ const DisplayTEI: React.FC = () => {
     const ct = new CETEI();
     const behaviors = {
       "tei": {
-        "facsimile": function(e) {
+        "facsimile": function(e: HTMLElement) {
           // headの中身を取得して、削除する
           e.innerHTML = "";
           
         },
-        "head": function(e) {
+        "head": function(e: HTMLElement) {
           // headの中身を取得して、削除する
           e.innerHTML = "";
 
         },
-        "bibl": function(e) {
+        "bibl": function(e: HTMLElement) {
           // headの中身を取得して、削除する
           e.innerHTML = "";
         },
         // lbタグのある部分にアイコンを追加し、クリックできるようにする.アイコンは必ず行の先頭に追加される
-        "lb": function(e) {
+        "lb": function(e: HTMLElement) {
           const icon = document.createElement("span");
           icon.innerHTML = "<br/>🔗";
           icon.style.cursor = "pointer";
