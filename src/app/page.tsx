@@ -1,101 +1,1023 @@
+"use client";
+ 
 import Image from "next/image";
+import { useEffect, useState } from 'react';
+import { auth, provider } from "@/lib/firebase/firebase";
+import { useAuthState } from "react-firebase-hooks/auth";
+//import { useAuth } from "@/context/auth"; // AuthProviderとuseAuthをインポート
+import type { NextPage } from 'next'
+//import ThreeCanvas from './components/ThreeCanvas'
+import SignIn from './components/SignIn'
+import ThreeCanvas from './components/ThreeCanvasManifest_copy'
+import SwitchButton from './components/SwitchButton'
+import DisplayTEI from './components/DisplayTEI'
+import { color } from "three/webgpu";
+import { FaPencilAlt, FaBook, FaRegFilePdf, FaTrashAlt } from "react-icons/fa";
+import {FaLink} from "react-icons/fa6";
+import { PiShareNetwork } from "react-icons/pi";
+import { IoDocumentTextOutline } from "react-icons/io5";
 
-export default function Home() {
+import ReactPlayer from 'react-player'
+
+import db from '@/lib/firebase/firebase'
+import {
+  Timestamp,
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  getDoc,
+  query,
+  setDoc,
+  updateDoc,
+  where,
+  onSnapshot,
+} from "firebase/firestore";
+import { info } from "console";
+
+
+const Home: NextPage = () => {
+
+  const [user, loading, error] = useAuthState(auth);
+
+  const [annotationsVisible, setAnnotationsVisible] = useState(true)
+  // sprite annotationとpolygon annotationの表示を切り替える
+  const [annotationMode, setAnnotationMode] = useState(false)
+  const [manifestUrl, setManifestUrl] = useState<string>('')
+  // infoPanelContentという連想配列を作成
+  const [infoPanelContent, setInfoPanelContent] = useState({id: '', creator: '', title: '', description: '', media: [], wikidata: [], bibliography: []})
+
+  const [isMediaDialogOpen, setIsMediaDialogOpen] = useState(false);
+  const [isBibDialogOpen, setIsBibDialogOpen] = useState(false);
+  const [isDescDialogOpen, setIsDescDialogOpen] = useState(false);
+  const [isWikidataDialogOpen, setIsWikidataDialogOpen] = useState(false);
+
+  //mediaの情報をstateで管理
+  const [source, setSource] = useState('');
+  const [type, setType] = useState('img');
+  const [caption, setCaption] = useState('');
+  //bibliographyの情報をstateで管理
+  const [bibAuthor, setBibAuthor] = useState('');
+  const [bibTitle, setBibTitle] = useState('');
+  const [bibYear, setBibYear] = useState('');
+  const [bibPage, setBibPage] = useState('');
+  const [bibPDF, setBibPDF] = useState('');
+  //descriptionの情報をstateで管理
+  const [desc, setDesc] = useState('');
+  // wikidataの情報をstateで管理
+  const [wikidata, setWikidata] = useState('');
+
+  const [selectedImage, setSelectedImage] = useState<{ source: string, caption: string, index: number } | null>(null);
+
+  //infoPanelContentが更新されたときに実行
+  useEffect(() => {
+    console.log(infoPanelContent)
+  }, [infoPanelContent])
+
+  console.log(user)
+
+  
+  const saveMedias = async () => {
+    const mediaData = {source, type, caption}
+    console.log(infoPanelContent, mediaData)
+    const data = {
+      source: source,
+      type: type,
+      caption: caption
+    }
+    
+    // firebaseのannotationsコレクションのidを持つdocのMediaフィールド(Array)のdataをfirebaseから取得
+    const docRef = doc(db, "annotations", infoPanelContent.id);
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      const origData = docSnap.data();
+      // firebaseのannotationsコレクションのidを持つdocのMediaフィールド(Array)にdataを追記
+      await updateDoc(docRef, {
+        media: [...origData.media, data]
+      });
+    } else {
+      console.log("No such document!");
+    }
+
+    handleMediaCloseDialog()
+  };
+
+  const saveWikidata = async () => {
+    
+    console.log(infoPanelContent, wikidata)
+    // wikidataのsparqlエンドポイントにアクセスして該当するデータのラベルを取得
+
+
+    const query = `SELECT ?item ?itemLabel ?wikipediaUrl WHERE {
+      VALUES ?item {wd:${wikidata.split('/').pop()}}
+      SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],en". }
+      ?wikipediaUrl schema:about ?item ;
+      schema:inLanguage "en" ;
+      schema:isPartOf <https://en.wikipedia.org/> .
+    }
+    ` //wikidataのsparqlクエリ
+    const url = `https://query.wikidata.org/sparql?query=${encodeURIComponent(query)}&format=json`
+    const result = await fetch(url).then(res => res.json())
+    console.log(result)
+    const label = result["results"]["bindings"][0]["itemLabel"]["value"]
+    console.log(label)
+    const wikipedia = result["results"]["bindings"][0]["wikipediaUrl"]["value"]
+
+    const data = {
+      uri: wikidata,
+      label: label, 
+      wikipedia: wikipedia
+    }
+    
+    // firebaseのannotationsコレクションのidを持つdocのMediaフィールド(Array)のdataをfirebaseから取得
+    const docRef = doc(db, "annotations", infoPanelContent.id);
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      const origData = docSnap.data();
+      // firebaseのannotationsコレクションのidを持つdocのMediaフィールド(Array)にdataを追記
+      await updateDoc(docRef, {
+        wikidata: [...origData.wikidata, data]
+      });
+    } else {
+      console.log("No such document!");
+    }
+    
+
+    handleWikidataCloseDialog()
+  }
+
+  const saveBib = async () => {
+    const bibData = {bibAuthor, bibTitle, bibYear, bibPage, bibPDF}
+    console.log(infoPanelContent, bibData)
+    const data = {
+      author: bibAuthor,
+      title: bibTitle,
+      year: bibYear,
+      page: bibPage,
+      pdf: bibPDF
+    }
+
+    // firebaseのannotationsコレクションのidを持つdocのMediaフィールド(Array)のdataをfirebaseから取得
+    const docRef = doc(db, "annotations", infoPanelContent.id);
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      const origData = docSnap.data();
+      // firebaseのannotationsコレクションのidを持つdocのMediaフィールド(Array)にdataを追記
+      await updateDoc(docRef, {
+        bibliography: [...origData.bibliography, data]
+      });
+    } else {
+      console.log("No such document!");
+    }
+
+    handleBibCloseDialog()
+  };
+
+  const saveDesc = async () => {
+    console.log(desc)
+    // descriptionの情報をfirebaseのannotationsコレクションのidを持つdocのdata/body/valueに保存
+    const docRef = doc(db, "annotations", infoPanelContent.id);
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      const origData = docSnap.data();
+      // firebaseのannotationsコレクションのidを持つdocのMediaフィールド(Array)にdataを追記
+      await updateDoc(docRef, {
+        data: {
+          body: {
+            value: desc,
+            label: origData.data.body.label,
+            type: origData.data.body.type
+          },
+          target: origData.data.target,
+        }
+      });
+    } else {
+      console.log("No such document!");
+    }
+
+    handleDescCloseDialog()
+  }
+
+
+  const handleSwitchChange = (checked: boolean) => {
+    setAnnotationsVisible(checked)
+  }
+
+  const handleAnnotationModeChange = (mode: boolean) => {
+    setAnnotationMode(mode)
+  }
+
+  const handleManifestUrlChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setManifestUrl(event.target.value)
+  }
+
+  const handleButtonClick = () => {
+    // handleManifestUrlChangeを実行
+    handleManifestUrlChange({ target: { value: manifestUrl } } as React.ChangeEvent<HTMLInputElement>);
+  }
+
+  const handleInfoPanelContentChange = (content: { id: string, title: string, description: string, media: [] }) => {
+    console.log(content)
+    setInfoPanelContent(content);
+  }
+
+  const deleteAnnotation = (id: string) => {
+    if (infoPanelContent.creator == user?.uid) {
+      const confirmed = confirm('Are you sure you want to delete this annotation?');
+      if (confirmed) {
+        console.log('delete annotation')
+        console.log(id)
+        //idのdocをfirebaseデータベースから削除
+        deleteDoc(doc(db, "annotations", id));
+        }
+    } else {
+      alert('You are not the creator of this annotation.')
+    }
+  }
+
+  const deleteMedia = (id: string, index: number) => {
+    console.log('delete media')
+    console.log(id)
+
+    if (infoPanelContent.creator == user?.uid) {
+    const confirmed = confirm('Are you sure you want to delete this Wiki Item?');
+    if (confirmed) {
+    //idのdocのBibliographyフィールドのindexの要素を削除
+    const docRef = doc(db, "annotations", id);
+    const deleteField = async () => {
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const origData = docSnap.data();
+        const newMedia = origData.media.filter((_, i) => i !== index)
+        await updateDoc(docRef, {
+          media: newMedia
+        });
+      } else {
+        console.log("No such document!");
+      }
+    };
+    deleteField();
+  }
+  } else {
+    alert('You are not the creator of this annotation.')
+  }
+  }
+
+  const deleteBib = (id: string, index: number) => {
+    console.log('delete bibliography')
+    console.log(id)
+
+    if (infoPanelContent.creator == user?.uid) {
+      const confirmed = confirm('Are you sure you want to delete this bibliography?');
+    if (confirmed) {
+    //idのdocのBibliographyフィールドのindexの要素を削除
+    const docRef = doc(db, "annotations", id);
+    const deleteField = async () => {
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const origData = docSnap.data();
+        const newBib = origData.bibliography.filter((_, i) => i !== index)
+        await updateDoc(docRef, {
+          bibliography: newBib
+        });
+      } else {
+        console.log("No such document!");
+      }
+    };
+    deleteField();
+  }
+  } else {
+    alert('You are not the creator of this annotation.')
+  }
+  }
+
+  const deleteWiki = (id: string, index: number) => {
+    console.log('delete wikiItem')
+    console.log(id)
+
+    if (infoPanelContent.creator == user?.uid) {
+      const confirmed = confirm('Are you sure you want to delete this Wiki Item?');
+    if (confirmed) {
+    //idのdocのBibliographyフィールドのindexの要素を削除
+    const docRef = doc(db, "annotations", id);
+    const deleteField = async () => {
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const origData = docSnap.data();
+        const newWiki = origData.wikidata.filter((_, i) => i !== index)
+        await updateDoc(docRef, {
+          wikidata: newWiki
+        });
+      } else {
+        console.log("No such document!");
+      }
+    };
+    deleteField();
+  }
+  } else {
+    alert('You are not the creator of this annotation.')
+  }
+  }
+
+  const handleMediaOpenDialog = () => {
+    if (infoPanelContent.creator == user?.uid) {
+      setIsMediaDialogOpen(true);
+    } else {
+      alert('You are not the creator of this annotation.')
+    }
+  };
+  const handleMediaCloseDialog = () => {
+    setIsMediaDialogOpen(false);
+  };
+
+  const handleBibOpenDialog = () => {
+    if (infoPanelContent.creator == user?.uid) {
+      setIsBibDialogOpen(true);
+    } else {
+      alert('You are not the creator of this annotation.')
+    }
+  }
+  const handleBibCloseDialog = () => {
+    setIsBibDialogOpen(false);
+  }
+
+  const handleDescOpenDialog = () => {
+    if (infoPanelContent.creator == user?.uid) {
+      setDesc(infoPanelContent.description);
+      setIsDescDialogOpen(true);
+    } else {
+      alert('You are not the creator of this annotation.')
+    }
+  }
+  const handleDescCloseDialog = () => {
+    setIsDescDialogOpen(false);
+  }
+
+  const handleWikidataOpenDialog = () => {
+    if (infoPanelContent.creator == user?.uid) {
+      setWikidata(infoPanelContent.wikidata);
+      setIsWikidataDialogOpen(true);
+    } else {
+      alert('You are not the creator of this annotation.')
+    }
+  }
+  const handleWikidataCloseDialog = () => {
+    setIsWikidataDialogOpen(false);
+  }
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+    <>
+      <style jsx global>{`
+        html, body, #__next {
+          margin: 0;
+          padding: 0;
+          height: 100%;
+          width: 100%;
+        }
+        * {
+          box-sizing: border-box;
+        }
+      `}</style>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+      <header style={{ backgroundColor: '#333', color: 'white', padding: '10px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h1 style={{ margin: 0 }}>3D Annotation Viewer</h1>
+        <nav>
+          <a href="#home" style={{ color: 'white', marginRight: '20px' }}>Home</a>
+          <a href="#about" style={{ color: 'white', marginRight: '20px' }}>About</a>
+          {/*<a href="#contact" style={{ color: 'white' }}>Contact</a>*/}
+          <SignIn />
+          {/*{user && <span style={{ color: 'white', marginLeft: '20px' }}>logged in</span>}*/}
+        </nav>
+      </header>
+      <div style={{ display: 'flex', flex: 1 }}>
+        <div style={{ flex: 1, borderRight: '1px solid #ccc', position: 'relative' }}>
+          <ThreeCanvas 
+            annotationsVisible={annotationsVisible} 
+            annotationMode={annotationMode} 
+            manifestUrl={manifestUrl} 
+            //infoPanelContent={infoPanelContent}
+            onInfoPanelContentChange={handleInfoPanelContentChange}
             />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+          <div style={{ position: 'absolute', top: '10px', left: '10px', zIndex: 100, backgroundColor: 'rgba(255, 255, 255, 0.8)', padding: '10px', borderRadius: '5px' }}>
+          
+                <div style={{ flex: '1 1 45%' }}>
+                  <p>Display annotations</p>
+                  <SwitchButton checked={annotationsVisible} onChange={handleSwitchChange} />
+                </div>
+                <div style={{ flex: '1 1 45%' }}>
+                  <p>Polygon annotation mode</p>
+                  <SwitchButton checked={annotationMode} onChange={handleAnnotationModeChange} />
+                </div>
+             
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '20px' }}>
+            <div style={{ flex: 0.3, borderBottom: '2px solid #ccc', paddingBottom: '20px' }}>
+              {/* user && <input type="text" value={manifestUrl} onChange={handleManifestUrlChange} placeholder="Enter IIIF Manifest URL" style={{ 
+                width: '100%',
+                padding: '10px',
+                border: '2px solid #333',
+                borderRadius: '5px',
+                marginBottom: '10px',
+                fontSize: '16px'
+                }} />*/}
+                <input type="text" value={manifestUrl} onChange={handleManifestUrlChange} placeholder="Enter IIIF Manifest URL" style={{ 
+                width: '100%',
+                padding: '10px',
+                border: '2px solid #333',
+                borderRadius: '5px',
+                marginBottom: '10px',
+                fontSize: '16px'
+                }} />
+              {/*<button onClick={handleButtonClick} style={{
+                 marginTop: '10px', 
+                 padding: '10px 20px',
+                 backgroundColor: '#333',
+                 color: 'white',
+                 border: 'none',
+                 borderRadius: '5px',
+                 cursor: 'pointer',
+                 fontSize: '16px'
+                 }}>Load Manifest</button>
+              */}
+            </div>
+            <div style={{ flex: 0.8, display: 'flex', borderBottom: '2px solid #ccc', paddingBottom: '20px', marginTop: '20px' }}>
+              {/* 上側のコンテンツをここに追加 */}
+              <div style={{ flex: 1, borderRight: '2px solid #ccc', paddingRight: '20px' }}>
+                <DisplayTEI />
+              </div>
+              <div style={{ flex: 1, paddingLeft: '20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <button onClick={handleDescOpenDialog} style={{
+                    padding: '5px 10px',
+                    marginBottom: '10px',
+                    backgroundColor: '#333',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '5px',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}>
+                    <FaPencilAlt />
+                  </button>
+                </div>
+                <div dangerouslySetInnerHTML={{ __html: infoPanelContent.description }}></div>
+              </div>
+            </div>
+            <div style={{ flex: 1.2, paddingTop: '20px' }}>
+              <div style={{fontSize:"24px", fontWeight:"bold"}}>{infoPanelContent.title}</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '20px' }}>
+                <div style={{ flex: 1, border: '1px solid #ccc', marginTop: "10px", padding: '10px', borderRadius: '5px', height: '270px' }}>
+                  <div style={{borderBottom: '2px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
+                    <h3 style={{ textAlign: 'center', fontWeight: 'bold', marginBottom:'10px' }}>AV Media</h3>
+                    <button onClick={handleMediaOpenDialog} style={{
+                      padding: '5px 10px',
+                      backgroundColor: '#333',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '5px',
+                      cursor: 'pointer',
+                      fontSize: '10px',
+                      marginBottom:'10px'
+                    }}>+</button>
+                  </div>
+                  <div style={{marginTop: "10px", overflowY: 'auto', maxHeight: '200px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '5px' }}>
+                    {infoPanelContent.media && infoPanelContent.media.length > 0 ? (
+                      infoPanelContent.media.map((mediaItem, index) => (
+                        <div key={index}>
+                          {mediaItem.type === 'img' && (
+                            <img 
+                              src={mediaItem.source} 
+                              alt={mediaItem.caption} 
+                              style={{ width: '100%'}}
+                              onClick={() => setSelectedImage({ source: mediaItem.source, caption: mediaItem.caption, index: index })}
+                            />
+                          )}
+                          {/*
+                          {mediaItem.type === 'video' && (
+                            <video 
+                              controls 
+                              style={{ width: '100%' }}
+                              onClick={() => setSelectedImage({ source: mediaItem.source, caption: mediaItem.caption })}
+                            >
+                              <source src={mediaItem.source} type="video/mp4" />
+                              Your browser does not support the video tag.
+                            </video>
+                          )}
+                            */}
+                          {/* 他のタイプのメディア処理を追加 */}
+                        </div>
+                      ))
+                    ) : null}
+                  </div>
+                </div>
+                <div style={{ flex: 0.8, border: '1px solid #ccc', marginTop: "10px", padding: '10px', borderRadius: '5px', height: '270px' }}>
+                  <div style={{borderBottom: '2px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
+                    <h3 style={{ textAlign: 'center', fontWeight: 'bold', marginBottom:'10px' }}>Wiki Items</h3>
+                    <button onClick={handleWikidataOpenDialog} style={{
+                      padding: '5px 10px',
+                      backgroundColor: '#333',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '5px',
+                      cursor: 'pointer',
+                      fontSize: '10px',
+                      marginBottom:'10px'
+                    }}>+</button>
+                  </div>
+                  <div style={{marginTop: "10px"}}>
+                    {infoPanelContent.wikidata && infoPanelContent.wikidata.length > 0 ? (
+                        infoPanelContent.wikidata.map((wikiItem, index) => (
+                          <div key={index} >
+                            <button style={{
+                              padding: '5px 10px',
+                              backgroundColor: '#333',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '5px',
+                              cursor: 'pointer',
+                              fontSize: '14px',
+                              marginBottom:'10px'
+                            }}>
+                              <span>{wikiItem.label}</span>
+                              </button>
+                              <a href={wikiItem.uri} target="_blank" rel="noopener noreferrer">
+                                <PiShareNetwork style={{ marginLeft: '5px', display: 'inline' }} />
+                              </a>
+                              {wikiItem.wikipedia && (
+                              <a href={wikiItem.wikipedia} target="_blank" rel="noopener noreferrer">
+                                <IoDocumentTextOutline style={{ marginLeft: '5px', display: 'inline' }} />
+                              </a>
+                            )}
+                              <button onClick={() => deleteWiki(infoPanelContent.id, index)} style={{
+                                padding: '5px 10px',
+                                backgroundColor: '#8b0000',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '5px',
+                                cursor: 'pointer',
+                                fontSize: '12px',
+                                marginBottom:'5px',
+                                marginLeft: '5px'
+                              }}>
+                                <FaTrashAlt/>
+                              </button>
+                          </div>
+                      ))
+                      ) : null}             
+                  </div>
+                </div>
+                <div style={{ flex: 1.2, border: '1px solid #ccc',  marginTop: "10px",padding: '10px', borderRadius: '5px', height: '270px' }}>
+                  <div style={{borderBottom: '2px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
+                    <h3 style={{ textAlign: 'center', fontWeight: 'bold', marginBottom:'10px' }}>Bibliography</h3>
+                    <button onClick={handleBibOpenDialog} style={{
+                      padding: '5px 10px',
+                      backgroundColor: '#333',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '5px',
+                      cursor: 'pointer',
+                      fontSize: '10px',
+                      marginBottom:'10px'
+                    }}>+</button>
+                  </div>
+                  <div style={{marginTop: "10px"}}>
+                    {infoPanelContent.bibliography && infoPanelContent.bibliography.length > 0 ? (
+                      infoPanelContent.bibliography.map((bibItem, index) => (
+                        <div key={index}>
+                          <p>
+                            <FaBook style={{ marginRight: '5px', display: 'inline' }} />
+                            <span>{bibItem.author} ({bibItem.year}): {bibItem.title}   </span>
+                            {bibItem.page && (
+                              <a href={bibItem.page} target="_blank" rel="noopener noreferrer">
+                                <FaLink style={{ marginLeft: '5px', display: 'inline' }} />
+                              </a>
+                            )}
+                            {bibItem.pdf && (
+                              <a href={bibItem.pdf} target="_blank" rel="noopener noreferrer">
+                                <FaRegFilePdf style={{ marginLeft: '5px', display: 'inline' }} />
+                              </a>
+                            )}
+                            <button onClick={() => deleteBib(infoPanelContent.id, index)} style={{
+                                padding: '5px 10px',
+                                backgroundColor: '#8b0000',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '5px',
+                                cursor: 'pointer',
+                                fontSize: '12px',
+                                marginBottom:'5px',
+                                marginLeft: '5px'
+                              }}>
+                                <FaTrashAlt/>
+                              </button>
+                          </p>
+                        </div>
+                      ))
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+              <button onClick={() => deleteAnnotation(infoPanelContent.id)} style={{
+                 marginTop: '20px', 
+                 padding: '10px 20px',
+                 backgroundColor: '#8b0000',
+                 color: 'white',
+                 border: 'none',
+                 borderRadius: '5px',
+                 cursor: 'pointer',
+                 fontSize: '16px'
+                 }}>Delete Annotation</button>
+            </div>
+        </div>
+      </div>
+      <footer style={{ backgroundColor: '#333', color: 'white', padding: '10px 20px', textAlign: 'center' }}>
+        &copy; 2023 3D Annotation Viewer. All rights reserved.
       </footer>
     </div>
-  );
+    
+    {isMediaDialogOpen && (
+      <div style={{
+        position: 'fixed',
+        width: '500px',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        backgroundColor: 'white',
+        padding: '20px',
+        border: '1px solid #ccc',
+        borderRadius: '5px',
+        zIndex: 1000
+      }}>
+        <form style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+          <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
+            Source URI:
+            <input
+              name="source" 
+              value={source}
+              required
+              onChange={(e) => setSource(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '10px',
+                marginTop: '5px',
+                border: '1px solid #ccc',
+                borderRadius: '5px',
+                fontSize: '16px'
+              }} 
+              />
+          </label>
+          <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
+            Type:
+            <select 
+              name="type" 
+              value={type}
+              onChange={(e) => setType(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '10px',
+                marginTop: '5px',
+                border: '1px solid #ccc',
+                borderRadius: '5px',
+                fontSize: '16px'
+              }}
+              >
+              <option value="img">Image</option>
+              <option value="video">Video</option>
+              <option value="audio">Audio</option>
+            </select>
+          </label>
+          <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
+            Caption:
+            <textarea
+              name="caption" 
+              value={caption}
+              required
+              onChange={(e) => setCaption(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '10px',
+                marginTop: '5px',
+                border: '1px solid #ccc',
+                borderRadius: '5px',
+                fontSize: '16px',
+                resize: 'vertical'
+              }}
+               />
+          </label>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+            <button type="button" onClick={saveMedias} style={{
+              padding: '10px 20px',
+              backgroundColor: '#000080',
+              color: 'white',
+              border: 'none',
+              borderRadius: '5px',
+              cursor: 'pointer',
+              fontSize: '16px',
+              marginRight: '10px'
+            }}>Save</button>
+            <button type="button" onClick={handleMediaCloseDialog} style={{
+              padding: '10px 20px',
+              backgroundColor: '#333',
+              color: 'white',
+              border: 'none',
+              borderRadius: '5px',
+              cursor: 'pointer',
+              fontSize: '16px'
+            }}>Close</button>
+          </div>
+        </form>
+      </div>
+    )}
+
+    {isWikidataDialogOpen && (
+      <div style={{
+        position: 'fixed',
+        width: '500px',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        backgroundColor: 'white',
+        padding: '20px',
+        border: '1px solid #ccc',
+        borderRadius: '5px',
+        zIndex: 1000
+      }}>
+        <form style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+          <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
+            Wikidata URI:
+            <input
+              name="wikidata" 
+              value={wikidata}
+              required
+              onChange={(e) => setWikidata(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '10px',
+                marginTop: '5px',
+                border: '1px solid #ccc',
+                borderRadius: '5px',
+                fontSize: '16px'
+              }} 
+              />
+          </label>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+            <button type="button" onClick={saveWikidata} style={{
+              padding: '10px 20px',
+              backgroundColor: '#000080',
+              color: 'white',
+              border: 'none',
+              borderRadius: '5px',
+              cursor: 'pointer',
+              fontSize: '16px',
+              marginRight: '10px'
+            }}>Save</button>
+            <button type="button" onClick={handleWikidataCloseDialog} style={{
+              padding: '10px 20px',
+              backgroundColor: '#333',
+              color: 'white',
+              border: 'none',
+              borderRadius: '5px',
+              cursor: 'pointer',
+              fontSize: '16px'
+            }}>Close</button>
+          </div>
+        </form>
+      </div>
+    )}
+
+    {isBibDialogOpen && (
+      <div style={{
+        width: '500px',
+        position: 'fixed',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        backgroundColor: 'white',
+        padding: '20px',
+        border: '1px solid #ccc',
+        borderRadius: '5px',
+        zIndex: 1000
+      }}>
+        <form style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+          <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
+            Author:
+            <input
+              name="bibAuthor" 
+              value={bibAuthor}
+              required
+              onChange={(e) => setBibAuthor(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '10px',
+                marginTop: '5px',
+                border: '1px solid #ccc',
+                borderRadius: '5px',
+                fontSize: '16px',
+                resize: 'vertical'
+              }} 
+              />
+          </label>
+          <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
+            Title:
+            <textarea
+              name="bibTitle" 
+              value={bibTitle}
+              required
+              onChange={(e) => setBibTitle(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '10px',
+                marginTop: '5px',
+                border: '1px solid #ccc',
+                borderRadius: '5px',
+                fontSize: '16px',
+                resize: 'vertical'
+              }}
+               />
+          </label>
+          <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
+            Year:
+            <input
+              name="bibYear" 
+              value={bibYear}
+              required
+              onChange={(e) => setBibYear(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '10px',
+                marginTop: '5px',
+                border: '1px solid #ccc',
+                borderRadius: '5px',
+                fontSize: '16px',
+                resize: 'vertical'
+              }}
+               />
+          </label>
+          <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
+            Page:
+            <input
+              name="bibPage" 
+              value={bibPage}
+              required
+              onChange={(e) => setBibPage(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '10px',
+                marginTop: '5px',
+                border: '1px solid #ccc',
+                borderRadius: '5px',
+                fontSize: '16px',
+                resize: 'vertical'
+              }}
+               />
+          </label>
+          <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
+            PDF:
+            <input
+              name="bibPDF" 
+              value={bibPDF}
+              required
+              onChange={(e) => setBibPDF(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '10px',
+                marginTop: '5px',
+                border: '1px solid #ccc',
+                borderRadius: '5px',
+                fontSize: '16px',
+                resize: 'vertical'
+              }}
+               />
+          </label>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+            <button type="button" onClick={saveBib} style={{
+              padding: '10px 20px',
+              backgroundColor: '#000080',
+              color: 'white',
+              border: 'none',
+              borderRadius: '5px',
+              cursor: 'pointer',
+              fontSize: '16px',
+              marginRight: '10px'
+            }}>Save</button>
+            <button type="button" onClick={handleBibCloseDialog} style={{
+              padding: '10px 20px',
+              backgroundColor: '#333',
+              color: 'white',
+              border: 'none',
+              borderRadius: '5px',
+              cursor: 'pointer',
+              fontSize: '16px'
+            }}>Close</button>
+          </div>
+        </form>
+      </div>
+    )}
+
+    {isDescDialogOpen && (
+      <div style={{
+        position: 'fixed',
+        height: '300px',
+        width: '500px',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        backgroundColor: 'white',
+        padding: '20px',
+        border: '1px solid #ccc',
+        borderRadius: '5px',
+        zIndex: 1000
+      }}>
+        <form style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+          <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
+            Description:
+            <textarea
+              name="description" 
+              value={desc}
+              required
+              onChange={(e) => setDesc(e.target.value)}
+              style={{
+                height: '150px', 
+                width: '100%',
+                padding: '10px',
+                marginTop: '5px',
+                border: '1px solid #ccc',
+                borderRadius: '5px',
+                fontSize: '16px',
+                resize: 'vertical'
+              }}
+               />
+          </label>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+            <button type="button" onClick={saveDesc} style={{
+              padding: '10px 20px',
+              backgroundColor: '#000080',
+              color: 'white',
+              border: 'none',
+              borderRadius: '5px',
+              cursor: 'pointer',
+              fontSize: '16px',
+              marginRight: '10px'
+            }}>Save</button>
+            <button type="button" onClick={handleDescCloseDialog} style={{
+              padding: '10px 20px',
+              backgroundColor: '#333',
+              color: 'white',
+              border: 'none',
+              borderRadius: '5px',
+              cursor: 'pointer',
+              fontSize: '16px'
+            }}>Close</button>
+          </div>
+        </form>
+      </div>
+    )}
+
+    {selectedImage && (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: '100%',
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 1000
+      }} onClick={() => setSelectedImage(null)}>
+        <img src={selectedImage.source} alt={selectedImage.caption} style={{ maxWidth: '90%', maxHeight: '90%' }} />
+        <br/>
+        <p style={{ color: 'white', marginTop: '5px', fontSize: '24px' }}>{selectedImage.caption}</p>
+        <button onClick={() => deleteMedia(infoPanelContent.id, selectedImage.index)} style={{
+                                position: 'absolute',
+                                top: '10px',
+                                right: '10px',
+                                padding: '5px 10px',
+                                backgroundColor: '#8b0000',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '5px',
+                                cursor: 'pointer',
+                                fontSize: '16px',
+                                marginBottom: '5px',
+                                marginTop: '20px',
+                                marginRight: '400px'
+                              }}>
+                                <FaTrashAlt/>
+                              </button>
+      </div>
+    )}
+
+    </>
+  )
 }
+
+export default Home
