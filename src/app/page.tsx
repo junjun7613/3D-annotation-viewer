@@ -537,7 +537,7 @@ const Home: NextPage = () => {
                     ) : null}
                   </div>
                 </div>
-                <div style={{ flex: 0.8, border: '1px solid #ccc', marginTop: "10px", padding: '10px', borderRadius: '5px', height: '270px' }}>
+                <div style={{ flex: 1, border: '1px solid #ccc', marginTop: "10px", padding: '10px', borderRadius: '5px', height: '270px' }}>
                   <div style={{borderBottom: '2px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
                     <h3 style={{ textAlign: 'center', fontWeight: 'bold', marginBottom:'10px' }}>Wiki Items</h3>
                     <button onClick={handleWikidataOpenDialog} style={{
@@ -596,7 +596,7 @@ const Home: NextPage = () => {
                       ) : null}             
                   </div>
                 </div>
-                <div style={{ flex: 1.2, border: '1px solid #ccc',  marginTop: "10px",padding: '10px', borderRadius: '5px', height: '270px' }}>
+                <div style={{ flex: 1, border: '1px solid #ccc',  marginTop: "10px",padding: '10px', borderRadius: '5px', height: '270px' }}>
                   <div style={{borderBottom: '2px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
                     <h3 style={{ textAlign: 'center', fontWeight: 'bold', marginBottom:'10px' }}>Bibliography</h3>
                     <button onClick={handleBibOpenDialog} style={{
