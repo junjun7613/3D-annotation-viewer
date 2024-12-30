@@ -57,7 +57,7 @@ console.log(getAnnotations());
 
 //const ThreeCanvas = () => {
 const ThreeCanvas: React.FC<ThreeCanvasProps> = ({ annotationsVisible, annotationMode, manifestUrl, onInfoPanelContentChange }) => {
-  const [user, loading, error] = useAuthState(auth);
+  const [user] = useAuthState(auth);
 
   const selectedSpriteRef = useRef<THREE.Sprite | null>(null)
   const selectedPolygonRef = useRef<THREE.Mesh | null>(null)
@@ -117,7 +117,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({ annotationsVisible, annotatio
       // ここでシーンの再描画や他の処理を行う
 
     // canvas要素を取得
-    let canvas = document.getElementById('canvas') as HTMLCanvasElement
+    const canvas = document.getElementById('canvas') as HTMLCanvasElement
 
     // シーン
     const scene = new THREE.Scene()
@@ -174,7 +174,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({ annotationsVisible, annotatio
       //getAnnotations().then(annotationData => {
 
         const importedModel = manifest.items[0].items[0].items[0].body.id;
-        const importedModelType = manifest.items[0].items[0].items[0].body.type;
+        //const importedModelType = manifest.items[0].items[0].items[0].body.type;
         targetManifest.current = manifest.id;
         tagetCanvas.current = manifest.items[0].id;
 
@@ -351,8 +351,8 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({ annotationsVisible, annotatio
                 console.log('Sprite clicked:', intersectedObject)
 
                 // intersectedObjectからcamPosを取得
-                const camPos = intersectedObject.userData.camPos;
-                const lookAt = intersectedObject.position;
+                //const camPos = intersectedObject.userData.camPos;
+                //const lookAt = intersectedObject.position;
 
                 /*
                 // カメラの位置をcamPosにスムーズに移動
@@ -474,7 +474,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({ annotationsVisible, annotatio
                 // オフセットを計算
                 const normal = intersects[0].face?.normal.clone().applyMatrix4(intersects[0].object.matrixWorld).normalize();
                 console.log('Normal:', normal);
-                const offset = normal?.multiplyScalar(0.08); // オフセットの距離を調整
+                //const offset = normal?.multiplyScalar(0.08); // オフセットの距離を調整
 
                 if (!annotationModeRef.current) {
                   const cameraDirection = new THREE.Vector3();
@@ -509,7 +509,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({ annotationsVisible, annotatio
                   const offset = cameraDirection.multiplyScalar(-0.005); // オフセットの距離を調整
                   const newPoint = intersectedPoint.clone().add(offset);
                   console.log(newPoint);
-                  const ZCoordinate = newPoint.z;
+                  //const ZCoordinate = newPoint.z;
 
                   polygonVertices.current.push(newPoint);
                   console.log(polygonVertices.current);
@@ -606,7 +606,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({ annotationsVisible, annotatio
     scene.add(directionalLight)
 
     // レイキャストの頻度を減らすためのカウンタ
-    let raycastCounter = 0;
+    //const raycastCounter = 0;
 
     // アニメーションループ
     const animate = () => {
@@ -680,6 +680,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({ annotationsVisible, annotatio
     // クリーンアップ
     return () => {
       window.removeEventListener('wheel', handleWheel)
+      unsubscribe()
     }
 
     // ブラウザのリサイズ処理
