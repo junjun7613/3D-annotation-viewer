@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, User } from 'firebase/auth';
+import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, User } from 'firebase/auth';
 import { auth } from '@/lib/firebase/firebase';
 
 interface AuthContextType {

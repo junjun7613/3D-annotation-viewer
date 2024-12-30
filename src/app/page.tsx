@@ -1,8 +1,7 @@
 "use client";
  
-import Image from "next/image";
 import { useEffect, useState } from 'react';
-import { auth, provider } from "@/lib/firebase/firebase";
+import { auth } from "@/lib/firebase/firebase";
 import { useAuthState } from "react-firebase-hooks/auth";
 //import { useAuth } from "@/context/auth"; // AuthProviderとuseAuthをインポート
 import type { NextPage } from 'next'
@@ -11,35 +10,22 @@ import SignIn from './components/SignIn'
 import ThreeCanvas from './components/ThreeCanvasManifest_copy'
 import SwitchButton from './components/SwitchButton'
 import DisplayTEI from './components/DisplayTEI'
-import { color } from "three/webgpu";
 import { FaPencilAlt, FaBook, FaRegFilePdf, FaTrashAlt } from "react-icons/fa";
 import {FaLink} from "react-icons/fa6";
 import { PiShareNetwork } from "react-icons/pi";
 import { IoDocumentTextOutline } from "react-icons/io5";
 
-import ReactPlayer from 'react-player'
-
 import db from '@/lib/firebase/firebase'
 import {
-  Timestamp,
-  addDoc,
-  collection,
   deleteDoc,
   doc,
-  getDocs,
   getDoc,
-  query,
-  setDoc,
   updateDoc,
-  where,
-  onSnapshot,
 } from "firebase/firestore";
-import { info } from "console";
-
 
 const Home: NextPage = () => {
 
-  const [user, loading, error] = useAuthState(auth);
+  const [user] = useAuthState(auth);
 
   const [annotationsVisible, setAnnotationsVisible] = useState(true)
   // sprite annotationとpolygon annotationの表示を切り替える

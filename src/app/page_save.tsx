@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import type { NextPage } from 'next'
 import { useEffect } from 'react'
 import * as THREE from 'three'
