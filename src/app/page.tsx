@@ -274,7 +274,7 @@ const Home: NextPage = () => {
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
         const origData = docSnap.data();
-        const newMedia = origData.media.filter((_: any, i: number) => i !== index)
+        const newMedia = origData.media.filter((_: MediaItem, i: number) => i !== index)
         await updateDoc(docRef, {
           media: newMedia
         });
@@ -302,7 +302,7 @@ const Home: NextPage = () => {
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
         const origData = docSnap.data();
-        const newBib = origData.bibliography.filter((_: any, i: number) => i !== index)
+        const newBib = origData.bibliography.filter((_: MediaItem, i: number) => i !== index)
         await updateDoc(docRef, {
           bibliography: newBib
         });
@@ -330,7 +330,7 @@ const Home: NextPage = () => {
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
         const origData = docSnap.data();
-        const newWiki = origData.wikidata.filter((_: any, i: number) => i !== index)
+        const newWiki = origData.wikidata.filter((_: MediaItem, i: number) => i !== index)
         await updateDoc(docRef, {
           wikidata: newWiki
         });
