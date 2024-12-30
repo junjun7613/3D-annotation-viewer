@@ -1030,7 +1030,7 @@ const Home: NextPage = () => {
                                 fontSize: '16px',
                                 marginBottom: '5px',
                                 marginTop: '20px',
-                                marginRight: '400px'
+                                marginRight: '10px'
                               }}>
                                 <FaTrashAlt/>
                               </button>
