@@ -31,6 +31,21 @@ interface Annotation {
     y: number;
     z: number;
   };
+  target_manifest?: string;
+  data: {
+    body: {
+      value: string;
+      label: string;
+    };
+    target: {
+      selector: {
+        type: string;
+        value: [number, number, number]; // valueプロパティを追加
+        area: [number, number, number]; // areaプロパティを追加
+        camPos: [number, number, number]; // camPosプロパティを追加
+      };
+    };
+  };
 }
 
 interface ThreeCanvasProps {
@@ -472,7 +487,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({ annotationsVisible, annotatio
                   const screenPosition = new THREE.Vector3(intersectedPoint.x, intersectedPoint.y, intersectedPoint.z).project(camera);
                   const x = (screenPosition.x * 0.5 + 0.5) * sizes.width;
                   const y = (screenPosition.y * -0.5 + 0.5) * sizes.height;
-                  setAnnotationPosition({ x, y });
+                  setAnnotationPosition(new THREE.Vector3(x, y, 0));
                   //　カメラの位置を取得
                   const cameraPosition = camera.position;
                   camPos.current = cameraPosition;
@@ -517,7 +532,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({ annotationsVisible, annotatio
                     const screenPosition = new THREE.Vector3(intersectedPoint.x, intersectedPoint.y, intersectedPoint.z).project(camera);
                     const x = (screenPosition.x * 0.5 + 0.5) * sizes.width;
                     const y = (screenPosition.y * -0.5 + 0.5) * sizes.height;
-                    setAnnotationPosition({ x, y });
+                    setAnnotationPosition(new THREE.Vector3(x, y, 0));
 
                     //　カメラの位置を取得
                     const cameraPosition = camera.position;
