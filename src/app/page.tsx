@@ -562,7 +562,7 @@ const Home: NextPage = () => {
                               border: 'none',
                               borderRadius: '5px',
                               cursor: 'pointer',
-                              fontSize: '10px',
+                              fontSize: '12px',
                               marginBottom:'10px'
                             }}>
                               <span>{wikiItem.label}</span>
@@ -582,7 +582,7 @@ const Home: NextPage = () => {
                                 border: 'none',
                                 borderRadius: '5px',
                                 cursor: 'pointer',
-                                fontSize: '12px',
+                                fontSize: '10px',
                                 marginBottom:'5px',
                                 marginLeft: '5px'
                               }}>
@@ -613,7 +613,7 @@ const Home: NextPage = () => {
                         <div key={index}>
                           <p>
                             <FaBook style={{ marginRight: '5px', display: 'inline' }} />
-                            <span style={{fontSize: '10px'}}>{bibItem.author} ({bibItem.year}): {bibItem.title}   </span>
+                            <span style={{fontSize: '12px'}}>{bibItem.author} ({bibItem.year}): {bibItem.title}   </span>
                             {bibItem.page && (
                               <a href={bibItem.page} target="_blank" rel="noopener noreferrer">
                                 <FaLink style={{ marginLeft: '5px', display: 'inline' }} />
@@ -631,7 +631,7 @@ const Home: NextPage = () => {
                                 border: 'none',
                                 borderRadius: '5px',
                                 cursor: 'pointer',
-                                fontSize: '12px',
+                                fontSize: '10px',
                                 marginBottom:'5px',
                                 marginLeft: '5px'
                               }}>
