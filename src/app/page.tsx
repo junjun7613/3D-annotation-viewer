@@ -563,10 +563,12 @@ const Home: NextPage = () => {
                               borderRadius: '5px',
                               cursor: 'pointer',
                               fontSize: '12px',
-                              marginBottom:'10px'
+                              marginBottom:'5px',
+                              marginTop: '10px'
                             }}>
                               <span>{wikiItem.label}</span>
                               </button>
+                              <div>
                               <a href={wikiItem.uri} target="_blank" rel="noopener noreferrer">
                                 <PiShareNetwork style={{ marginLeft: '5px', display: 'inline' }} />
                               </a>
@@ -588,6 +590,7 @@ const Home: NextPage = () => {
                               }}>
                                 <FaTrashAlt/>
                               </button>
+                              </div>
                           </div>
                       ))
                       ) : null}             
@@ -613,7 +616,8 @@ const Home: NextPage = () => {
                         <div key={index}>
                           <p>
                             <FaBook style={{ marginRight: '5px', display: 'inline' }} />
-                            <span style={{fontSize: '12px'}}>{bibItem.author} ({bibItem.year}): {bibItem.title}   </span>
+                            <span style={{fontSize: '12px'}}>{bibItem.author} ({bibItem.year}): {bibItem.title}</span>
+                            <div>
                             {bibItem.page && (
                               <a href={bibItem.page} target="_blank" rel="noopener noreferrer">
                                 <FaLink style={{ marginLeft: '5px', display: 'inline' }} />
@@ -637,6 +641,7 @@ const Home: NextPage = () => {
                               }}>
                                 <FaTrashAlt/>
                               </button>
+                              </div>
                           </p>
                         </div>
                       ))
