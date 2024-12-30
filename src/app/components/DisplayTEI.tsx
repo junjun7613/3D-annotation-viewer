@@ -8,7 +8,7 @@ const DisplayTEI: React.FC = () => {
 
   useEffect(() => {
     const ct = new CETEI();
-    let behaviors = {
+    const behaviors = {
       "tei": {
         "facsimile": function(e) {
           // headの中身を取得して、削除する
@@ -26,7 +26,7 @@ const DisplayTEI: React.FC = () => {
         },
         // lbタグのある部分にアイコンを追加し、クリックできるようにする.アイコンは必ず行の先頭に追加される
         "lb": function(e) {
-          let icon = document.createElement("span");
+          const icon = document.createElement("span");
           icon.innerHTML = "<br/>🔗";
           icon.style.cursor = "pointer";
           icon.style.marginRight = "5px";
@@ -44,7 +44,7 @@ const DisplayTEI: React.FC = () => {
       const element = document.createElement('div');
       element.appendChild(data);
       setTeiHTML(element.outerHTML);
-    }).catch((error: any) => {
+    }).catch((error: unknown) => {
       console.error('Error fetching XML:', error);
     });
   }, []);

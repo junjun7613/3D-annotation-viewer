@@ -6,7 +6,7 @@ import { auth, provider } from "@/lib/firebase/firebase";
 import { signInWithPopup, signOut } from "firebase/auth";
 
 export const SighIn = () => {
-  const [user, loading, error] = useAuthState(auth);
+  const [user] = useAuthState(auth);
   const router = useRouter();
   const [isSignedIn, setIsSignedIn] = useState(false);
 

@@ -82,7 +82,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({ annotationsVisible, annotatio
   const tagetCanvas = useRef<string | null>(null);
 
   // json dataを格納するための変数
-  const [manifest, setManifest] = useState([]);
+  //const [manifest, setManifest] = useState([]);
 
   const handleInfoPanelContentChange = (content: { id: string, creator: string, title: string, description: string, media: [], wikidata: [], bibliography:[] }) => {
     setInfoPanelContent(content);
@@ -578,7 +578,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({ annotationsVisible, annotatio
 
 
     //manifestのデータを出力
-    console.log(manifest);
+    //console.log(manifest);
 
     // コントロール
     const controls = new OrbitControls(camera, renderer.domElement)

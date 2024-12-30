@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { auth, provider } from "@/lib/firebase/firebase";
+import { auth } from "@/lib/firebase/firebase";
 import { useRouter } from 'next/router';
 import { useAuthState } from "react-firebase-hooks/auth";
 
 const Home = () => {
-  const [user, loading, error] = useAuthState(auth);
+  //const [user, loading, error] = useAuthState(auth);
   const [manifestUrl, setManifestUrl] = useState('');
   const router = useRouter();
 
