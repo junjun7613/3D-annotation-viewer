@@ -1,7 +1,6 @@
 "use client";
 
-import { title } from 'process';
-import { use, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three-stdlib'
 import { GLTFLoader } from 'three-stdlib'

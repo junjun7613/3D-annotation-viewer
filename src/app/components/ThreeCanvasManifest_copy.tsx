@@ -1,8 +1,7 @@
 "use client";
 
-import { off, title } from 'process';
-import { use, useEffect, useRef, useState } from 'react'
-import { auth, provider } from "@/lib/firebase/firebase";
+import { useEffect, useRef, useState } from 'react'
+import { auth } from "@/lib/firebase/firebase";
 import { useAuthState } from "react-firebase-hooks/auth";
 import * as THREE from 'three'
 import { OrbitControls } from 'three-stdlib'
@@ -11,20 +10,12 @@ import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRe
 
 import db from '@/lib/firebase/firebase'
 import {
-  Timestamp,
   addDoc,
   collection,
-  deleteDoc,
-  doc,
   getDocs,
   query,
-  setDoc,
-  updateDoc,
-  where,
   onSnapshot
 } from "firebase/firestore";
-import { info } from 'console';
-import { get } from 'http';
 
 //firebaseのデータを格納するための型
 interface Annotation {
