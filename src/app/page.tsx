@@ -404,7 +404,7 @@ const Home: NextPage = () => {
           box-sizing: border-box;
         }
       `}</style>
-    <div style={{ display: 'flex', flexDirection: 'column', height: '80%', width: "100%" }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: "100%" }}>
       <header style={{ backgroundColor: '#333', color: 'white', padding: '10px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1 style={{ margin: 0 }}>3D Annotation Viewer</h1>
         <nav>
