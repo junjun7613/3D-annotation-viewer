@@ -101,6 +101,15 @@ const Home: NextPage = () => {
     console.log(infoPanelContent)
   }, [infoPanelContent])
 
+  // URLからマニフェストURLを取得して設定するuseEffect
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const manifestParam = params.get('manifest');
+    if (manifestParam) {
+      setManifestUrl(manifestParam);
+    }
+  }, []);
+
   console.log(user)
 
   
