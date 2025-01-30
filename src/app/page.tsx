@@ -478,9 +478,11 @@ const Home: NextPage = () => {
             </div>
             <div style={{ flex: 0.8, display: 'flex', borderBottom: '2px solid #ccc', paddingBottom: '20px', marginTop: '20px' }}>
               {/* 上側のコンテンツをここに追加 */}
+              {/*
               <div style={{ flex: 1, borderRight: '2px solid #ccc', paddingRight: '20px' }}>
                 <DisplayTEI />
               </div>
+              */}
               <div style={{ flex: 1, paddingLeft: '20px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <button onClick={handleDescOpenDialog} style={{
@@ -502,7 +504,7 @@ const Home: NextPage = () => {
             <div style={{ flex: 1.2, paddingTop: '20px' }}>
               <div style={{fontSize:"24px", fontWeight:"bold"}}>{infoPanelContent.title}</div>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: '20px' }}>
-                <div style={{ flex: 1, border: '1px solid #ccc', marginTop: "10px", padding: '10px', borderRadius: '5px', height: '270px' }}>
+                <div style={{ flex: 1, border: '1px solid #ccc', marginTop: "10px", padding: '10px', borderRadius: '5px', height: '300px' }}>
                   <div style={{borderBottom: '2px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
                     <h3 style={{ textAlign: 'center', fontWeight: 'bold', marginBottom:'10px' }}>AV Media</h3>
                     <button onClick={handleMediaOpenDialog} style={{
@@ -546,7 +548,7 @@ const Home: NextPage = () => {
                     ) : null}
                   </div>
                 </div>
-                <div style={{ flex: 1, border: '1px solid #ccc', marginTop: "10px", padding: '10px', borderRadius: '5px', height: '270px' }}>
+                <div style={{ flex: 1, border: '1px solid #ccc', marginTop: "10px", padding: '10px', borderRadius: '5px', height: '300px' }}>
                   <div style={{borderBottom: '2px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
                     <h3 style={{ textAlign: 'center', fontWeight: 'bold', marginBottom:'10px' }}>Wiki Items</h3>
                     <button onClick={handleWikidataOpenDialog} style={{
@@ -577,7 +579,7 @@ const Home: NextPage = () => {
                             }}>
                               <span>{wikiItem.label}</span>
                               </button>
-                              <div>
+                              {/*<div>*/}
                               <a href={wikiItem.uri} target="_blank" rel="noopener noreferrer">
                                 <PiShareNetwork style={{ marginLeft: '5px', display: 'inline' }} />
                               </a>
@@ -599,13 +601,13 @@ const Home: NextPage = () => {
                               }}>
                                 <FaTrashAlt/>
                               </button>
-                              </div>
+                              {/*</div>*/}
                           </div>
                       ))
                       ) : null}             
                   </div>
                 </div>
-                <div style={{ flex: 1, border: '1px solid #ccc',  marginTop: "10px",padding: '10px', borderRadius: '5px', height: '270px' }}>
+                <div style={{ flex: 1, border: '1px solid #ccc',  marginTop: "10px",padding: '10px', borderRadius: '5px', height: '300px' }}>
                   <div style={{borderBottom: '2px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
                     <h3 style={{ textAlign: 'center', fontWeight: 'bold', marginBottom:'10px' }}>Bibliography</h3>
                     <button onClick={handleBibOpenDialog} style={{
