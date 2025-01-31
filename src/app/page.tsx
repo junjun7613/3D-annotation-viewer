@@ -270,6 +270,29 @@ const Home: NextPage = () => {
     }
   }
 
+  const downloadAnnotation = (id: string) => {
+    console.log(id);
+    // idのdocをfirebaseデータベースから取得
+    const docRef = doc(db, "annotations", id);
+    const download = async () => {
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        console.log(data);
+        // dataをjson形式でダウンロード
+        const element = document.createElement("a");
+        const file = new Blob([JSON.stringify(data)], {type: 'text/plain'});
+        element.href = URL.createObjectURL(file);
+        element.download = `${id}.json`;
+        document.body.appendChild(element); // Required for this to work in FireFox
+        element.click();
+      } else {
+        console.log("No such document!");
+      }
+    };
+    download();
+  }
+
   const deleteMedia = (id: string, index: number) => {
     console.log('delete media')
     console.log(id)
@@ -447,7 +470,7 @@ const Home: NextPage = () => {
           </div>
         </div>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '20px' }}>
-            <div style={{ flex: 0.3, borderBottom: '2px solid #ccc', paddingBottom: '20px' }}>
+            <div style={{ flex: 0.2, borderBottom: '2px solid #ccc', paddingBottom: '20px' }}>
               {/* user && <input type="text" value={manifestUrl} onChange={handleManifestUrlChange} placeholder="Enter IIIF Manifest URL" style={{ 
                 width: '100%',
                 padding: '10px',
@@ -661,7 +684,7 @@ const Home: NextPage = () => {
                 </div>
               </div>
               <button onClick={() => deleteAnnotation(infoPanelContent.id)} style={{
-                 marginTop: '20px', 
+                 marginTop: '40px', 
                  padding: '10px 20px',
                  backgroundColor: '#8b0000',
                  color: 'white',
@@ -670,6 +693,17 @@ const Home: NextPage = () => {
                  cursor: 'pointer',
                  fontSize: '16px'
                  }}>Delete Annotation</button>
+              <button onClick={() => downloadAnnotation(infoPanelContent.id)} style={{
+                 marginTop: '40px', 
+                 marginLeft: '20px',
+                 padding: '10px 20px',
+                 backgroundColor: '#006400',
+                 color: 'white',
+                 border: 'none',
+                 borderRadius: '5px',
+                 cursor: 'pointer',
+                 fontSize: '16px'
+                 }}>Download</button>
             </div>
         </div>
       </div>
