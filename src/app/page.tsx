@@ -13,6 +13,7 @@ import DisplayTEI from './components/DisplayTEI'
 import { FaPencilAlt, FaBook, FaRegFilePdf, FaTrashAlt } from "react-icons/fa";
 import {FaLink} from "react-icons/fa6";
 import { PiShareNetwork } from "react-icons/pi";
+import {FiUpload} from "react-icons/fi";
 import { IoDocumentTextOutline } from "react-icons/io5";
 
 import db from '@/lib/firebase/firebase'
@@ -553,18 +554,15 @@ const Home: NextPage = () => {
                               onClick={() => setSelectedImage({ source: mediaItem.source, caption: mediaItem.caption, index: index })}
                             />
                           )}
-                          {/*
+                          {/* type == "video" の場合には、mp4形式のビデオを表示*/}
                           {mediaItem.type === 'video' && (
                             <video 
+                              src={mediaItem.source} 
                               controls 
-                              style={{ width: '100%' }}
-                              onClick={() => setSelectedImage({ source: mediaItem.source, caption: mediaItem.caption })}
-                            >
-                              <source src={mediaItem.source} type="video/mp4" />
-                              Your browser does not support the video tag.
-                            </video>
+                              style={{ width: '100%'}}
+                            />
                           )}
-                            */}
+                          {/* type == "audio" の場合には、mp3形式の音声を表示*/}
                           {/* 他のタイプのメディア処理を追加 */}
                         </div>
                       ))
