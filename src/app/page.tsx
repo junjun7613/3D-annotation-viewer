@@ -1,5 +1,5 @@
 "use client";
- 
+
 import { useEffect, useState } from 'react';
 import { auth } from "@/lib/firebase/firebase";
 import { useAuthState } from "react-firebase-hooks/auth";
@@ -11,9 +11,9 @@ import ThreeCanvas from './components/ThreeCanvasManifest_copy'
 import SwitchButton from './components/SwitchButton'
 import DisplayTEI from './components/DisplayTEI'
 import { FaPencilAlt, FaBook, FaRegFilePdf, FaTrashAlt } from "react-icons/fa";
-import {FaLink} from "react-icons/fa6";
+import { FaLink } from "react-icons/fa6";
 import { PiShareNetwork } from "react-icons/pi";
-import {FiUpload} from "react-icons/fi";
+import { FiUpload } from "react-icons/fi";
 import { IoDocumentTextOutline } from "react-icons/io5";
 
 import db from '@/lib/firebase/firebase'
@@ -96,6 +96,7 @@ const Home: NextPage = () => {
   const [wikidata, setWikidata] = useState('');
 
   const [selectedImage, setSelectedImage] = useState<{ source: string, caption: string, index: number } | null>(null);
+  const [selectedVideo, setSelectedVideo] = useState<{ source: string, caption: string, index: number } | null>(null);
 
   //infoPanelContentが更新されたときに実行
   useEffect(() => {
@@ -113,16 +114,16 @@ const Home: NextPage = () => {
 
   console.log(user)
 
-  
+
   const saveMedias = async () => {
-    const mediaData = {source, type, caption}
+    const mediaData = { source, type, caption }
     console.log(infoPanelContent, mediaData)
     const data = {
       source: source,
       type: type,
       caption: caption
     }
-    
+
     // firebaseのannotationsコレクションのidを持つdocのMediaフィールド(Array)のdataをfirebaseから取得
     const docRef = doc(db, "annotations", infoPanelContent.id);
     const docSnap = await getDoc(docRef);
@@ -141,7 +142,7 @@ const Home: NextPage = () => {
   };
 
   const saveWikidata = async () => {
-    
+
     console.log(infoPanelContent, wikidata)
     // wikidataのsparqlエンドポイントにアクセスして該当するデータのラベルを取得
 
@@ -163,10 +164,10 @@ const Home: NextPage = () => {
 
     const data = {
       uri: wikidata,
-      label: label, 
+      label: label,
       wikipedia: wikipedia
     }
-    
+
     // firebaseのannotationsコレクションのidを持つdocのMediaフィールド(Array)のdataをfirebaseから取得
     const docRef = doc(db, "annotations", infoPanelContent.id);
     const docSnap = await getDoc(docRef);
@@ -180,13 +181,13 @@ const Home: NextPage = () => {
     } else {
       console.log("No such document!");
     }
-    
+
 
     handleWikidataCloseDialog()
   }
 
   const saveBib = async () => {
-    const bibData = {bibAuthor, bibTitle, bibYear, bibPage, bibPDF}
+    const bibData = { bibAuthor, bibTitle, bibYear, bibPage, bibPDF }
     console.log(infoPanelContent, bibData)
     const data = {
       author: bibAuthor,
@@ -265,7 +266,7 @@ const Home: NextPage = () => {
         console.log(id)
         //idのdocをfirebaseデータベースから削除
         deleteDoc(doc(db, "annotations", id));
-        }
+      }
     } else {
       alert('You are not the creator of this annotation.')
     }
@@ -282,7 +283,7 @@ const Home: NextPage = () => {
         console.log(data);
         // dataをjson形式でダウンロード
         const element = document.createElement("a");
-        const file = new Blob([JSON.stringify(data)], {type: 'text/plain'});
+        const file = new Blob([JSON.stringify(data)], { type: 'text/plain' });
         element.href = URL.createObjectURL(file);
         element.download = `${id}.json`;
         document.body.appendChild(element); // Required for this to work in FireFox
@@ -299,27 +300,27 @@ const Home: NextPage = () => {
     console.log(id)
 
     if (infoPanelContent.creator == user?.uid) {
-    const confirmed = confirm('Are you sure you want to delete this Wiki Item?');
-    if (confirmed) {
-    //idのdocのBibliographyフィールドのindexの要素を削除
-    const docRef = doc(db, "annotations", id);
-    const deleteField = async () => {
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const origData = docSnap.data();
-        const newMedia = origData.media.filter((_: MediaItem, i: number) => i !== index)
-        await updateDoc(docRef, {
-          media: newMedia
-        });
-      } else {
-        console.log("No such document!");
+      const confirmed = confirm('Are you sure you want to delete this Wiki Item?');
+      if (confirmed) {
+        //idのdocのBibliographyフィールドのindexの要素を削除
+        const docRef = doc(db, "annotations", id);
+        const deleteField = async () => {
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const origData = docSnap.data();
+            const newMedia = origData.media.filter((_: MediaItem, i: number) => i !== index)
+            await updateDoc(docRef, {
+              media: newMedia
+            });
+          } else {
+            console.log("No such document!");
+          }
+        };
+        deleteField();
       }
-    };
-    deleteField();
-  }
-  } else {
-    alert('You are not the creator of this annotation.')
-  }
+    } else {
+      alert('You are not the creator of this annotation.')
+    }
   }
 
   const deleteBib = (id: string, index: number) => {
@@ -328,26 +329,26 @@ const Home: NextPage = () => {
 
     if (infoPanelContent.creator == user?.uid) {
       const confirmed = confirm('Are you sure you want to delete this bibliography?');
-    if (confirmed) {
-    //idのdocのBibliographyフィールドのindexの要素を削除
-    const docRef = doc(db, "annotations", id);
-    const deleteField = async () => {
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const origData = docSnap.data();
-        const newBib = origData.bibliography.filter((_: MediaItem, i: number) => i !== index)
-        await updateDoc(docRef, {
-          bibliography: newBib
-        });
-      } else {
-        console.log("No such document!");
+      if (confirmed) {
+        //idのdocのBibliographyフィールドのindexの要素を削除
+        const docRef = doc(db, "annotations", id);
+        const deleteField = async () => {
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const origData = docSnap.data();
+            const newBib = origData.bibliography.filter((_: MediaItem, i: number) => i !== index)
+            await updateDoc(docRef, {
+              bibliography: newBib
+            });
+          } else {
+            console.log("No such document!");
+          }
+        };
+        deleteField();
       }
-    };
-    deleteField();
-  }
-  } else {
-    alert('You are not the creator of this annotation.')
-  }
+    } else {
+      alert('You are not the creator of this annotation.')
+    }
   }
 
   const deleteWiki = (id: string, index: number) => {
@@ -356,26 +357,26 @@ const Home: NextPage = () => {
 
     if (infoPanelContent.creator == user?.uid) {
       const confirmed = confirm('Are you sure you want to delete this Wiki Item?');
-    if (confirmed) {
-    //idのdocのBibliographyフィールドのindexの要素を削除
-    const docRef = doc(db, "annotations", id);
-    const deleteField = async () => {
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const origData = docSnap.data();
-        const newWiki = origData.wikidata.filter((_: MediaItem, i: number) => i !== index)
-        await updateDoc(docRef, {
-          wikidata: newWiki
-        });
-      } else {
-        console.log("No such document!");
+      if (confirmed) {
+        //idのdocのBibliographyフィールドのindexの要素を削除
+        const docRef = doc(db, "annotations", id);
+        const deleteField = async () => {
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const origData = docSnap.data();
+            const newWiki = origData.wikidata.filter((_: MediaItem, i: number) => i !== index)
+            await updateDoc(docRef, {
+              wikidata: newWiki
+            });
+          } else {
+            console.log("No such document!");
+          }
+        };
+        deleteField();
       }
-    };
-    deleteField();
-  }
-  } else {
-    alert('You are not the creator of this annotation.')
-  }
+    } else {
+      alert('You are not the creator of this annotation.')
+    }
   }
 
   const handleMediaOpenDialog = () => {
@@ -437,40 +438,40 @@ const Home: NextPage = () => {
           box-sizing: border-box;
         }
       `}</style>
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: "100%" }}>
-      <header style={{ backgroundColor: '#333', color: 'white', padding: '10px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1 style={{ margin: 0 }}>3D Annotation Viewer</h1>
-        <nav>
-          <a href="#home" style={{ color: 'white', marginRight: '20px' }}>Home</a>
-          <a href="#about" style={{ color: 'white', marginRight: '20px' }}>About</a>
-          {/*<a href="#contact" style={{ color: 'white' }}>Contact</a>*/}
-          <SignIn />
-          {/*{user && <span style={{ color: 'white', marginLeft: '20px' }}>logged in</span>}*/}
-        </nav>
-      </header>
-      <div style={{ display: 'flex', flex: 1 }}>
-        <div style={{ flex: 1, borderRight: '1px solid #ccc', position: 'relative' }}>
-          <ThreeCanvas 
-            annotationsVisible={annotationsVisible} 
-            annotationMode={annotationMode} 
-            manifestUrl={manifestUrl} 
-            //infoPanelContent={infoPanelContent}
-            onInfoPanelContentChange={handleInfoPanelContentChange}
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: "100%" }}>
+        <header style={{ backgroundColor: '#333', color: 'white', padding: '10px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h1 style={{ margin: 0 }}>3D Annotation Viewer</h1>
+          <nav>
+            <a href="#home" style={{ color: 'white', marginRight: '20px' }}>Home</a>
+            <a href="#about" style={{ color: 'white', marginRight: '20px' }}>About</a>
+            {/*<a href="#contact" style={{ color: 'white' }}>Contact</a>*/}
+            <SignIn />
+            {/*{user && <span style={{ color: 'white', marginLeft: '20px' }}>logged in</span>}*/}
+          </nav>
+        </header>
+        <div style={{ display: 'flex', flex: 1 }}>
+          <div style={{ flex: 1, borderRight: '1px solid #ccc', position: 'relative' }}>
+            <ThreeCanvas
+              annotationsVisible={annotationsVisible}
+              annotationMode={annotationMode}
+              manifestUrl={manifestUrl}
+              //infoPanelContent={infoPanelContent}
+              onInfoPanelContentChange={handleInfoPanelContentChange}
             />
-          <div style={{ position: 'absolute', top: '10px', left: '10px', zIndex: 100, backgroundColor: 'rgba(255, 255, 255, 0.8)', padding: '10px', borderRadius: '5px' }}>
-          
-                <div style={{ flex: '1 1 45%' }}>
-                  <p>Display annotations</p>
-                  <SwitchButton checked={annotationsVisible} onChange={handleSwitchChange} />
-                </div>
-                <div style={{ flex: '1 1 45%' }}>
-                  <p>Polygon annotation mode</p>
-                  <SwitchButton checked={annotationMode} onChange={handleAnnotationModeChange} />
-                </div>
-             
+            <div style={{ position: 'absolute', top: '10px', left: '10px', zIndex: 100, backgroundColor: 'rgba(255, 255, 255, 0.8)', padding: '10px', borderRadius: '5px' }}>
+
+              <div style={{ flex: '1 1 45%' }}>
+                <p>Display annotations</p>
+                <SwitchButton checked={annotationsVisible} onChange={handleSwitchChange} />
+              </div>
+              <div style={{ flex: '1 1 45%' }}>
+                <p>Polygon annotation mode</p>
+                <SwitchButton checked={annotationMode} onChange={handleAnnotationModeChange} />
+              </div>
+
+            </div>
           </div>
-        </div>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '20px' }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '20px' }}>
             <div style={{ flex: 0.2, borderBottom: '2px solid #ccc', paddingBottom: '20px' }}>
               {/* user && <input type="text" value={manifestUrl} onChange={handleManifestUrlChange} placeholder="Enter IIIF Manifest URL" style={{ 
                 width: '100%',
@@ -480,14 +481,14 @@ const Home: NextPage = () => {
                 marginBottom: '10px',
                 fontSize: '16px'
                 }} />*/}
-                <input type="text" value={manifestUrl} onChange={handleManifestUrlChange} placeholder="Enter IIIF Manifest URL" style={{ 
+              <input type="text" value={manifestUrl} onChange={handleManifestUrlChange} placeholder="Enter IIIF Manifest URL" style={{
                 width: '100%',
                 padding: '10px',
                 border: '2px solid #333',
                 borderRadius: '5px',
                 marginBottom: '10px',
                 fontSize: '16px'
-                }} />
+              }} />
               {/*<button onClick={handleButtonClick} style={{
                  marginTop: '10px', 
                  padding: '10px 20px',
@@ -526,11 +527,11 @@ const Home: NextPage = () => {
               </div>
             </div>
             <div style={{ flex: 1.2, paddingTop: '20px' }}>
-              <div style={{fontSize:"24px", fontWeight:"bold"}}>{infoPanelContent.title}</div>
+              <div style={{ fontSize: "24px", fontWeight: "bold" }}>{infoPanelContent.title}</div>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: '20px' }}>
                 <div style={{ flex: 1, border: '1px solid #ccc', marginTop: "10px", padding: '10px', borderRadius: '5px', height: '300px' }}>
-                  <div style={{borderBottom: '2px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
-                    <h3 style={{ textAlign: 'center', fontWeight: 'bold', marginBottom:'10px' }}>AV Media</h3>
+                  <div style={{ borderBottom: '2px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <h3 style={{ textAlign: 'center', fontWeight: 'bold', marginBottom: '10px' }}>Image & Video</h3>
                     <button onClick={handleMediaOpenDialog} style={{
                       padding: '5px 10px',
                       backgroundColor: '#333',
@@ -539,22 +540,41 @@ const Home: NextPage = () => {
                       borderRadius: '5px',
                       cursor: 'pointer',
                       fontSize: '10px',
-                      marginBottom:'10px'
+                      marginBottom: '10px'
                     }}>+</button>
                   </div>
-                  <div style={{marginTop: "10px", overflowY: 'auto', maxHeight: '200px', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '5px' }}>
+                  <div style={{ marginTop: "10px", overflowY: 'auto', maxHeight: '200px', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '5px' }}>
                     {infoPanelContent.media && infoPanelContent.media.length > 0 ? (
                       infoPanelContent.media.map((mediaItem, index) => (
                         <div key={index}>
+                          
                           {mediaItem.type === 'img' && (
-                            <img 
-                              src={mediaItem.source} 
-                              alt={mediaItem.caption} 
-                              style={{ width: '100%'}}
+                            <img
+                              src={mediaItem.source}
+                              alt={mediaItem.caption}
+                              style={{ width: '100%' }}
                               onClick={() => setSelectedImage({ source: mediaItem.source, caption: mediaItem.caption, index: index })}
                             />
                           )}
-                          {/* type == "video" の場合には、mp4形式のビデオを表示*/}
+                          
+                          {mediaItem.type === 'video' && (
+                            console.log(mediaItem.source.split("/")[3]),
+                            /*
+                            <iframe 
+                              style={{width:'100%', height:'70%'}}
+                              src={`https://www.youtube.com/embed/${mediaItem.source.split("/")[3]}`} 
+                              title="YouTube video player" 
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                              />
+                              */
+                              <img
+                              src={`https://img.youtube.com/vi/${mediaItem.source.split("/")[3].split("?")[0]}/default.jpg`} 
+                              alt={mediaItem.caption}
+                              style={{ width: '100%' }}
+                              onClick={() => setSelectedVideo({ source: `https://www.youtube.com/embed/${mediaItem.source.split("/")[3]}`, caption: mediaItem.caption, index: index })}
+                            />
+                          )}
+                          {/*
                           {mediaItem.type === 'video' && (
                             <video 
                               src={mediaItem.source} 
@@ -562,6 +582,7 @@ const Home: NextPage = () => {
                               style={{ width: '100%'}}
                             />
                           )}
+                            */}
                           {/* type == "audio" の場合には、mp3形式の音声を表示*/}
                           {/* 他のタイプのメディア処理を追加 */}
                         </div>
@@ -570,8 +591,8 @@ const Home: NextPage = () => {
                   </div>
                 </div>
                 <div style={{ flex: 1, border: '1px solid #ccc', marginTop: "10px", padding: '10px', borderRadius: '5px', height: '300px' }}>
-                  <div style={{borderBottom: '2px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
-                    <h3 style={{ textAlign: 'center', fontWeight: 'bold', marginBottom:'10px' }}>Wiki Items</h3>
+                  <div style={{ borderBottom: '2px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <h3 style={{ textAlign: 'center', fontWeight: 'bold', marginBottom: '10px' }}>Wiki Items</h3>
                     <button onClick={handleWikidataOpenDialog} style={{
                       padding: '5px 10px',
                       backgroundColor: '#333',
@@ -580,57 +601,57 @@ const Home: NextPage = () => {
                       borderRadius: '5px',
                       cursor: 'pointer',
                       fontSize: '10px',
-                      marginBottom:'10px'
+                      marginBottom: '10px'
                     }}>+</button>
                   </div>
-                  <div style={{marginTop: "10px"}}>
+                  <div style={{ marginTop: "10px" }}>
                     {infoPanelContent.wikidata && infoPanelContent.wikidata.length > 0 ? (
-                        infoPanelContent.wikidata.map((wikiItem, index) => (
-                          <div key={index} >
-                            <button style={{
-                              padding: '5px 10px',
-                              backgroundColor: '#333',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '5px',
-                              cursor: 'pointer',
-                              fontSize: '12px',
-                              marginBottom:'5px',
-                              marginTop: '10px'
-                            }}>
-                              <span>{wikiItem.label}</span>
-                              </button>
-                              {/*<div>*/}
-                              <a href={wikiItem.uri} target="_blank" rel="noopener noreferrer">
-                                <PiShareNetwork style={{ marginLeft: '5px', display: 'inline' }} />
-                              </a>
-                              {wikiItem.wikipedia && (
-                              <a href={wikiItem.wikipedia} target="_blank" rel="noopener noreferrer">
-                                <IoDocumentTextOutline style={{ marginLeft: '5px', display: 'inline' }} />
-                              </a>
-                            )}
-                              <button onClick={() => deleteWiki(infoPanelContent.id, index)} style={{
-                                padding: '5px 10px',
-                                backgroundColor: '#8b0000',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '5px',
-                                cursor: 'pointer',
-                                fontSize: '10px',
-                                marginBottom:'5px',
-                                marginLeft: '5px'
-                              }}>
-                                <FaTrashAlt/>
-                              </button>
-                              {/*</div>*/}
-                          </div>
+                      infoPanelContent.wikidata.map((wikiItem, index) => (
+                        <div key={index} >
+                          <button style={{
+                            padding: '5px 10px',
+                            backgroundColor: '#333',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '5px',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            marginBottom: '5px',
+                            marginTop: '10px'
+                          }}>
+                            <span>{wikiItem.label}</span>
+                          </button>
+                          {/*<div>*/}
+                          <a href={wikiItem.uri} target="_blank" rel="noopener noreferrer">
+                            <PiShareNetwork style={{ marginLeft: '5px', display: 'inline' }} />
+                          </a>
+                          {wikiItem.wikipedia && (
+                            <a href={wikiItem.wikipedia} target="_blank" rel="noopener noreferrer">
+                              <IoDocumentTextOutline style={{ marginLeft: '5px', display: 'inline' }} />
+                            </a>
+                          )}
+                          <button onClick={() => deleteWiki(infoPanelContent.id, index)} style={{
+                            padding: '5px 10px',
+                            backgroundColor: '#8b0000',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '5px',
+                            cursor: 'pointer',
+                            fontSize: '10px',
+                            marginBottom: '5px',
+                            marginLeft: '5px'
+                          }}>
+                            <FaTrashAlt />
+                          </button>
+                          {/*</div>*/}
+                        </div>
                       ))
-                      ) : null}             
+                    ) : null}
                   </div>
                 </div>
-                <div style={{ flex: 1, border: '1px solid #ccc',  marginTop: "10px",padding: '10px', borderRadius: '5px', height: '300px' }}>
-                  <div style={{borderBottom: '2px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
-                    <h3 style={{ textAlign: 'center', fontWeight: 'bold', marginBottom:'10px' }}>Bibliography</h3>
+                <div style={{ flex: 1, border: '1px solid #ccc', marginTop: "10px", padding: '10px', borderRadius: '5px', height: '300px' }}>
+                  <div style={{ borderBottom: '2px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <h3 style={{ textAlign: 'center', fontWeight: 'bold', marginBottom: '10px' }}>Bibliography</h3>
                     <button onClick={handleBibOpenDialog} style={{
                       padding: '5px 10px',
                       backgroundColor: '#333',
@@ -639,28 +660,28 @@ const Home: NextPage = () => {
                       borderRadius: '5px',
                       cursor: 'pointer',
                       fontSize: '10px',
-                      marginBottom:'10px'
+                      marginBottom: '10px'
                     }}>+</button>
                   </div>
-                  <div style={{marginTop: "10px"}}>
+                  <div style={{ marginTop: "10px" }}>
                     {infoPanelContent.bibliography && infoPanelContent.bibliography.length > 0 ? (
                       infoPanelContent.bibliography.map((bibItem, index) => (
                         <div key={index}>
                           <div>
                             <FaBook style={{ marginRight: '5px', display: 'inline' }} />
-                            <span style={{fontSize: '12px'}}>{bibItem.author} ({bibItem.year}): {bibItem.title}</span>
+                            <span style={{ fontSize: '12px' }}>{bibItem.author} ({bibItem.year}): {bibItem.title}</span>
                             <div>
-                            {bibItem.page && (
-                              <a href={bibItem.page} target="_blank" rel="noopener noreferrer">
-                                <FaLink style={{ marginLeft: '5px', display: 'inline' }} />
-                              </a>
-                            )}
-                            {bibItem.pdf && (
-                              <a href={bibItem.pdf} target="_blank" rel="noopener noreferrer">
-                                <FaRegFilePdf style={{ marginLeft: '5px', display: 'inline' }} />
-                              </a>
-                            )}
-                            <button onClick={() => deleteBib(infoPanelContent.id, index)} style={{
+                              {bibItem.page && (
+                                <a href={bibItem.page} target="_blank" rel="noopener noreferrer">
+                                  <FaLink style={{ marginLeft: '5px', display: 'inline' }} />
+                                </a>
+                              )}
+                              {bibItem.pdf && (
+                                <a href={bibItem.pdf} target="_blank" rel="noopener noreferrer">
+                                  <FaRegFilePdf style={{ marginLeft: '5px', display: 'inline' }} />
+                                </a>
+                              )}
+                              <button onClick={() => deleteBib(infoPanelContent.id, index)} style={{
                                 padding: '5px 10px',
                                 backgroundColor: '#8b0000',
                                 color: 'white',
@@ -668,12 +689,12 @@ const Home: NextPage = () => {
                                 borderRadius: '5px',
                                 cursor: 'pointer',
                                 fontSize: '10px',
-                                marginBottom:'5px',
+                                marginBottom: '5px',
                                 marginLeft: '5px'
                               }}>
-                                <FaTrashAlt/>
+                                <FaTrashAlt />
                               </button>
-                              </div>
+                            </div>
                           </div>
                         </div>
                       ))
@@ -682,408 +703,450 @@ const Home: NextPage = () => {
                 </div>
               </div>
               <button onClick={() => deleteAnnotation(infoPanelContent.id)} style={{
-                 marginTop: '40px', 
-                 padding: '10px 20px',
-                 backgroundColor: '#8b0000',
-                 color: 'white',
-                 border: 'none',
-                 borderRadius: '5px',
-                 cursor: 'pointer',
-                 fontSize: '16px'
-                 }}>Delete Annotation</button>
+                marginTop: '40px',
+                padding: '10px 20px',
+                backgroundColor: '#8b0000',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                fontSize: '16px'
+              }}>Delete Annotation</button>
               <button onClick={() => downloadAnnotation(infoPanelContent.id)} style={{
-                 marginTop: '40px', 
-                 marginLeft: '20px',
-                 padding: '10px 20px',
-                 backgroundColor: '#006400',
-                 color: 'white',
-                 border: 'none',
-                 borderRadius: '5px',
-                 cursor: 'pointer',
-                 fontSize: '16px'
-                 }}>Download</button>
+                marginTop: '40px',
+                marginLeft: '20px',
+                padding: '10px 20px',
+                backgroundColor: '#006400',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                fontSize: '16px'
+              }}>Download</button>
             </div>
+          </div>
         </div>
+        <footer style={{ backgroundColor: '#333', color: 'white', padding: '10px 20px', textAlign: 'center' }}>
+          &copy; 2023 3D Annotation Viewer. All rights reserved.
+        </footer>
       </div>
-      <footer style={{ backgroundColor: '#333', color: 'white', padding: '10px 20px', textAlign: 'center' }}>
-        &copy; 2023 3D Annotation Viewer. All rights reserved.
-      </footer>
-    </div>
-    
-    {isMediaDialogOpen && (
-      <div style={{
-        position: 'fixed',
-        width: '500px',
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        backgroundColor: 'white',
-        padding: '20px',
-        border: '1px solid #ccc',
-        borderRadius: '5px',
-        zIndex: 1000
-      }}>
-        <form style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-          <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
-            Source URI:
-            <input
-              name="source" 
-              value={source}
-              required
-              onChange={(e) => setSource(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '10px',
-                marginTop: '5px',
-                border: '1px solid #ccc',
-                borderRadius: '5px',
-                fontSize: '16px'
-              }} 
+
+      {isMediaDialogOpen && (
+        <div style={{
+          position: 'fixed',
+          width: '500px',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          backgroundColor: 'white',
+          padding: '20px',
+          border: '1px solid #ccc',
+          borderRadius: '5px',
+          zIndex: 1000
+        }}>
+          <form style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
+              Source URI:
+              <input
+                name="source"
+                value={source}
+                required
+                onChange={(e) => setSource(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  marginTop: '5px',
+                  border: '1px solid #ccc',
+                  borderRadius: '5px',
+                  fontSize: '16px'
+                }}
               />
-          </label>
-          <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
-            Type:
-            <select 
-              name="type" 
-              value={type}
-              onChange={(e) => setType(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '10px',
-                marginTop: '5px',
-                border: '1px solid #ccc',
-                borderRadius: '5px',
-                fontSize: '16px'
-              }}
+            </label>
+            <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
+              Type:
+              <select
+                name="type"
+                value={type}
+                onChange={(e) => setType(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  marginTop: '5px',
+                  border: '1px solid #ccc',
+                  borderRadius: '5px',
+                  fontSize: '16px'
+                }}
               >
-              <option value="img">Image</option>
-              <option value="video">Video</option>
-              <option value="audio">Audio</option>
-            </select>
-          </label>
-          <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
-            Caption:
-            <textarea
-              name="caption" 
-              value={caption}
-              required
-              onChange={(e) => setCaption(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '10px',
-                marginTop: '5px',
-                border: '1px solid #ccc',
+                <option value="img">Image</option>
+                <option value="video">Video</option>
+                <option value="audio">Audio</option>
+              </select>
+            </label>
+            <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
+              Caption:
+              <textarea
+                name="caption"
+                value={caption}
+                required
+                onChange={(e) => setCaption(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  marginTop: '5px',
+                  border: '1px solid #ccc',
+                  borderRadius: '5px',
+                  fontSize: '16px',
+                  resize: 'vertical'
+                }}
+              />
+            </label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+              <button type="button" onClick={saveMedias} style={{
+                padding: '10px 20px',
+                backgroundColor: '#000080',
+                color: 'white',
+                border: 'none',
                 borderRadius: '5px',
+                cursor: 'pointer',
                 fontSize: '16px',
-                resize: 'vertical'
-              }}
-               />
-          </label>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
-            <button type="button" onClick={saveMedias} style={{
-              padding: '10px 20px',
-              backgroundColor: '#000080',
-              color: 'white',
-              border: 'none',
-              borderRadius: '5px',
-              cursor: 'pointer',
-              fontSize: '16px',
-              marginRight: '10px'
-            }}>Save</button>
-            <button type="button" onClick={handleMediaCloseDialog} style={{
-              padding: '10px 20px',
-              backgroundColor: '#333',
-              color: 'white',
-              border: 'none',
-              borderRadius: '5px',
-              cursor: 'pointer',
-              fontSize: '16px'
-            }}>Close</button>
-          </div>
-        </form>
-      </div>
-    )}
-
-    {isWikidataDialogOpen && (
-      <div style={{
-        position: 'fixed',
-        width: '500px',
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        backgroundColor: 'white',
-        padding: '20px',
-        border: '1px solid #ccc',
-        borderRadius: '5px',
-        zIndex: 1000
-      }}>
-        <form style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-          <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
-            Wikidata URI:
-            <input
-              name="wikidata" 
-              value={wikidata}
-              required
-              onChange={(e) => setWikidata(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '10px',
-                marginTop: '5px',
-                border: '1px solid #ccc',
+                marginRight: '10px'
+              }}>Save</button>
+              <button type="button" onClick={handleMediaCloseDialog} style={{
+                padding: '10px 20px',
+                backgroundColor: '#333',
+                color: 'white',
+                border: 'none',
                 borderRadius: '5px',
+                cursor: 'pointer',
                 fontSize: '16px'
-              }} 
+              }}>Close</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {isWikidataDialogOpen && (
+        <div style={{
+          position: 'fixed',
+          width: '500px',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          backgroundColor: 'white',
+          padding: '20px',
+          border: '1px solid #ccc',
+          borderRadius: '5px',
+          zIndex: 1000
+        }}>
+          <form style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
+              Wikidata URI:
+              <input
+                name="wikidata"
+                value={wikidata}
+                required
+                onChange={(e) => setWikidata(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  marginTop: '5px',
+                  border: '1px solid #ccc',
+                  borderRadius: '5px',
+                  fontSize: '16px'
+                }}
               />
-          </label>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
-            <button type="button" onClick={saveWikidata} style={{
-              padding: '10px 20px',
-              backgroundColor: '#000080',
-              color: 'white',
-              border: 'none',
-              borderRadius: '5px',
-              cursor: 'pointer',
-              fontSize: '16px',
-              marginRight: '10px'
-            }}>Save</button>
-            <button type="button" onClick={handleWikidataCloseDialog} style={{
-              padding: '10px 20px',
-              backgroundColor: '#333',
-              color: 'white',
-              border: 'none',
-              borderRadius: '5px',
-              cursor: 'pointer',
-              fontSize: '16px'
-            }}>Close</button>
-          </div>
-        </form>
-      </div>
-    )}
-
-    {isBibDialogOpen && (
-      <div style={{
-        width: '500px',
-        position: 'fixed',
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        backgroundColor: 'white',
-        padding: '20px',
-        border: '1px solid #ccc',
-        borderRadius: '5px',
-        zIndex: 1000
-      }}>
-        <form style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-          <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
-            Author:
-            <input
-              name="bibAuthor" 
-              value={bibAuthor}
-              required
-              onChange={(e) => setBibAuthor(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '10px',
-                marginTop: '5px',
-                border: '1px solid #ccc',
+            </label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+              <button type="button" onClick={saveWikidata} style={{
+                padding: '10px 20px',
+                backgroundColor: '#000080',
+                color: 'white',
+                border: 'none',
                 borderRadius: '5px',
+                cursor: 'pointer',
                 fontSize: '16px',
-                resize: 'vertical'
-              }} 
+                marginRight: '10px'
+              }}>Save</button>
+              <button type="button" onClick={handleWikidataCloseDialog} style={{
+                padding: '10px 20px',
+                backgroundColor: '#333',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                fontSize: '16px'
+              }}>Close</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {isBibDialogOpen && (
+        <div style={{
+          width: '500px',
+          position: 'fixed',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          backgroundColor: 'white',
+          padding: '20px',
+          border: '1px solid #ccc',
+          borderRadius: '5px',
+          zIndex: 1000
+        }}>
+          <form style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
+              Author:
+              <input
+                name="bibAuthor"
+                value={bibAuthor}
+                required
+                onChange={(e) => setBibAuthor(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  marginTop: '5px',
+                  border: '1px solid #ccc',
+                  borderRadius: '5px',
+                  fontSize: '16px',
+                  resize: 'vertical'
+                }}
               />
-          </label>
-          <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
-            Title:
-            <textarea
-              name="bibTitle" 
-              value={bibTitle}
-              required
-              onChange={(e) => setBibTitle(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '10px',
-                marginTop: '5px',
-                border: '1px solid #ccc',
+            </label>
+            <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
+              Title:
+              <textarea
+                name="bibTitle"
+                value={bibTitle}
+                required
+                onChange={(e) => setBibTitle(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  marginTop: '5px',
+                  border: '1px solid #ccc',
+                  borderRadius: '5px',
+                  fontSize: '16px',
+                  resize: 'vertical'
+                }}
+              />
+            </label>
+            <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
+              Year:
+              <input
+                name="bibYear"
+                value={bibYear}
+                required
+                onChange={(e) => setBibYear(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  marginTop: '5px',
+                  border: '1px solid #ccc',
+                  borderRadius: '5px',
+                  fontSize: '16px',
+                  resize: 'vertical'
+                }}
+              />
+            </label>
+            <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
+              Page:
+              <input
+                name="bibPage"
+                value={bibPage}
+                required
+                onChange={(e) => setBibPage(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  marginTop: '5px',
+                  border: '1px solid #ccc',
+                  borderRadius: '5px',
+                  fontSize: '16px',
+                  resize: 'vertical'
+                }}
+              />
+            </label>
+            <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
+              PDF:
+              <input
+                name="bibPDF"
+                value={bibPDF}
+                required
+                onChange={(e) => setBibPDF(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  marginTop: '5px',
+                  border: '1px solid #ccc',
+                  borderRadius: '5px',
+                  fontSize: '16px',
+                  resize: 'vertical'
+                }}
+              />
+            </label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+              <button type="button" onClick={saveBib} style={{
+                padding: '10px 20px',
+                backgroundColor: '#000080',
+                color: 'white',
+                border: 'none',
                 borderRadius: '5px',
+                cursor: 'pointer',
                 fontSize: '16px',
-                resize: 'vertical'
-              }}
-               />
-          </label>
-          <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
-            Year:
-            <input
-              name="bibYear" 
-              value={bibYear}
-              required
-              onChange={(e) => setBibYear(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '10px',
-                marginTop: '5px',
-                border: '1px solid #ccc',
+                marginRight: '10px'
+              }}>Save</button>
+              <button type="button" onClick={handleBibCloseDialog} style={{
+                padding: '10px 20px',
+                backgroundColor: '#333',
+                color: 'white',
+                border: 'none',
                 borderRadius: '5px',
-                fontSize: '16px',
-                resize: 'vertical'
-              }}
-               />
-          </label>
-          <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
-            Page:
-            <input
-              name="bibPage" 
-              value={bibPage}
-              required
-              onChange={(e) => setBibPage(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '10px',
-                marginTop: '5px',
-                border: '1px solid #ccc',
-                borderRadius: '5px',
-                fontSize: '16px',
-                resize: 'vertical'
-              }}
-               />
-          </label>
-          <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
-            PDF:
-            <input
-              name="bibPDF" 
-              value={bibPDF}
-              required
-              onChange={(e) => setBibPDF(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '10px',
-                marginTop: '5px',
-                border: '1px solid #ccc',
-                borderRadius: '5px',
-                fontSize: '16px',
-                resize: 'vertical'
-              }}
-               />
-          </label>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
-            <button type="button" onClick={saveBib} style={{
-              padding: '10px 20px',
-              backgroundColor: '#000080',
-              color: 'white',
-              border: 'none',
-              borderRadius: '5px',
-              cursor: 'pointer',
-              fontSize: '16px',
-              marginRight: '10px'
-            }}>Save</button>
-            <button type="button" onClick={handleBibCloseDialog} style={{
-              padding: '10px 20px',
-              backgroundColor: '#333',
-              color: 'white',
-              border: 'none',
-              borderRadius: '5px',
-              cursor: 'pointer',
-              fontSize: '16px'
-            }}>Close</button>
-          </div>
-        </form>
-      </div>
-    )}
+                cursor: 'pointer',
+                fontSize: '16px'
+              }}>Close</button>
+            </div>
+          </form>
+        </div>
+      )}
 
-    {isDescDialogOpen && (
-      <div style={{
-        position: 'fixed',
-        height: '300px',
-        width: '500px',
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        backgroundColor: 'white',
-        padding: '20px',
-        border: '1px solid #ccc',
-        borderRadius: '5px',
-        zIndex: 1000
-      }}>
-        <form style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-          <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
-            Description:
-            <textarea
-              name="description" 
-              value={desc}
-              required
-              onChange={(e) => setDesc(e.target.value)}
-              style={{
-                height: '150px', 
-                width: '100%',
-                padding: '10px',
-                marginTop: '5px',
-                border: '1px solid #ccc',
+      {isDescDialogOpen && (
+        <div style={{
+          position: 'fixed',
+          height: '300px',
+          width: '500px',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          backgroundColor: 'white',
+          padding: '20px',
+          border: '1px solid #ccc',
+          borderRadius: '5px',
+          zIndex: 1000
+        }}>
+          <form style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
+              Description:
+              <textarea
+                name="description"
+                value={desc}
+                required
+                onChange={(e) => setDesc(e.target.value)}
+                style={{
+                  height: '150px',
+                  width: '100%',
+                  padding: '10px',
+                  marginTop: '5px',
+                  border: '1px solid #ccc',
+                  borderRadius: '5px',
+                  fontSize: '16px',
+                  resize: 'vertical'
+                }}
+              />
+            </label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+              <button type="button" onClick={saveDesc} style={{
+                padding: '10px 20px',
+                backgroundColor: '#000080',
+                color: 'white',
+                border: 'none',
                 borderRadius: '5px',
+                cursor: 'pointer',
                 fontSize: '16px',
-                resize: 'vertical'
-              }}
-               />
-          </label>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
-            <button type="button" onClick={saveDesc} style={{
-              padding: '10px 20px',
-              backgroundColor: '#000080',
-              color: 'white',
-              border: 'none',
-              borderRadius: '5px',
-              cursor: 'pointer',
-              fontSize: '16px',
-              marginRight: '10px'
-            }}>Save</button>
-            <button type="button" onClick={handleDescCloseDialog} style={{
-              padding: '10px 20px',
-              backgroundColor: '#333',
-              color: 'white',
-              border: 'none',
-              borderRadius: '5px',
-              cursor: 'pointer',
-              fontSize: '16px'
-            }}>Close</button>
-          </div>
-        </form>
-      </div>
-    )}
+                marginRight: '10px'
+              }}>Save</button>
+              <button type="button" onClick={handleDescCloseDialog} style={{
+                padding: '10px 20px',
+                backgroundColor: '#333',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                fontSize: '16px'
+              }}>Close</button>
+            </div>
+          </form>
+        </div>
+      )}
 
-    {selectedImage && (
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
-        backgroundColor: 'rgba(0, 0, 0, 0.8)',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        alignItems: 'center',
-        zIndex: 1000
-      }} onClick={() => setSelectedImage(null)}>
-        <img src={selectedImage.source} alt={selectedImage.caption} style={{ maxWidth: '90%', maxHeight: '90%' }} />
-        <br/>
-        <p style={{ color: 'white', marginTop: '5px', fontSize: '24px' }}>{selectedImage.caption}</p>
-        <button onClick={() => deleteMedia(infoPanelContent.id, selectedImage.index)} style={{
-                                position: 'absolute',
-                                top: '10px',
-                                right: '10px',
-                                padding: '5px 10px',
-                                backgroundColor: '#8b0000',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '5px',
-                                cursor: 'pointer',
-                                fontSize: '16px',
-                                marginBottom: '5px',
-                                marginTop: '10px',
-                                marginRight: '10px'
-                              }}>
-                                <FaTrashAlt/>
-                              </button>
-      </div>
-    )}
+      {selectedImage && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }} onClick={() => setSelectedImage(null)}>
+          <img src={selectedImage.source} alt={selectedImage.caption} style={{ maxWidth: '90%', maxHeight: '90%' }} />
+          <br />
+          <p style={{ color: 'white', marginTop: '5px', fontSize: '24px' }}>{selectedImage.caption}</p>
+          <button onClick={() => deleteMedia(infoPanelContent.id, selectedImage.index)} style={{
+            position: 'absolute',
+            top: '10px',
+            right: '10px',
+            padding: '5px 10px',
+            backgroundColor: '#8b0000',
+            color: 'white',
+            border: 'none',
+            borderRadius: '5px',
+            cursor: 'pointer',
+            fontSize: '16px',
+            marginBottom: '5px',
+            marginTop: '10px',
+            marginRight: '10px'
+          }}>
+            <FaTrashAlt />
+          </button>
+        </div>
+      )}
+
+{selectedVideo && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }} onClick={() => setSelectedVideo(null)}>
+          <iframe 
+            style={{width:'100%', height:'70%'}}
+            src={selectedVideo.source} 
+            title="YouTube video player" 
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            />
+          <br />
+          <p style={{ color: 'white', marginTop: '5px', fontSize: '24px' }}>{selectedVideo.caption}</p>
+          <button onClick={() => deleteMedia(infoPanelContent.id, selectedVideo.index)} style={{
+            position: 'absolute',
+            top: '10px',
+            right: '10px',
+            padding: '5px 10px',
+            backgroundColor: '#8b0000',
+            color: 'white',
+            border: 'none',
+            borderRadius: '5px',
+            cursor: 'pointer',
+            fontSize: '16px',
+            marginBottom: '5px',
+            marginTop: '10px',
+            marginRight: '10px'
+          }}>
+            <FaTrashAlt />
+          </button>
+        </div>
+      )}
 
     </>
   )
