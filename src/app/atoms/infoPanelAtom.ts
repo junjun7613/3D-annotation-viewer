@@ -30,12 +30,4 @@ export interface InfoPanelContent {
   bibliography: BibliographyItem[];
 }
 
-export const infoPanelAtom = atom<InfoPanelContent>({
-  id: '',
-  creator: '',
-  title: '',
-  description: '',
-  media: [],
-  wikidata: [],
-  bibliography: [],
-});
+export const infoPanelAtom = atom<InfoPanelContent | null>(null);

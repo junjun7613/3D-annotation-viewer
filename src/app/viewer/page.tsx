@@ -21,62 +21,26 @@ const Home: NextPage = () => {
     }
   }, []);
 
-  /*
-  const handleManifestUrlChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setManifestUrl(event.target.value)
-  }
-  */
-
   return (
-    <>
-      <style jsx global>{`
-        html,
-        body,
-        #__next {
-          margin: 0;
-          padding: 0;
-          height: 100%;
-          width: 100%;
-        }
-        * {
-          box-sizing: border-box;
-        }
-      `}</style>
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}>
-        <Header />
-        <div style={{ display: 'flex', flex: 1 }}>
+    <div className="flex flex-col h-screen w-full">
+      <Header />
+
+      <main className="flex flex-1 min-h-0 flex-col lg:flex-row">
+        <div className="w-full lg:w-2/3 h-[50vh] lg:h-full relative border-b lg:border-b-0 lg:border-r border-gray-200 dark:border-gray-700">
           <Viewer manifestUrl={manifestUrl} />
-          <div
-            style={{
-              flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              height: '100%',
-              overflowY: 'hidden',
-            }}
-          >
-            <div
-              style={{
-                flex: 1,
-                overflowY: 'auto',
-                borderBottom: '1px solid #ccc',
-              }}
-            >
-              <Metadata />
-            </div>
-            <div
-              style={{
-                flex: 1,
-                overflowY: 'auto',
-              }}
-            >
-              <InfoPanel />
-            </div>
+        </div>
+        <div className="w-full lg:w-1/3 h-[50vh] lg:h-full flex flex-col">
+          <div className="flex-1 overflow-y-auto border-b border-gray-200 dark:border-gray-700">
+            <Metadata manifestUrl={manifestUrl} />
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            <InfoPanel />
           </div>
         </div>
-        <Footer />
-      </div>
-    </>
+      </main>
+
+      <Footer />
+    </div>
   );
 };
 

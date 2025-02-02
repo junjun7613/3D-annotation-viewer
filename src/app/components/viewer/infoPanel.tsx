@@ -10,13 +10,13 @@ const Metadata = () => {
     <div className="metadata-container" style={{ padding: '20px' }}>
       {/* タイトルセクション */}
       <div style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '20px' }}>
-        {infoPanelContent.title || 'No Title'}
+        {infoPanelContent?.title || 'No Title'}
       </div>
 
       {/* 説明セクション */}
       <div style={{ marginBottom: '20px' }}>
         <div
-          dangerouslySetInnerHTML={{ __html: infoPanelContent.description || 'No description' }}
+          dangerouslySetInnerHTML={{ __html: infoPanelContent?.description || 'No description' }}
         />
       </div>
     </div>

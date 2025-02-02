@@ -16,9 +16,20 @@ const Home = () => {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', justifyContent: 'center', alignItems: 'center' }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100vh',
+        justifyContent: 'center',
+        alignItems: 'center',
+      }}
+    >
       <h1>Enter IIIF Manifest URL</h1>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <form
+        onSubmit={handleSubmit}
+        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}
+      >
         <input
           type="text"
           value={manifestUrl}
@@ -26,7 +37,9 @@ const Home = () => {
           placeholder="Enter IIIF Manifest URL"
           style={{ width: '300px', padding: '10px', marginBottom: '10px' }}
         />
-        <button type="submit" style={{ padding: '10px 20px' }}>View</button>
+        <button type="submit" style={{ padding: '10px 20px' }}>
+          View
+        </button>
       </form>
     </div>
   );

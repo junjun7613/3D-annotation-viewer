@@ -8,13 +8,11 @@ interface SwitchButtonProps {
 
 const SwitchButton: React.FC<SwitchButtonProps> = ({ checked, onChange }) => {
   return (
-    <div style={{ backgroundColor: 'rgba(255, 255, 255, 0.7)', padding: '10px', borderRadius: '5px' }}>
+    <div
+      style={{ backgroundColor: 'rgba(255, 255, 255, 0.7)', padding: '10px', borderRadius: '5px' }}
+    >
       <label className="switch">
-        <input
-          type="checkbox"
-          checked={checked}
-          onChange={(e) => onChange(e.target.checked)}
-        />
+        <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
         <span className="slider round"></span>
       </label>
       <style jsx>{`
@@ -39,24 +37,24 @@ const SwitchButton: React.FC<SwitchButtonProps> = ({ checked, onChange }) => {
           right: 0;
           bottom: 0;
           background-color: #ccc;
-          transition: .4s;
+          transition: 0.4s;
           border-radius: 34px;
         }
 
         .slider:before {
           position: absolute;
-          content: "";
+          content: '';
           height: 26px;
           width: 26px;
           left: 4px;
           bottom: 4px;
           background-color: white;
-          transition: .4s;
+          transition: 0.4s;
           border-radius: 50%;
         }
 
         input:checked + .slider {
-          background-color: #2196F3;
+          background-color: #2196f3;
         }
 
         input:checked + .slider:before {

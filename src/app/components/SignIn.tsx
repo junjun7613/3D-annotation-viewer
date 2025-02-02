@@ -1,9 +1,9 @@
-"use client";
-import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { useAuthState } from "react-firebase-hooks/auth";
-import { auth, provider } from "@/lib/firebase/firebase";
-import { signInWithPopup, signOut } from "firebase/auth";
+'use client';
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth, provider } from '@/lib/firebase/firebase';
+import { signInWithPopup, signOut } from 'firebase/auth';
 
 export const SighIn = () => {
   const [user] = useAuthState(auth);
@@ -12,11 +12,9 @@ export const SighIn = () => {
 
   useEffect(() => {
     if (user) {
-        console.log(user);
-        setIsSignedIn(true);
+      setIsSignedIn(true);
     } else {
-        console.log(user);
-        setIsSignedIn(false);
+      setIsSignedIn(false);
     }
   }, [user]);
 
@@ -24,9 +22,9 @@ export const SighIn = () => {
     try {
       await signInWithPopup(auth, provider);
       setIsSignedIn(true);
-      router.push("/");
+      router.push('/');
     } catch (error) {
-      console.error("Sign in error:", error);
+      console.error('Sign in error:', error);
     }
   };
 
@@ -35,7 +33,7 @@ export const SighIn = () => {
       await signOut(auth);
       setIsSignedIn(false);
     } catch (error) {
-      console.error("Sign out error:", error);
+      console.error('Sign out error:', error);
     }
   };
 
