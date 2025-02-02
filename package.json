@@ -1,5 +1,5 @@
 {
-  "name": "three_sample",
+  "name": "3d-annotation-viewer",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -10,9 +10,11 @@
   },
   "dependencies": {
     "@react-three/fiber": "^8.17.10",
+    "@samvera/clover-iiif": "^2.12.0",
     "CETEIcean": "^1.9.3",
     "firebase": "^11.1.0",
     "jeasings": "^0.0.16",
+    "jotai": "^2.11.3",
     "lodash": "^4.17.21",
     "next": "15.0.3",
     "react": "^18.0.0",

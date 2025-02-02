@@ -1,91 +1,37 @@
-"use client"
+'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import ThreeCanvas from '@/app/components/ThreeCanvasManifest_copy';
+import SwitchButton from '@/app/components/SwitchButton';
 
-import ThreeCanvas from '@/app/components/ThreeCanvasManifest_copy'
-import SwitchButton from '@/app/components/SwitchButton'
+interface ViewerProps {
+  manifestUrl: string;
+}
 
- interface MediaItem {
-    type: string;
-    source: string;
-    caption: string;
-  }
-
-  interface WikidataItem {
-    label: string;
-    uri: string;
-    wikipedia?: string;
-  }
-
-  interface BibliographyItem {
-    author: string;
-    title: string;
-    year: string;
-    page?: string;
-    pdf?: string;
-  }
-
-  interface InfoPanelContent {
-    id: string;
-    creator: string;
-    title: string;
-    description: string;
-    media: MediaItem[];
-    wikidata: WikidataItem[];
-    bibliography: BibliographyItem[];
-  }
-
-
-const Viewer = (
-    {manifestUrl}: {manifestUrl: string}
-) => {
-
-    
-
-     const [infoPanelContent, setInfoPanelContent] = useState<InfoPanelContent>({
-    id: '',
-    creator: '',
-    title: '',
-    description: '',
-    media: [],
-    wikidata: [],
-    bibliography: []
-  });
-
-      const [annotationsVisible, setAnnotationsVisible] = useState(true)
+const Viewer: React.FC<ViewerProps> = ({ manifestUrl }) => {
+  const [annotationsVisible, setAnnotationsVisible] = useState(true);
+  const [annotationMode] = useState(false);
 
   const handleSwitchChange = (checked: boolean) => {
-    setAnnotationsVisible(checked)
-  }
+    setAnnotationsVisible(checked);
+  };
 
-
-    const handleInfoPanelContentChange = (content: { id: string, creator: string, title: string, description: string, media: [], wikidata: [], bibliography: [] }) => {
-    
-    setInfoPanelContent(content);
-  }
-
-
-    return (
-<div style={{ flex: 1, borderRight: '1px solid #ccc', position: 'relative' }}>
-            <ThreeCanvas
-              annotationsVisible={annotationsVisible}
-              annotationMode={false}
-              
-              manifestUrl={manifestUrl}
-              onInfoPanelContentChange={handleInfoPanelContentChange}
-              editable={false}
-            />
-            <div style={{ position: 'absolute', top: '10px', left: '10px', zIndex: 100, backgroundColor: 'rgba(255, 255, 255, 0.8)', padding: '10px', borderRadius: '5px' }}>
-
-              <div style={{ flex: '1 1 45%' }}>
-                <p>Display annotations</p>
-                <SwitchButton checked={annotationsVisible} onChange={handleSwitchChange} />
-              </div>
-               
-
-            </div>
-          </div>
-    )
-}
+  return (
+    <div className="w-full h-full">
+      <ThreeCanvas
+        annotationsVisible={annotationsVisible}
+        annotationMode={annotationMode}
+        manifestUrl={manifestUrl}
+        editable={false}
+      />
+      <div className="absolute top-4 left-4 z-50 bg-white/80 dark:bg-gray-800/80 p-4 rounded-lg max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl">
+        <div>
+          <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">Display annotations</p>
+          <SwitchButton checked={annotationsVisible} onChange={handleSwitchChange} />
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default Viewer;
