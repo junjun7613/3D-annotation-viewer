@@ -53,6 +53,7 @@ interface ThreeCanvasProps {
   annotationMode: boolean;
   manifestUrl: string;
   onInfoPanelContentChange: (content: { id: string, creator: string, title: string, description: string, media:[], wikidata:[], bibliography:[] }) => void;
+  editable?: boolean;
 }
 
 //firebaseからデータを取得する関数
@@ -68,10 +69,10 @@ const getAnnotations = async () => {
   return annotations;
 };
 
-console.log(getAnnotations());
+
 
 //const ThreeCanvas = () => {
-const ThreeCanvas: React.FC<ThreeCanvasProps> = ({ annotationsVisible, annotationMode, manifestUrl, onInfoPanelContentChange }) => {
+const ThreeCanvas: React.FC<ThreeCanvasProps> = ({ annotationsVisible, annotationMode, manifestUrl, onInfoPanelContentChange, editable = true }) => {
   const [user] = useAuthState(auth);
 
   const selectedSpriteRef = useRef<THREE.Sprite | null>(null)
@@ -554,13 +555,19 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({ annotationsVisible, annotatio
             };
 
             window.removeEventListener('click', onMouseClick)
-            window.removeEventListener('dblclick', onMouseDblClick)
+            
             window.addEventListener('click', onMouseClick)
-            window.addEventListener('dblclick', onMouseDblClick);
+
+            if (editable) {
+              window.removeEventListener('dblclick', onMouseDblClick)
+              window.addEventListener('dblclick', onMouseDblClick);
+            }
 
             return () => {
               window.removeEventListener('click', onMouseClick)
-              window.removeEventListener('dblclick', onMouseDblClick);
+              if (editable) {
+                window.removeEventListener('dblclick', onMouseDblClick);
+              }
             }
 
           })
