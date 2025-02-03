@@ -78,6 +78,8 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   manifestUrl,
   editable = true,
 }) => {
+  //const canvasRef = useRef<HTMLDivElement>(null);
+  //const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const [user] = useAuthState(auth);
   const setInfoPanel = useSetAtom(infoPanelAtom);
   const selectedSpriteRef = useRef<THREE.Sprite | null>(null);
