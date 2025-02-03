@@ -426,7 +426,8 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
                   bibliography
                 );
 
-                if (title && description) {
+                //if (title && description) {
+                if (title) {
                   const div = document.createElement('div');
                   div.className = 'panel';
                   div.style.backgroundColor = 'rgba(0, 0, 0, 0.2)';
