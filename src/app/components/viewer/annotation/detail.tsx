@@ -1,9 +1,7 @@
-'use client';
-
 import { useAtom } from 'jotai';
 import { infoPanelAtom } from '@/app/atoms/infoPanelAtom';
 
-const Metadata = () => {
+const Detail = () => {
   const [infoPanelContent] = useAtom(infoPanelAtom);
 
   return (
@@ -23,4 +21,4 @@ const Metadata = () => {
   );
 };
 
-export default Metadata;
+export default Detail;

@@ -4,10 +4,12 @@ import { useEffect, useState } from 'react';
 import type { NextPage } from 'next';
 
 import Header from '@/app/components/viewer/header';
-import Viewer from '@/app/components/viewer/viewer';
+// import Viewer from '@/app/components/viewer/viewer';
+import Viewer from '@/app/components/viewer/layout/panels/canvas';
 import Footer from '@/app/components/viewer/footer';
-import InfoPanel from '@/app/components/viewer/infoPanel';
-import Metadata from '@/app/components/viewer/metadata';
+import InfoPanel from '@/app/components/viewer/layout/panels/info';
+import AnnotationPanel from '@/app/components/viewer/layout/panels/annotation';
+// import Metadata from '@/app/components/viewer/metadata';
 
 const Home: NextPage = () => {
   const [manifestUrl, setManifestUrl] = useState<string>('');
@@ -31,10 +33,10 @@ const Home: NextPage = () => {
         </div>
         <div className="w-full lg:w-1/3 h-[50vh] lg:h-full flex flex-col">
           <div className="flex-1 overflow-y-auto border-b border-gray-200 dark:border-gray-700">
-            <Metadata manifestUrl={manifestUrl} />
+            <InfoPanel manifestUrl={manifestUrl} />
           </div>
           <div className="flex-1 overflow-y-auto">
-            <InfoPanel />
+            <AnnotationPanel />
           </div>
         </div>
       </main>
