@@ -9,6 +9,7 @@ import type { NextPage } from 'next';
 import SignIn from './components/SignIn';
 import ThreeCanvas from './components/ThreeCanvasManifest_copy';
 import SwitchButton from './components/SwitchButton';
+import CustomEditor from './components/CustomEditor';
 // import DisplayTEI from './components/DisplayTEI';
 import { FaPencilAlt, FaBook, FaRegFilePdf, FaTrashAlt } from 'react-icons/fa';
 import { FaLink } from 'react-icons/fa6';
