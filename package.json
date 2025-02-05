@@ -16,6 +16,7 @@
     "ckeditor5": "^44.1.0",
     "ckeditor5-premium-features": "^44.1.0",
     "firebase": "^11.1.0",
+    "gsap": "^3.12.7",
     "jeasings": "^0.0.16",
     "jotai": "^2.11.3",
     "lodash": "^4.17.21",

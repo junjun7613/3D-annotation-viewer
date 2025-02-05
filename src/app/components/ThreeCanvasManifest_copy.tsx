@@ -8,6 +8,7 @@ import { OrbitControls } from 'three-stdlib';
 import { GLTFLoader } from 'three-stdlib';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+//import {gsap} from 'gsap';
 
 import db from '@/lib/firebase/firebase';
 import { addDoc, collection, getDocs, query, onSnapshot } from 'firebase/firestore';
@@ -255,12 +256,14 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
                   // マテリアルを作成する
                   const material = new THREE.SpriteMaterial({
                     map: texture,
-                    //depthTest: false, // スプライトを常に前面に表示
+                    depthTest: false, // スプライトを常に前面に表示
                     transparent: true, // スプライトを半透明にする
                     opacity: 0.7,
                   });
 
                   const sprite = new THREE.Sprite(material);
+                  sprite.renderOrder = 999; // スプライトのレンダー順序を設定
+
                   const coordinates = annotation.data.target.selector.value;
 
                   //coordinatesの各要素を数値化して、spriteの位置を設定
@@ -282,6 +285,19 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
                     bibliography: annotation.bibliography,
                     camPos: annotation.data.target.selector.camPos,
                   };
+
+                  /*
+                  // レイキャスターを使用してスプライトの位置をチェック
+                  const raycaster = new THREE.Raycaster();
+                  raycaster.setFromCamera(new THREE.Vector2(), camera);
+                  const intersects = raycaster.intersectObject(sprite, false);
+
+                  if (intersects.length < 1) {
+                    sprite.visible = true; // オブジェクトの前面にある場合は表示する
+                  } else {
+                    sprite.visible = false; // オブジェクトの裏側にある場合は非表示にする
+                  }
+                  */
 
                   scene.add(sprite);
                   sprites.push(sprite);
@@ -365,15 +381,29 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
 
                 const intersectedObject = intersects[0].object;
 
-                /*
+                console.log(intersectedObject)
+                
                 // カメラの位置をcamPosにスムーズに移動
-                camera.position.set(camPos[0], camPos[1], camPos[2]);
+                /*
+                camera.position.set(intersectedObject.userData.camPos[0], intersectedObject.userData.camPos[1], intersectedObject.userData.camPos[2]);
                 // カメラの向きをlookAtが中心になるようにスムーズに向ける
                 camera.updateMatrixWorld();
-                camera.lookAt(lookAt);
+                camera.lookAt(intersectedObject.position);
                 camera.up.set(0, 100, 0); // カメラのアップベクトルを設定
                 camera.updateProjectionMatrix();
                 animate();
+                
+                gsap.to(camera.position, {
+                  x: intersectedObject.userData.camPos[0],
+                  y: intersectedObject.userData.camPos[1],
+                  z: intersectedObject.userData.camPos[2],
+                  duration: 1, // アニメーションの持続時間（秒）
+                  onUpdate: () => {
+                    camera.lookAt(intersectedObject.position);
+                    camera.updateProjectionMatrix();
+                    animate();
+                  }
+                });
                 */
 
                 // 既存の情報パネルを削除
