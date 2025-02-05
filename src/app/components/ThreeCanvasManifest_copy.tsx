@@ -6,6 +6,7 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 import * as THREE from 'three';
 import { OrbitControls } from 'three-stdlib';
 import { GLTFLoader } from 'three-stdlib';
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 
 import db from '@/lib/firebase/firebase';
@@ -212,6 +213,9 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
 
         // GLTFLoader
         const loader = new GLTFLoader();
+        const dracoLoader = new DRACOLoader();
+        dracoLoader.setDecoderPath('https://www.gstatic.com/draco/v1/decoders/');
+        loader.setDRACOLoader(dracoLoader)
         loader.load(
           //'/models/inscription_1.glb', // Replace with the path to your .glb file
           importedModel,
