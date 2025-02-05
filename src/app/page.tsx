@@ -9,12 +9,12 @@ import type { NextPage } from 'next';
 import SignIn from './components/SignIn';
 import ThreeCanvas from './components/ThreeCanvasManifest_copy';
 import SwitchButton from './components/SwitchButton';
-// import CustomEditor from './components/CustomEditor';
-// import DisplayTEI from './components/DisplayTEI';
+//import CustomEditor from './components/CustomEditor';
+//import DisplayTEI from './components/DisplayTEI';
 import { FaPencilAlt, FaBook, FaRegFilePdf, FaTrashAlt } from 'react-icons/fa';
 import { FaLink } from 'react-icons/fa6';
 import { PiShareNetwork } from 'react-icons/pi';
-// import { FiUpload } from 'react-icons/fi';
+//import { FiUpload } from 'react-icons/fi';
 import { IoDocumentTextOutline } from 'react-icons/io5';
 import { useAtom } from 'jotai';
 import { infoPanelAtom } from '@/app/atoms/infoPanelAtom';
@@ -1181,6 +1181,11 @@ const Home: NextPage = () => {
                   resize: 'vertical',
                 }}
               />
+              {/* 
+              <CustomEditor 
+                value={desc}
+                />
+              */}
             </label>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
               <button
