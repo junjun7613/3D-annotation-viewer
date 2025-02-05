@@ -9,10 +9,17 @@ import {
   PrimitivesExternalWebResource,
   PrimitivesIIIFResource,
 } from '@samvera/clover-iiif/primitives';
-import type { Manifest } from '@iiif/presentation-3';
+
+import { useAtomValue } from 'jotai';
+import { manifestAtom } from '@/app/atoms/infoPanelAtom';
+
 import React from 'react';
 
-const MetadataContent = ({ manifest }: { manifest: Manifest }) => {
+const MetadataContent = () => {
+  const manifest = useAtomValue(manifestAtom);
+
+  if (!manifest) return null;
+
   return (
     <div className="p-3 sm:p-5 space-y-4 sm:space-y-6 text-gray-900 dark:text-gray-100 max-w-3xl mx-auto">
       <div>

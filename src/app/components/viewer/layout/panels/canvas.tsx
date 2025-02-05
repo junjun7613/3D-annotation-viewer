@@ -4,11 +4,7 @@ import { useState } from 'react';
 import ThreeCanvas from '@/app/components/ThreeCanvasManifest_copy';
 import SwitchButton from '@/app/components/SwitchButton';
 
-interface ViewerProps {
-  manifestUrl: string;
-}
-
-const Viewer: React.FC<ViewerProps> = ({ manifestUrl }) => {
+const Viewer = ({ manifestUrl }: { manifestUrl: string }) => {
   const [annotationsVisible, setAnnotationsVisible] = useState(true);
   const [annotationMode] = useState(false);
 

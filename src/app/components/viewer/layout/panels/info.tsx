@@ -1,9 +1,8 @@
 'use client';
-
-import type { Manifest } from '@iiif/presentation-3';
-import React, { useEffect, useState } from 'react';
-import AnnotationList from '@/app/components/viewer/annotation/list';
+import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import MetadataContent from '@/app/components/viewer/metadata/metadata';
+import AnnotationList from '@/app/components/viewer/annotation/annotationList';
 
 const Tabs = {
   METADATA: 'metadata',
@@ -12,30 +11,24 @@ const Tabs = {
 
 type TabType = (typeof Tabs)[keyof typeof Tabs];
 
-const ManifestMetadata = ({ manifestUrl }: { manifestUrl: string }) => {
-  const [activeTab, setActiveTab] = useState<TabType>(Tabs.METADATA);
-  const [manifest, setManifest] = useState<Manifest>();
+const ManifestMetadata = () => {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState<TabType>(() => {
+    // URLから初期タブを取得、なければメタデータをデフォルトに
+    return (searchParams.get('tab') as TabType) || Tabs.METADATA;
+  });
 
-  useEffect(() => {
-    const fetchManifest = async () => {
-      try {
-        const response = await fetch(manifestUrl);
-        if (!response.ok) throw new Error('Failed to fetch manifest');
-        const json = await response.json();
-        setManifest(json);
-      } catch (error) {
-        console.error('Error fetching manifest:', error);
-      }
-    };
-
-    if (manifestUrl) {
-      fetchManifest();
-    }
-  }, [manifestUrl]);
+  const handleTabChange = (tab: TabType) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', tab);
+    router.push(`?${params.toString()}`);
+    setActiveTab(tab);
+  };
 
   const TabButton = ({ tab, label }: { tab: TabType; label: string }) => (
     <button
-      onClick={() => setActiveTab(tab)}
+      onClick={() => handleTabChange(tab)}
       className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
         activeTab === tab
           ? 'border-blue-500 text-blue-600 dark:text-blue-400'
@@ -57,7 +50,9 @@ const ManifestMetadata = ({ manifestUrl }: { manifestUrl: string }) => {
 
       <div className="flex-1 overflow-y-auto">
         {activeTab === Tabs.METADATA ? (
-          manifest && <MetadataContent manifest={manifest} />
+          <div className="p-3 sm:p-5">
+            <MetadataContent />
+          </div>
         ) : (
           <div className="p-3 sm:p-5">
             <AnnotationList />
