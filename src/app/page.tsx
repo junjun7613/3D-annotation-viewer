@@ -21,6 +21,7 @@ import { infoPanelAtom } from '@/app/atoms/infoPanelAtom';
 
 import db from '@/lib/firebase/firebase';
 import { deleteDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { info } from 'console';
 
 const Home: NextPage = () => {
   const [user] = useAuthState(auth);
@@ -139,6 +140,16 @@ const Home: NextPage = () => {
     } else {
       console.warn('No such document!');
     }
+
+    console.log(infoPanelContent);
+    // firestoreのannotationsからinfoPanelContentのidを持つdocを取得
+    const docRef_updated = doc(db, 'annotations', infoPanelContent?.id || '');
+    const docSnap_updated = await getDoc(docRef);
+    const updatedData = docSnap_updated.data();
+
+    //console.log(updatedData?.wikidata);
+
+    // infoPanelContentのwikidataにdataを追記
 
     handleWikidataCloseDialog();
   };
