@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import ThreeCanvas from '@/app/components/ThreeCanvasManifest_copy';
+import ThreeCanvas from '@/app/components/ThreeCanvasManifest';
 import SwitchButton from '@/app/components/SwitchButton';
 
 const Viewer = ({ manifestUrl }: { manifestUrl: string }) => {

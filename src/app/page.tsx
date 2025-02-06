@@ -7,7 +7,7 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 import type { NextPage } from 'next';
 //import ThreeCanvas from './components/ThreeCanvas'
 import SignIn from './components/SignIn';
-import ThreeCanvas from './components/ThreeCanvasManifest_copy';
+import ThreeCanvas from './components/ThreeCanvasManifest';
 import SwitchButton from './components/SwitchButton';
 //import CustomEditor from './components/CustomEditor';
 //import DisplayTEI from './components/DisplayTEI';
