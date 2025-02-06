@@ -9,6 +9,7 @@ import Scene from '@/app/components/viewer/three/Scene';
 
 const Home: NextPage = () => {
   const glbUrl = '/models/253efdf34478459954ae04f6b3befa5f3822ed59.glb';
+
   return (
     <div style={{ width: '80vw', height: '80vh', backgroundColor: 'lightgray' }}>
       <Canvas

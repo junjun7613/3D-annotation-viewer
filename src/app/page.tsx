@@ -21,7 +21,6 @@ import { infoPanelAtom } from '@/app/atoms/infoPanelAtom';
 
 import db from '@/lib/firebase/firebase';
 import { deleteDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
-import { info } from 'console';
 
 const Home: NextPage = () => {
   const [user] = useAuthState(auth);
@@ -102,11 +101,6 @@ const Home: NextPage = () => {
       console.warn('No such document!');
     }
 
-    // firestoreのannotationsからinfoPanelContentのidを持つdocを取得
-    const docRef_updated = doc(db, 'annotations', infoPanelContent?.id || '');
-    const docSnap_updated = await getDoc(docRef);
-    const updatedData = docSnap_updated.data();
-
     //console.log(updatedData?.wikidata);
 
     // infoPanelContentのwikidataにdataを追記
@@ -152,12 +146,6 @@ const Home: NextPage = () => {
       console.warn('No such document!');
     }
 
-    console.log(infoPanelContent);
-    // firestoreのannotationsからinfoPanelContentのidを持つdocを取得
-    const docRef_updated = doc(db, 'annotations', infoPanelContent?.id || '');
-    const docSnap_updated = await getDoc(docRef);
-    const updatedData = docSnap_updated.data();
-
     //console.log(updatedData?.wikidata);
 
     // infoPanelContentのwikidataにdataを追記
@@ -190,11 +178,6 @@ const Home: NextPage = () => {
     } else {
       console.warn('No such document!');
     }
-
-    // firestoreのannotationsからinfoPanelContentのidを持つdocを取得
-    const docRef_updated = doc(db, 'annotations', infoPanelContent?.id || '');
-    const docSnap_updated = await getDoc(docRef);
-    const updatedData = docSnap_updated.data();
 
     //console.log(updatedData?.wikidata);
 
@@ -301,7 +284,6 @@ const Home: NextPage = () => {
         if (infoPanelContent?.media) {
           infoPanelContent.media.splice(index, 1);
         }
-
       }
     } else {
       alert('You are not the creator of this annotation.');
@@ -332,7 +314,6 @@ const Home: NextPage = () => {
         if (infoPanelContent?.bibliography) {
           infoPanelContent.bibliography.splice(index, 1);
         }
-
       }
     } else {
       alert('You are not the creator of this annotation.');
@@ -361,9 +342,8 @@ const Home: NextPage = () => {
 
         // wikiの削除が直ちにブラウザに反映されるようにinfoPanelContentのwikidataからindexの要素を削除
         //if (infoPanelContent?.wikidata) {
-          //infoPanelContent.wikidata.splice(index, 1);
+        //infoPanelContent.wikidata.splice(index, 1);
         //}
-
       }
     } else {
       alert('You are not the creator of this annotation.');
