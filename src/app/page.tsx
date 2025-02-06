@@ -296,6 +296,12 @@ const Home: NextPage = () => {
           }
         };
         deleteField();
+
+        //infoPanelContentのmediaからindexの要素を削除
+        if (infoPanelContent?.media) {
+          infoPanelContent.media.splice(index, 1);
+        }
+
       }
     } else {
       alert('You are not the creator of this annotation.');
@@ -321,13 +327,19 @@ const Home: NextPage = () => {
           }
         };
         deleteField();
+
+        //infoPanelContentのbibliographyからindexの要素を削除
+        if (infoPanelContent?.bibliography) {
+          infoPanelContent.bibliography.splice(index, 1);
+        }
+
       }
     } else {
       alert('You are not the creator of this annotation.');
     }
   };
 
-  const deleteWiki = (id: string, index: number) => {
+  const deleteWiki = async (id: string, index: number) => {
     if (infoPanelContent?.creator == user?.uid) {
       const confirmed = confirm('Are you sure you want to delete this Wiki Item?');
       if (confirmed) {
@@ -346,6 +358,12 @@ const Home: NextPage = () => {
           }
         };
         deleteField();
+
+        // wikiの削除が直ちにブラウザに反映されるようにinfoPanelContentのwikidataからindexの要素を削除
+        //if (infoPanelContent?.wikidata) {
+          //infoPanelContent.wikidata.splice(index, 1);
+        //}
+
       }
     } else {
       alert('You are not the creator of this annotation.');
