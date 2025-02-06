@@ -102,6 +102,17 @@ const Home: NextPage = () => {
       console.warn('No such document!');
     }
 
+    // firestoreのannotationsからinfoPanelContentのidを持つdocを取得
+    const docRef_updated = doc(db, 'annotations', infoPanelContent?.id || '');
+    const docSnap_updated = await getDoc(docRef);
+    const updatedData = docSnap_updated.data();
+
+    //console.log(updatedData?.wikidata);
+
+    // infoPanelContentのwikidataにdataを追記
+    infoPanelContent?.media.push(data);
+    console.log(infoPanelContent);
+
     handleMediaCloseDialog();
   };
 
@@ -179,6 +190,17 @@ const Home: NextPage = () => {
     } else {
       console.warn('No such document!');
     }
+
+    // firestoreのannotationsからinfoPanelContentのidを持つdocを取得
+    const docRef_updated = doc(db, 'annotations', infoPanelContent?.id || '');
+    const docSnap_updated = await getDoc(docRef);
+    const updatedData = docSnap_updated.data();
+
+    //console.log(updatedData?.wikidata);
+
+    // infoPanelContentのwikidataにdataを追記
+    infoPanelContent?.bibliography.push(data);
+    console.log(infoPanelContent);
 
     handleBibCloseDialog();
   };
