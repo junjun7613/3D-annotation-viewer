@@ -260,6 +260,23 @@ const Home: NextPage = () => {
     }
   };
 
+  const downloadRDF = (id: string) => {
+    // idのdocをfirebaseデータベースから取得
+    const docRef = doc(db, 'annotations', id);
+    const download = async () => {
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        console.log(data);
+      } else {
+        console.warn('No such document!');
+      }
+    };
+    if (infoPanelContent?.id) {
+      download();
+    }
+  };
+
   const deleteMedia = (id: string, index: number) => {
     if (infoPanelContent?.creator == user?.uid) {
       const confirmed = confirm('Are you sure you want to delete this Wiki Item?');
@@ -841,7 +858,23 @@ const Home: NextPage = () => {
                   fontSize: '16px',
                 }}
               >
-                Download
+                JSON
+              </button>
+              <button
+                onClick={() => infoPanelContent?.id && downloadRDF(infoPanelContent.id)}
+                style={{
+                  marginTop: '40px',
+                  marginLeft: '20px',
+                  padding: '10px 20px',
+                  backgroundColor: '#006400',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '5px',
+                  cursor: 'pointer',
+                  fontSize: '16px',
+                }}
+              >
+                RDF
               </button>
             </div>
           </div>
