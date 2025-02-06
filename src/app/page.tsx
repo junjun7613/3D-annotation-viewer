@@ -150,6 +150,8 @@ const Home: NextPage = () => {
     //console.log(updatedData?.wikidata);
 
     // infoPanelContentのwikidataにdataを追記
+    infoPanelContent?.wikidata.push(data);
+    console.log(infoPanelContent);
 
     handleWikidataCloseDialog();
   };
