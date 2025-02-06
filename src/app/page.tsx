@@ -481,7 +481,7 @@ const Home: NextPage = () => {
             </div>
           </div>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '20px' }}>
-            <div style={{ flex: 0.2, borderBottom: '2px solid #ccc', paddingBottom: '20px' }}>
+            <div style={{ flex: 0.2, display: 'flex', borderBottom: '2px solid #ccc', paddingBottom: '10px' }}>
               {/* user && <input type="text" value={manifestUrl} onChange={handleManifestUrlChange} placeholder="Enter IIIF Manifest URL" style={{ 
                 width: '100%',
                 padding: '10px',
@@ -496,7 +496,8 @@ const Home: NextPage = () => {
                 onChange={handleManifestUrlChange}
                 placeholder="Enter IIIF Manifest URL"
                 style={{
-                  width: '100%',
+                  width: '70%',
+                  height: '50px',
                   padding: '10px',
                   border: '2px solid #333',
                   borderRadius: '5px',
@@ -515,6 +516,22 @@ const Home: NextPage = () => {
                  fontSize: '16px'
                  }}>Load Manifest</button>
               */}
+              <button
+                onClick={() => infoPanelContent?.id && downloadRDF(infoPanelContent.id)}
+                style={{
+                  marginLeft: '30px',
+                  height: '50px',
+                  padding: '10px 20px',
+                  backgroundColor: '#006400',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '5px',
+                  cursor: 'pointer',
+                  fontSize: '16px',
+                }}
+              >
+                RDF
+              </button>
             </div>
             <div
               style={{
@@ -522,7 +539,7 @@ const Home: NextPage = () => {
                 display: 'flex',
                 borderBottom: '2px solid #ccc',
                 paddingBottom: '20px',
-                marginTop: '20px',
+                marginTop: '10px',
               }}
             >
               {/* 上側のコンテンツをここに追加 */}
@@ -531,7 +548,21 @@ const Home: NextPage = () => {
                 <DisplayTEI />
               </div>
               */}
-              <div style={{ flex: 1, paddingLeft: '20px' }}>
+              <div style={{ 
+                flex: 0.3, 
+                height: '270px',
+                borderRight: '2px solid #ccc', 
+                paddingRight: '20px', 
+                marginTop: '10px' 
+                }}>
+                {infoPanelContent?.title || ''}
+              </div>
+              <div style={{ 
+                flex: 0.7,  
+                height: '270px', 
+                paddingLeft: '20px', 
+                marginTop: '10px' 
+                }}>
                 <div
                   style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
                 >
@@ -557,9 +588,6 @@ const Home: NextPage = () => {
               </div>
             </div>
             <div style={{ flex: 1.2, paddingTop: '20px' }}>
-              <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
-                {infoPanelContent?.title || ''}
-              </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: '20px' }}>
                 <div
                   style={{
@@ -568,7 +596,7 @@ const Home: NextPage = () => {
                     marginTop: '10px',
                     padding: '10px',
                     borderRadius: '5px',
-                    height: '300px',
+                    height: '320px',
                   }}
                 >
                   <div
@@ -656,7 +684,7 @@ const Home: NextPage = () => {
                     marginTop: '10px',
                     padding: '10px',
                     borderRadius: '5px',
-                    height: '300px',
+                    height: '320px',
                   }}
                 >
                   <div
@@ -751,7 +779,7 @@ const Home: NextPage = () => {
                     marginTop: '10px',
                     padding: '10px',
                     borderRadius: '5px',
-                    height: '300px',
+                    height: '320px',
                   }}
                 >
                   <div
@@ -858,23 +886,7 @@ const Home: NextPage = () => {
                   fontSize: '16px',
                 }}
               >
-                JSON
-              </button>
-              <button
-                onClick={() => infoPanelContent?.id && downloadRDF(infoPanelContent.id)}
-                style={{
-                  marginTop: '40px',
-                  marginLeft: '20px',
-                  padding: '10px 20px',
-                  backgroundColor: '#006400',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '5px',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                }}
-              >
-                RDF
+                JSON Download
               </button>
             </div>
           </div>
