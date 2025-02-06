@@ -138,21 +138,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
 
   useEffect(() => {
     const q = query(collection(db, 'annotations'));
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const annotations: Annotation[] = [];
-      querySnapshot.forEach((doc) => {
-        const data = doc.data() as Annotation;
-        const annotationWithId = {
-          ...data,
-          id: doc.id,
-          creator: data.creator,
-          media: data.media || [],
-          bibliography: data.bibliography || [],
-        };
-        annotations.push(annotationWithId);
-      });
-      // アノテーションの更新を反映
-      // 必要に応じて、シーンの再描画や他の処理を行う
+    
 
       // ここでシーンの再描画や他の処理を行う
 
@@ -231,10 +217,30 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
           }
         );
 
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+          const annotations: Annotation[] = [];
+          querySnapshot.forEach((doc) => {
+            const data = doc.data() as Annotation;
+            const annotationWithId = {
+              ...data,
+              id: doc.id,
+              creator: data.creator,
+              media: data.media || [],
+              bibliography: data.bibliography || [],
+            };
+            annotations.push(annotationWithId);
+          });
+          // アノテーションの更新を反映
+          // 必要に応じて、シーンの再描画や他の処理を行う
         // アノテーションの読み込み
         getAnnotations()
           .then((data) => {
             // manifestにdataを格納
+
+            // 現在のannotationsを削除
+            spritesRef.current.forEach((sprite) => {
+              scene.remove(sprite);
+            });
 
             const sprites: THREE.Sprite[] = [];
             const polygons = [];
