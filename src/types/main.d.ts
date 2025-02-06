@@ -1,3 +1,5 @@
+import type { Vector3 } from 'three';
+
 export interface Annotation {
   id: string;
   creator: string;
@@ -56,4 +58,12 @@ export interface InfoPanelContent {
   media: MediaItem[];
   wikidata: WikidataItem[];
   bibliography: BibliographyItem[];
+}
+
+export interface Annotation3 {
+  id: string;
+  position: Vector3;
+  content: string;
+  cameraPosition: Vector3;
+  targetPosition: Vector3;
 }

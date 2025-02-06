@@ -1,43 +1,45 @@
 'use client';
 
-import { Clone, useGLTF } from '@react-three/drei';
+import { Clone, useGLTF, OrbitControls } from '@react-three/drei';
+import type { OrbitControls as OrbitControlsType } from 'three-stdlib';
 import type { ThreeEvent } from '@react-three/fiber';
 import Annotations from '@/app/components/viewer/three/Annotations';
-import type { Vector3 as ThreeVector3 } from 'three';
+
 import { Vector3 } from 'three';
-import { useState } from 'react';
-// アノテーションの型定義
-type Annotation = {
-  id: string;
-  position: ThreeVector3;
-  content: string;
-};
+import { useRef } from 'react';
+import { useThree } from '@react-three/fiber';
+import type { Annotation3 as Annotation } from '@/types/main';
+import { useAtom } from 'jotai';
+import { annotationsAtom3 } from '@/app/atoms/infoPanelAtom';
 
 export default function Scene({ glbUrl }: { glbUrl: string }) {
-  const sampleAnnotations: Annotation[] = [
-    { id: '1', position: new Vector3(0, 0, 0), content: '新しいアノテーション' },
-  ];
-  const [annotations, setAnnotations] = useState<Annotation[]>(sampleAnnotations);
+  const controlsRef = useRef<OrbitControlsType>(null);
+  const [annotations, setAnnotations] = useAtom(annotationsAtom3);
+  // const [annotations, setAnnotations] = useState<Annotation[]>(sampleAnnotations);
+  const { camera } = useThree();
   const handleClick = (event: ThreeEvent<MouseEvent>) => {
     event.stopPropagation();
     // クリック位置のワールド座標を取得
     if (event.point) {
       // クリック位置のワールド座標を取得
       const clickedPosition = new Vector3(event.point.x, event.point.y, event.point.z);
-      setAnnotations([
-        ...annotations,
-        {
-          id: (annotations.length + 1).toString(),
-          position: clickedPosition,
-          content: '新しいアノテーション',
-        },
-      ]);
+
+      const annotation: Annotation = {
+        id: (annotations.length + 1).toString(),
+        position: clickedPosition,
+        content: '新しいアノテーション',
+        cameraPosition: camera.position.clone(),
+        targetPosition: controlsRef.current?.target.clone() || new Vector3(),
+      };
+
+      setAnnotations([...annotations, annotation]);
     }
   };
 
   const model = useGLTF(glbUrl);
   return (
     <>
+      <OrbitControls ref={controlsRef} />
       <Clone object={model.scene} onDoubleClick={handleClick} />
       <Annotations annotations={annotations} />
     </>
