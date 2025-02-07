@@ -10,6 +10,8 @@ import 'ckeditor5-premium-features/ckeditor5-premium-features.css';
 
 interface CustomEditorProps {
     value: string;
+    // onChangeで関数を受け取る
+    onChange: (value: string) => void;
   }
 
 const CustomEditor: React.FC<CustomEditorProps> = ({value}) => {

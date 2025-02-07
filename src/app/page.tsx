@@ -9,7 +9,7 @@ import type { NextPage } from 'next';
 import SignIn from './components/SignIn';
 import ThreeCanvas from './components/ThreeCanvasManifest';
 import SwitchButton from './components/SwitchButton';
-//import CustomEditor from './components/CustomEditor';
+import CustomEditor from './components/CustomEditor';
 //import DisplayTEI from './components/DisplayTEI';
 import { FaPencilAlt, FaBook, FaRegFilePdf, FaTrashAlt } from 'react-icons/fa';
 import { FaLink } from 'react-icons/fa6';
@@ -20,7 +20,7 @@ import { useAtom } from 'jotai';
 import { infoPanelAtom } from '@/app/atoms/infoPanelAtom';
 
 import db from '@/lib/firebase/firebase';
-import { deleteDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { deleteDoc, doc, getDoc, getDocs, updateDoc, collection } from 'firebase/firestore';
 
 const Home: NextPage = () => {
   const [user] = useAuthState(auth);
@@ -39,11 +39,13 @@ const Home: NextPage = () => {
 
   const [infoPanelContent] = useAtom(infoPanelAtom);
 
+  const [isRDFDialogOpen, setIsRDFDialogOpen] = useState(false);
   const [isMediaDialogOpen, setIsMediaDialogOpen] = useState(false);
   const [isBibDialogOpen, setIsBibDialogOpen] = useState(false);
   const [isDescDialogOpen, setIsDescDialogOpen] = useState(false);
   const [isWikidataDialogOpen, setIsWikidataDialogOpen] = useState(false);
 
+  const [IRI, setIRI] = useState('');
   //mediaの情報をstateで管理
   const [source, setSource] = useState('');
   const [type, setType] = useState('img');
@@ -189,6 +191,7 @@ const Home: NextPage = () => {
   };
 
   const saveDesc = async () => {
+    console.log(desc);
     // descriptionの情報をfirebaseのannotationsコレクションのidを持つdocのdata/body/valueに保存
     const docRef = doc(db, 'annotations', infoPanelContent?.id || '');
     const docSnap = await getDoc(docRef);
@@ -261,20 +264,53 @@ const Home: NextPage = () => {
   };
 
   const downloadRDF = (id: string) => {
-    // idのdocをfirebaseデータベースから取得
-    const docRef = doc(db, 'annotations', id);
-    const download = async () => {
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        console.log(data);
-      } else {
-        console.warn('No such document!');
-      }
-    };
-    if (infoPanelContent?.id) {
-      download();
-    }
+    console.log("RDF download");
+    console.log(id);
+    // firebaseのannotationsコレクションのすべてのDocの中から、targetmanifestの値がidと一致するものを取得
+    const querySnapshot = getDocs(collection(db, 'annotations'));
+    querySnapshot.then((snapshot) => {
+      let turtleData = "@prefix : <https://junjun7613.github.io/MicroKnowledge/himiko.owl#> .\n"; // ベースURIを定義
+      turtleData += "\n";
+
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.target_manifest === id) {
+          console.log(data);
+          // 以下でannotationごとにTutleを生成・ダウンロード
+          turtleData += `\n<${IRI}${doc.id}> a <https://example.com/vocabulary/Annotation> ;\n`;
+          const properties = [];
+
+          properties.push(
+            `  <https://junjun7613.github.io/MicroKnowledge/himiko.owl#descriptionStart> <https://example.com/description/0001>`
+          );
+          
+          // 各プロパティをセミコロンで終わらせ、最後のプロパティにはピリオドを付ける
+          properties.forEach((prop, index) => {
+            if (index < properties.length - 1) {
+              turtleData += prop + ";\n";
+            } else {
+              turtleData += prop + ".\n";
+            }
+          });
+
+          // プロパティがない場合はピリオドを追加
+          if (properties.length === 0) {
+            turtleData += ".\n";
+          }
+          
+        }
+      })
+
+      const blob = new Blob([turtleData], { type: "text/turtle" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "graph-data.ttl";
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    handleRDFCloseDialog();
   };
 
   const deleteMedia = (id: string, index: number) => {
@@ -365,6 +401,13 @@ const Home: NextPage = () => {
     } else {
       alert('You are not the creator of this annotation.');
     }
+  };
+
+  const handleRDFOpenDialog = () => {
+    setIsRDFDialogOpen(true);
+  };
+  const handleRDFCloseDialog = () => {
+    setIsRDFDialogOpen(false);
   };
 
   const handleMediaOpenDialog = () => {
@@ -517,7 +560,7 @@ const Home: NextPage = () => {
                  }}>Load Manifest</button>
               */}
               <button
-                onClick={() => infoPanelContent?.id && downloadRDF(infoPanelContent.id)}
+                onClick={() => handleRDFOpenDialog()}
                 style={{
                   marginLeft: '30px',
                   height: '50px',
@@ -584,6 +627,7 @@ const Home: NextPage = () => {
                 </div>
                 <div
                   dangerouslySetInnerHTML={{ __html: infoPanelContent?.description || '' }}
+                  // infoPanelContent?.descriptionのマークダウンをHTMLに変換
                 ></div>
               </div>
             </div>
@@ -902,6 +946,76 @@ const Home: NextPage = () => {
           &copy; 2025 3D Annotation Editor. All rights reserved.
         </footer>
       </div>
+
+      {isRDFDialogOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            width: '500px',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            backgroundColor: 'white',
+            padding: '20px',
+            border: '1px solid #ccc',
+            borderRadius: '5px',
+            zIndex: 1000,
+          }}
+        >
+          <form style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
+              IRI:
+              <input
+                name="IRI"
+                value={IRI}
+                required
+                onChange={(e) => setIRI(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  marginTop: '5px',
+                  border: '1px solid #ccc',
+                  borderRadius: '5px',
+                  fontSize: '16px',
+                }}
+              />
+            </label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={() => downloadRDF(manifestUrl)}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: '#000080',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '5px',
+                  cursor: 'pointer',
+                  fontSize: '16px',
+                  marginRight: '10px',
+                }}
+              >
+                Download
+              </button>
+              <button
+                type="button"
+                onClick={handleRDFCloseDialog}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: '#333',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '5px',
+                  cursor: 'pointer',
+                  fontSize: '16px',
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {isMediaDialogOpen && (
         <div
@@ -1243,6 +1357,7 @@ const Home: NextPage = () => {
           <form style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
             <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
               Description:
+              
               <textarea
                 name="description"
                 value={desc}
@@ -1259,11 +1374,15 @@ const Home: NextPage = () => {
                   resize: 'vertical',
                 }}
               />
+              
               {/* 
               <CustomEditor 
                 value={desc}
+                // 入力されたテキストをセット
+                onChange={setDesc}
                 />
               */}
+              
             </label>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
               <button
