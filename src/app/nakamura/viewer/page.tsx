@@ -5,15 +5,42 @@ import { Vector3 } from 'three';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { Suspense } from 'react';
-import Scene from '@/app/components/viewer/three/Scene';
+import Scene from '@/app/components/viewer/three/editor/Scene';
 import { annotationsAtom3 } from '@/app/atoms/infoPanelAtom';
 import { useAtom } from 'jotai';
 import type { Annotation3 } from '@/types/main';
-import { useEffect } from 'react';
-import AnnotationList3 from '@/app/components/viewer/annotation/annotationList3';
+import { useEffect, useState } from 'react';
+import AnnotationList3 from '@/app/components/viewer/annotation/editor/annotationList3';
+
 const Home: NextPage = () => {
   const glbUrl =
     'https://sukilam.aws.ldas.jp/files/original/253efdf34478459954ae04f6b3befa5f3822ed59.glb';
+
+  const [layout, setLayout] = useState<'horizontal' | 'vertical'>('horizontal');
+  const [viewerHeight, setViewerHeight] = useState('100vh');
+
+  // ウィンドウサイズとデバイスに応じてレイアウトを変更
+  useEffect(() => {
+    const handleResize = () => {
+      // レイアウトの設定
+      setLayout(window.innerWidth < 768 ? 'vertical' : 'horizontal');
+
+      // モバイルデバイスでのビューポートの高さ調整
+      const vh = window.innerHeight * 0.01;
+      document.documentElement.style.setProperty('--vh', `${vh}px`);
+
+      // ビューワーの高さ調整
+      if (window.innerWidth < 768) {
+        setViewerHeight(`${window.innerHeight * 0.6}px`);
+      } else {
+        setViewerHeight('100vh');
+      }
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const [, setAnnotations] = useAtom(annotationsAtom3);
 
@@ -59,20 +86,36 @@ const Home: NextPage = () => {
   }, [setAnnotations]);
 
   return (
-    <div style={{ display: 'flex', width: '100vw', height: '100vh' }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: layout === 'horizontal' ? 'row' : 'column',
+        width: '100%',
+        height: layout === 'horizontal' ? '100vh' : 'auto',
+        maxHeight: '100vh',
+        overflow: 'hidden',
+      }}
+    >
       {/* 3Dビューワー */}
       <div
         style={{
-          flex: '0 0 70%', // 幅70%で固定
-          height: '100%',
-          backgroundColor: '#f5f5f5',
+          flex: layout === 'horizontal' ? '0 0 70%' : 'none',
+          height: layout === 'horizontal' ? '100%' : viewerHeight,
           position: 'relative',
+          backgroundColor: '#f5f5f5',
         }}
       >
         <Canvas
           camera={{
             position: [0, 2, 5],
             fov: 50,
+          }}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
           }}
         >
           <Suspense fallback={null}>
@@ -93,15 +136,17 @@ const Home: NextPage = () => {
         </Canvas>
       </div>
 
-      {/* サイドパネル */}
+      {/* アノテーションリスト */}
       <div
         style={{
-          flex: '0 0 30%', // 幅30%で固定
-          height: '100%',
+          flex: layout === 'horizontal' ? '0 0 30%' : '1 0 auto',
+          height: layout === 'horizontal' ? '100vh' : 'auto',
+          maxHeight: layout === 'horizontal' ? '100vh' : '40vh',
           backgroundColor: '#ffffff',
-          padding: '20px',
-          boxShadow: '-2px 0 10px rgba(0,0,0,0.1)',
-          overflowY: 'auto', // コンテンツが多い場合にスクロール可能
+          boxShadow:
+            layout === 'horizontal' ? '-2px 0 10px rgba(0,0,0,0.1)' : '0 -2px 10px rgba(0,0,0,0.1)',
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch', // iOSのスムーズスクロール
         }}
       >
         <AnnotationList3 />

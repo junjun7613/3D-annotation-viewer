@@ -1,9 +1,9 @@
-import { annotationsAtom, selectedAnnotationIdAtom } from '@/app/atoms/infoPanelAtom';
+import { annotationsAtom3, selectedAnnotationIdAtom } from '@/app/atoms/infoPanelAtom';
 import { useAtom } from 'jotai';
-// import type { Annotation3 } from '@/types/main';
+import type { Annotation3 } from '@/types/main';
 
 export default function AnnotationList3() {
-  const [annotations, setAnnotations] = useAtom(annotationsAtom);
+  const [annotations, setAnnotations] = useAtom(annotationsAtom3);
   const [selectedAnnotationId, setSelectedAnnotationId] = useAtom(selectedAnnotationIdAtom);
 
   const handleDelete = (id: string, e: React.MouseEvent) => {
@@ -14,18 +14,17 @@ export default function AnnotationList3() {
     }
   };
 
-  const focusOnAnnotation = (annotationId: string) => {
-    setSelectedAnnotationId(annotationId);
+  const focusOnAnnotation = (annotation: Annotation3) => {
+    setSelectedAnnotationId(annotation.id);
   };
   return (
     <div className="p-6">
       <h2 className="text-xl font-bold mb-6 text-gray-800">アノテーション一覧</h2>
-      <div className="mb-4 text-gray-500">{annotations.length}件</div>
       <div className="space-y-4">
-        {annotations.map((annotation, index) => (
+        {annotations.map((annotation) => (
           <div
             key={annotation.id}
-            onClick={() => focusOnAnnotation(annotation.id)}
+            onClick={() => focusOnAnnotation(annotation)}
             className={`group rounded-lg shadow-sm hover:shadow-md transition-all duration-200 
                 cursor-pointer border overflow-hidden
                 ${
@@ -46,7 +45,7 @@ export default function AnnotationList3() {
                                       : 'bg-blue-500'
                                   }`}
                   >
-                    {index + 1}
+                    {annotation.id}
                   </div>
                   <div
                     className={`ml-3 text-sm font-medium
@@ -56,7 +55,7 @@ export default function AnnotationList3() {
                                       : 'text-gray-600 group-hover:text-blue-600'
                                   }`}
                   >
-                    {annotation.data.body.label}
+                    アノテーション {annotation.id}
                   </div>
                 </div>
                 <button
@@ -79,7 +78,7 @@ export default function AnnotationList3() {
               </div>
 
               {/* コンテンツ部分 */}
-              <div className="text-gray-700 text-sm pl-9">{annotation.data.body.value}</div>
+              <div className="text-gray-700 text-sm pl-9">{annotation.content}</div>
 
               {/* アクションボタン */}
               <div className="mt-3 pl-9 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">

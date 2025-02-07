@@ -1,0 +1,62 @@
+import {
+  // Homepage,
+  Label,
+  Metadata as CloverMetadata,
+  // PartOf,
+  // RequiredStatement,
+  SeeAlso,
+  Summary,
+  PrimitivesExternalWebResource,
+  // PrimitivesIIIFResource,
+} from '@samvera/clover-iiif/primitives';
+
+import { useAtomValue } from 'jotai';
+import { manifestAtom } from '@/app/atoms/infoPanelAtom';
+
+const Metadata3 = () => {
+  const manifest = useAtomValue(manifestAtom);
+  return (
+    <div className="p-6">
+      <h2 className="text-xl font-bold mb-6 text-gray-800">メタデータ</h2>
+      {/* メタデータの内容をここに追加 */}
+      {manifest && (
+        <div className="space-y-4">
+          <div className="border-b pb-2">
+            <div className="text-sm text-gray-500">Title</div>
+            <div className="text-gray-900">
+              <Label label={manifest.label} as="span" />
+            </div>
+          </div>
+          {manifest.summary && (
+            <div className="border-b pb-2">
+              <div className="text-sm text-gray-500">Description</div>
+              <div className="text-gray-900">
+                <Summary summary={manifest.summary} />
+              </div>
+            </div>
+          )}
+
+          {manifest.metadata && (
+            <div className="border-b pb-2">
+              <div className="text-sm text-gray-500">Metadata</div>
+              <div className="text-gray-900">
+                <CloverMetadata metadata={manifest.metadata || []} />
+              </div>
+            </div>
+          )}
+
+          {manifest.seeAlso && (
+            <div className="border-b pb-2">
+              <div className="text-sm text-gray-500">See Also</div>
+              <div className="text-gray-900">
+                <SeeAlso seeAlso={manifest.seeAlso as unknown as PrimitivesExternalWebResource[]} />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Metadata3;
