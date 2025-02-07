@@ -1,6 +1,5 @@
 'use client';
 
-import { Html } from '@react-three/drei';
 import { useState } from 'react';
 import { useThree } from '@react-three/fiber';
 import gsap from 'gsap';
@@ -10,14 +9,29 @@ import { useAtom } from 'jotai';
 import { annotationsAtom } from '@/app/atoms/infoPanelAtom';
 import { selectedAnnotationIdAtom } from '@/app/atoms/infoPanelAtom';
 import { useEffect } from 'react';
-import { Vector3 } from 'three';
-export default function Annotations() {
+import { Vector3, Mesh } from 'three';
+import { GLTF } from 'three-stdlib';
+
+export default function Annotations({ model }: { model: GLTF }) {
   const [openAnnotationId, setOpenAnnotationId] = useState<string | null>(null);
   const [selectedAnnotationId, setSelectedAnnotationId] = useAtom(selectedAnnotationIdAtom);
 
   const [annotations] = useAtom(annotationsAtom);
 
   const { camera } = useThree();
+
+  const [meshList, setMeshList] = useState<Mesh[]>([]);
+
+  useEffect(() => {
+    const meshes: Mesh[] = [];
+    model.scene.traverse((child) => {
+      if (child.type === 'Mesh') {
+        meshes.push(child as Mesh);
+      }
+    });
+    console.log({ meshes });
+    setMeshList(meshes);
+  }, [model]);
 
   const focusOnAnnotation = (annotationId: string) => {
     const annotation = annotations.find((a) => a.id === annotationId);
@@ -48,20 +62,21 @@ export default function Annotations() {
     <>
       {annotations.map((annotation, index) => {
         const selector = annotation.data?.target?.selector;
-        const value = selector?.value;
+
         const type = selector?.type;
 
         return type === '3DSelector' ? (
-          <Html key={annotation.id} position={[value[0], value[1], value[2]]}>
-            <AnnotationMarker
-              number={(index + 1).toString()}
-              content={annotation.data.body.label}
-              isOpen={openAnnotationId === annotation.id}
-              onClick={() => {
-                setSelectedAnnotationId(annotation.id);
-              }}
-            />
-          </Html>
+          <AnnotationMarker
+            key={annotation.id}
+            number={(index + 1).toString()}
+            annotation={annotation}
+            isOpen={openAnnotationId === annotation.id}
+            onClick={() => {
+              setSelectedAnnotationId(annotation.id);
+            }}
+            /*mesh={mesh} */
+            meshList={meshList}
+          />
         ) : (
           <AreaMarker
             key={annotation.id}

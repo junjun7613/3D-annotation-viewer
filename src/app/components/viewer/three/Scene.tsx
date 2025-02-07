@@ -9,11 +9,12 @@ export default function Scene({ glbUrl }: { glbUrl: string }) {
   const controlsRef = useRef<OrbitControlsType>(null);
   // glbUrl = '/models/inscription_1.glb';
   const model = useGLTF(glbUrl);
+
   return (
     <>
       <OrbitControls ref={controlsRef} />
       <Clone object={model.scene} />
-      <Annotations />
+      {model && <Annotations model={model} />}
     </>
   );
 }
