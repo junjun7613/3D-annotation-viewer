@@ -1,18 +1,9 @@
 import { annotationsAtom, selectedAnnotationIdAtom } from '@/app/atoms/infoPanelAtom';
 import { useAtom } from 'jotai';
-// import type { Annotation3 } from '@/types/main';
 
 export default function AnnotationList3() {
-  const [annotations, setAnnotations] = useAtom(annotationsAtom);
+  const [annotations] = useAtom(annotationsAtom);
   const [selectedAnnotationId, setSelectedAnnotationId] = useAtom(selectedAnnotationIdAtom);
-
-  const handleDelete = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation(); // クリックイベントの伝播を止める
-    setAnnotations(annotations.filter((a) => a.id !== id));
-    if (selectedAnnotationId === id) {
-      setSelectedAnnotationId(null);
-    }
-  };
 
   const focusOnAnnotation = (annotationId: string) => {
     setSelectedAnnotationId(annotationId);
@@ -59,37 +50,19 @@ export default function AnnotationList3() {
                     {annotation.data.body.label}
                   </div>
                 </div>
-                <button
-                  onClick={(e) => handleDelete(annotation.id, e)}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-600"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </button>
               </div>
 
               {/* コンテンツ部分 */}
               <div className="text-gray-700 text-sm pl-9">{annotation.data.body.value}</div>
 
               {/* アクションボタン */}
+              {/*
               <div className="mt-3 pl-9 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button className="text-xs text-blue-500 hover:text-blue-600 font-medium">
                   詳細を見る
                 </button>
-                <button className="text-xs text-gray-500 hover:text-gray-600 font-medium">
-                  編集
-                </button>
               </div>
+              */}
             </div>
           </div>
         ))}
