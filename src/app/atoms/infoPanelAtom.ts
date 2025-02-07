@@ -12,3 +12,5 @@ export const annotationsAtom3 = atom<Annotation3[]>([]);
 
 // 選択中のアノテーションIDのアトム
 export const selectedAnnotationIdAtom = atom<string | null>(null);
+
+export const manifestUrlAtom = atom<string | null>(null);

@@ -1,0 +1,52 @@
+'use client';
+
+import { Label } from '@samvera/clover-iiif/primitives';
+import { useAtom } from 'jotai';
+import { manifestAtom, manifestUrlAtom } from '@/app/atoms/infoPanelAtom';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+
+const Header3 = () => {
+  const [manifest] = useAtom(manifestAtom);
+  const [manifestUrl, setManifestUrl] = useAtom(manifestUrlAtom);
+  const router = useRouter();
+
+  const handleClick = () => {
+    setManifestUrl(null);
+    router.push('/viewer');
+  };
+
+  return (
+    <header className="h-14 bg-white border-b border-gray-200 flex items-center px-3 sm:px-6 justify-between">
+      <div className="flex items-center space-x-2 sm:space-x-4 min-w-0">
+        <button onClick={handleClick} className="hover:opacity-80 transition-opacity shrink-0">
+          <h1 className="text-lg sm:text-xl font-bold text-gray-800">3D Viewer</h1>
+        </button>
+        {manifestUrl && manifest && (
+          <span className="text-sm text-gray-500 truncate">
+            <Label label={manifest.label} as="span" />
+          </span>
+        )}
+      </div>
+      <div className="flex items-center space-x-2 sm:space-x-4 ml-2 shrink-0">
+        {/*
+        <button className="hidden sm:block px-4 py-2 text-sm text-gray-600 hover:text-gray-800">
+          共有
+        </button>
+        */}
+        {manifestUrl && (
+          <Link
+            href={manifestUrl}
+            target="_blank"
+            className="px-3 sm:px-4 py-2 text-sm text-white bg-blue-500 rounded-md hover:bg-blue-600 whitespace-nowrap"
+          >
+            <span className="hidden sm:inline">ダウンロード</span>
+            <span className="sm:hidden">DL</span>
+          </Link>
+        )}
+      </div>
+    </header>
+  );
+};
+
+export default Header3;

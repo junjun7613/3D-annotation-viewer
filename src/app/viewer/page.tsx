@@ -3,7 +3,7 @@
 import type { NextPage } from 'next';
 import { Suspense } from 'react';
 
-import { annotationsAtom } from '@/app/atoms/infoPanelAtom';
+import { annotationsAtom, manifestUrlAtom } from '@/app/atoms/infoPanelAtom';
 import { useAtom } from 'jotai';
 import { useEffect, useState } from 'react';
 import Info3 from '@/app/components/viewer/layout/panels/info3';
@@ -11,49 +11,37 @@ import { fetchManifest } from '@/lib/services/utils';
 import { annotationService } from '@/lib/services/annotation';
 import { manifestAtom } from '@/app/atoms/infoPanelAtom';
 import CanvasComponent from '@/app/components/viewer/three/Canvas';
-
-// Info3コンポーネントのラッパー
-const InfoWrapper = () => {
-  return (
-    <Suspense
-      fallback={
-        <div className="p-6 animate-pulse">
-          <div className="h-6 w-48 bg-gray-200 rounded mb-6"></div>
-          <div className="space-y-4">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-20 bg-gray-200 rounded"></div>
-            ))}
-          </div>
-        </div>
-      }
-    >
-      <Info3 />
-    </Suspense>
-  );
-};
+import ManifestInput from '@/app/components/viewer/input';
+import Header3 from '@/app/components/viewer/header3';
+import Footer3 from '@/app/components/viewer/footer3';
 
 const Home: NextPage = () => {
+  const [manifestUrl, setManifestUrl] = useAtom(manifestUrlAtom);
   const [, setManifest] = useAtom(manifestAtom);
   const [glbUrl, setGlbUrl] = useState<string | null>(null);
-  const [layout, setLayout] = useState<'horizontal' | 'vertical'>('horizontal');
-  const [viewerHeight, setViewerHeight] = useState('100vh');
+  const [, setLayout] = useState<'horizontal' | 'vertical'>('horizontal');
+  const [, setViewerHeight] = useState('100vh');
   const [, setAnnotations] = useAtom(annotationsAtom);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const manifestParam = params.get('manifest');
     if (!manifestParam) return;
-    fetchManifest(manifestParam).then((manifest) => {
+    setManifestUrl(manifestParam);
+  }, []);
+
+  useEffect(() => {
+    if (!manifestUrl) return;
+    fetchManifest(manifestUrl).then((manifest) => {
       setGlbUrl(manifest.items[0].items[0].items[0].body.id);
 
       setManifest(manifest);
     });
 
-    annotationService.getAnnotationsByManifestId(manifestParam).then((annotations) => {
-      console.log(annotations);
+    annotationService.getAnnotationsByManifestId(manifestUrl).then((annotations) => {
       setAnnotations(annotations);
     });
-  }, [setManifest, setAnnotations]);
+  }, [manifestUrl]);
 
   // ウィンドウサイズとデバイスに応じてレイアウトを変更
   useEffect(() => {
@@ -78,45 +66,46 @@ const Home: NextPage = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: layout === 'horizontal' ? 'row' : 'column',
-        width: '100%',
-        height: layout === 'horizontal' ? '100vh' : 'auto',
-        maxHeight: '100vh',
-        overflow: 'hidden',
-      }}
-    >
-      {/* 3Dビューワー */}
-      <div
-        style={{
-          flex: layout === 'horizontal' ? '0 0 70%' : 'none',
-          height: layout === 'horizontal' ? '100%' : viewerHeight,
-          position: 'relative',
-          backgroundColor: '#f5f5f5',
-        }}
-      >
-        {glbUrl && <CanvasComponent glbUrl={glbUrl} />}
-      </div>
+  const handleManifestSubmit = async (manifestUrl: string) => {
+    setManifestUrl(manifestUrl);
+  };
 
-      {/* アノテーションリスト */}
-      <div
-        style={{
-          flex: layout === 'horizontal' ? '0 0 30%' : '1 0 auto',
-          height: layout === 'horizontal' ? '100vh' : 'auto',
-          maxHeight: layout === 'horizontal' ? '100vh' : '40vh',
-          backgroundColor: '#ffffff',
-          boxShadow:
-            layout === 'horizontal' ? '-2px 0 10px rgba(0,0,0,0.1)' : '0 -2px 10px rgba(0,0,0,0.1)',
-          overflowY: 'auto',
-          WebkitOverflowScrolling: 'touch', // iOSのスムーズスクロール
-        }}
-      >
-        <InfoWrapper />
+  return (
+    <>
+      <div className="flex flex-col h-screen">
+        <Header3 />
+        <main className="flex-1 flex overflow-hidden">
+          {manifestUrl ? (
+            <div className="flex flex-col sm:flex-row w-full">
+              <div className="h-[50vh] sm:h-full sm:w-[70%] relative bg-gray-100">
+                {glbUrl && <CanvasComponent glbUrl={glbUrl} />}
+              </div>
+              <div className="flex-1 sm:w-[30%] bg-white shadow-lg overflow-y-auto border-t sm:border-t-0 sm:border-l border-gray-200">
+                <Suspense
+                  fallback={
+                    <div className="p-6 animate-pulse">
+                      <div className="h-6 w-48 bg-gray-200 rounded mb-6"></div>
+                      <div className="space-y-4">
+                        {[...Array(3)].map((_, i) => (
+                          <div key={i} className="h-20 bg-gray-200 rounded"></div>
+                        ))}
+                      </div>
+                    </div>
+                  }
+                >
+                  <Info3 />
+                </Suspense>
+              </div>
+            </div>
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <ManifestInput onSubmit={handleManifestSubmit} />
+            </div>
+          )}
+        </main>
+        {!manifestUrl && <Footer3 />}
       </div>
-    </div>
+    </>
   );
 };
 
