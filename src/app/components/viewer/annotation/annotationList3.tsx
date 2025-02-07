@@ -53,7 +53,10 @@ export default function AnnotationList3() {
               </div>
 
               {/* コンテンツ部分 */}
-              <div className="text-gray-700 text-sm pl-9">{annotation.data.body.value}</div>
+              <div 
+                className="text-gray-700 text-sm pl-9"
+                dangerouslySetInnerHTML={{__html: annotation.data.body.value}}
+                />
 
               {/* アクションボタン */}
               {/*
