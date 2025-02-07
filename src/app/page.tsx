@@ -439,7 +439,7 @@ const Home: NextPage = () => {
             alignItems: 'center',
           }}
         >
-          <h1 style={{ margin: 0 }}>3D Annotation Viewer</h1>
+          <h1 style={{ margin: 0 }}>3D Annotation Editor</h1>
           <nav>
             <a href="#home" style={{ color: 'white', marginRight: '20px' }}>
               Home
@@ -899,7 +899,7 @@ const Home: NextPage = () => {
             textAlign: 'center',
           }}
         >
-          &copy; 2023 3D Annotation Viewer. All rights reserved.
+          &copy; 2025 3D Annotation Editor. All rights reserved.
         </footer>
       </div>
 
