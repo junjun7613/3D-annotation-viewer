@@ -49,6 +49,7 @@ const Home: NextPage = () => {
   //mediaの情報をstateで管理
   const [source, setSource] = useState('');
   const [type, setType] = useState('img');
+  const [wikiType, setWikiType] = useState('wikidata');
   const [caption, setCaption] = useState('');
   //bibliographyの情報をstateで管理
   const [bibAuthor, setBibAuthor] = useState('');
@@ -113,26 +114,42 @@ const Home: NextPage = () => {
   };
 
   const saveWikidata = async () => {
-    // wikidataのsparqlエンドポイントにアクセスして該当するデータのラベルを取得
+    let data = {}
+    if (wikiType === 'wikidata') {
+      // wikidataのsparqlエンドポイントにアクセスして該当するデータのラベルを取得
+      console.log(wikidata);
 
-    const query = `SELECT ?item ?itemLabel ?wikipediaUrl WHERE {
-      VALUES ?item {wd:${wikidata.split('/').pop()}}
-      SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],en". }
-      ?wikipediaUrl schema:about ?item ;
-      schema:inLanguage "en" ;
-      schema:isPartOf <https://en.wikipedia.org/> .
+      const query = `SELECT ?item ?itemLabel ?wikipediaUrl WHERE {
+        VALUES ?item {wd:${wikidata.split('/').pop()}}
+        SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],en". }
+        ?wikipediaUrl schema:about ?item ;
+        schema:inLanguage "en" ;
+        schema:isPartOf <https://en.wikipedia.org/> .
+      }
+      `; //wikidataのsparqlクエリ
+      const url = `https://query.wikidata.org/sparql?query=${encodeURIComponent(query)}&format=json`;
+      const result = await fetch(url).then((res) => res.json());
+      const label = result['results']['bindings'][0]['itemLabel']['value'];
+      const wikipedia = result['results']['bindings'][0]['wikipediaUrl']['value'];
+      /*
+      const data = {
+        uri: wikidata,
+        label: label,
+        wikipedia: wikipedia,
+      };
+      */
+      data = {
+        type: wikiType,
+        uri: wikidata,
+        label: label,
+        wikipedia: wikipedia,
+      };
+
+    } else if (wikiType === 'pleiades') {
+      console.log("register pleiades");
     }
-    `; //wikidataのsparqlクエリ
-    const url = `https://query.wikidata.org/sparql?query=${encodeURIComponent(query)}&format=json`;
-    const result = await fetch(url).then((res) => res.json());
-    const label = result['results']['bindings'][0]['itemLabel']['value'];
-    const wikipedia = result['results']['bindings'][0]['wikipediaUrl']['value'];
 
-    const data = {
-      uri: wikidata,
-      label: label,
-      wikipedia: wikipedia,
-    };
+    console.log(data);
 
     // firebaseのannotationsコレクションのidを持つdocのMediaフィールド(Array)のdataをfirebaseから取得
     const docRef = doc(db, 'annotations', infoPanelContent?.id || '');
@@ -1151,6 +1168,25 @@ const Home: NextPage = () => {
           }}
         >
           <form style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
+              Type:
+              <select
+                name="type"
+                value={wikiType}
+                onChange={(e) => setWikiType(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  marginTop: '5px',
+                  border: '1px solid #ccc',
+                  borderRadius: '5px',
+                  fontSize: '16px',
+                }}
+              >
+                <option value="wikidata">Wikidata</option>
+                <option value="pleiades">Pleiades</option>
+              </select>
+            </label>
             <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
               Wikidata URI:
               <input
