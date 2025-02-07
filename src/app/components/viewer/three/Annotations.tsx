@@ -46,6 +46,8 @@ export default function Annotations() {
   return (
     <>
       {annotations.map((annotation, index) => (
+      // annotation.data.target.selector.valueが存在する場合のみ表示
+      annotation.data.target.selector.value && (
         <Html
           key={annotation.id}
           position={[
@@ -63,6 +65,7 @@ export default function Annotations() {
             }}
           />
         </Html>
+      )
       ))}
     </>
   );
