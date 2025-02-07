@@ -9,7 +9,7 @@ import type { NextPage } from 'next';
 import SignIn from './components/SignIn';
 import ThreeCanvas from './components/ThreeCanvasManifest';
 import SwitchButton from './components/SwitchButton';
-import CustomEditor from './components/CustomEditor';
+// import CustomEditor from './components/CustomEditor';
 //import DisplayTEI from './components/DisplayTEI';
 import { FaPencilAlt, FaBook, FaRegFilePdf, FaTrashAlt } from 'react-icons/fa';
 import { FaLink } from 'react-icons/fa6';
@@ -264,13 +264,13 @@ const Home: NextPage = () => {
   };
 
   const downloadRDF = (id: string) => {
-    console.log("RDF download");
+    console.log('RDF download');
     console.log(id);
     // firebaseのannotationsコレクションのすべてのDocの中から、targetmanifestの値がidと一致するものを取得
     const querySnapshot = getDocs(collection(db, 'annotations'));
     querySnapshot.then((snapshot) => {
-      let turtleData = "@prefix : <https://junjun7613.github.io/MicroKnowledge/himiko.owl#> .\n"; // ベースURIを定義
-      turtleData += "\n";
+      let turtleData = '@prefix : <https://junjun7613.github.io/MicroKnowledge/himiko.owl#> .\n'; // ベースURIを定義
+      turtleData += '\n';
 
       snapshot.forEach((doc) => {
         const data = doc.data();
@@ -283,29 +283,28 @@ const Home: NextPage = () => {
           properties.push(
             `  <https://junjun7613.github.io/MicroKnowledge/himiko.owl#descriptionStart> <https://example.com/description/0001>`
           );
-          
+
           // 各プロパティをセミコロンで終わらせ、最後のプロパティにはピリオドを付ける
           properties.forEach((prop, index) => {
             if (index < properties.length - 1) {
-              turtleData += prop + ";\n";
+              turtleData += prop + ';\n';
             } else {
-              turtleData += prop + ".\n";
+              turtleData += prop + '.\n';
             }
           });
 
           // プロパティがない場合はピリオドを追加
           if (properties.length === 0) {
-            turtleData += ".\n";
+            turtleData += '.\n';
           }
-          
         }
-      })
+      });
 
-      const blob = new Blob([turtleData], { type: "text/turtle" });
+      const blob = new Blob([turtleData], { type: 'text/turtle' });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
+      const a = document.createElement('a');
       a.href = url;
-      a.download = "graph-data.ttl";
+      a.download = 'graph-data.ttl';
       a.click();
       URL.revokeObjectURL(url);
     });
@@ -524,7 +523,14 @@ const Home: NextPage = () => {
             </div>
           </div>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '20px' }}>
-            <div style={{ flex: 0.2, display: 'flex', borderBottom: '2px solid #ccc', paddingBottom: '10px' }}>
+            <div
+              style={{
+                flex: 0.2,
+                display: 'flex',
+                borderBottom: '2px solid #ccc',
+                paddingBottom: '10px',
+              }}
+            >
               {/* user && <input type="text" value={manifestUrl} onChange={handleManifestUrlChange} placeholder="Enter IIIF Manifest URL" style={{ 
                 width: '100%',
                 padding: '10px',
@@ -591,21 +597,25 @@ const Home: NextPage = () => {
                 <DisplayTEI />
               </div>
               */}
-              <div style={{ 
-                flex: 0.3, 
-                height: '270px',
-                borderRight: '2px solid #ccc', 
-                paddingRight: '20px', 
-                marginTop: '10px' 
-                }}>
+              <div
+                style={{
+                  flex: 0.3,
+                  height: '270px',
+                  borderRight: '2px solid #ccc',
+                  paddingRight: '20px',
+                  marginTop: '10px',
+                }}
+              >
                 {infoPanelContent?.title || ''}
               </div>
-              <div style={{ 
-                flex: 0.7,  
-                height: '270px', 
-                paddingLeft: '20px', 
-                marginTop: '10px' 
-                }}>
+              <div
+                style={{
+                  flex: 0.7,
+                  height: '270px',
+                  paddingLeft: '20px',
+                  marginTop: '10px',
+                }}
+              >
                 <div
                   style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
                 >
@@ -1357,7 +1367,6 @@ const Home: NextPage = () => {
           <form style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
             <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
               Description:
-              
               <textarea
                 name="description"
                 value={desc}
@@ -1374,7 +1383,6 @@ const Home: NextPage = () => {
                   resize: 'vertical',
                 }}
               />
-              
               {/* 
               <CustomEditor 
                 value={desc}
@@ -1382,7 +1390,6 @@ const Home: NextPage = () => {
                 onChange={setDesc}
                 />
               */}
-              
             </label>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
               <button
