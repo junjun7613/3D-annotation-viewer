@@ -50,13 +50,18 @@ export default function AnnotationList3() {
                     {annotation.data.body.label}
                   </div>
                 </div>
+                <div className="mt-2">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    Type: {annotation.data?.target?.selector?.type || '不明'}
+                  </span>
+                </div>
               </div>
 
               {/* コンテンツ部分 */}
-              <div 
+              <div
                 className="text-gray-700 text-sm pl-9"
-                dangerouslySetInnerHTML={{__html: annotation.data.body.value}}
-                />
+                dangerouslySetInnerHTML={{ __html: annotation.data.body.value }}
+              />
 
               {/* アクションボタン */}
               {/*

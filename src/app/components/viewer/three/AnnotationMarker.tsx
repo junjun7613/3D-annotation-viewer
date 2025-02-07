@@ -1,3 +1,5 @@
+import Popup from '@/app/components/viewer/three/Popup';
+
 export default function AnnotationMarker({
   number,
   content,
@@ -20,13 +22,7 @@ export default function AnnotationMarker({
       </div>
 
       {/* ポップアップ */}
-      {isOpen && (
-        <div className="absolute left-8 top-0 z-10">
-          <div className="bg-white/90 backdrop-blur-sm px-3 py-2 rounded-lg shadow-lg">
-            <div className="text-sm text-gray-800">{content}</div>
-          </div>
-        </div>
-      )}
+      {isOpen && <Popup content={content} />}
     </div>
   );
 }

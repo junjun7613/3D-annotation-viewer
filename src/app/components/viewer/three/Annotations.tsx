@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useThree } from '@react-three/fiber';
 import gsap from 'gsap';
 import AnnotationMarker from '@/app/components/viewer/three/AnnotationMarker';
+import AreaMarker from '@/app/components/viewer/three/AreaMarker';
 import { useAtom } from 'jotai';
 import { annotationsAtom } from '@/app/atoms/infoPanelAtom';
 import { selectedAnnotationIdAtom } from '@/app/atoms/infoPanelAtom';
@@ -45,28 +46,36 @@ export default function Annotations() {
 
   return (
     <>
-      {annotations.map((annotation, index) => (
-      // annotation.data.target.selector.valueが存在する場合のみ表示
-      annotation.data.target.selector.value && (
-        <Html
-          key={annotation.id}
-          position={[
-            annotation.data.target.selector.value[0],
-            annotation.data.target.selector.value[1],
-            annotation.data.target.selector.value[2],
-          ]}
-        >
-          <AnnotationMarker
+      {annotations.map((annotation, index) => {
+        const selector = annotation.data?.target?.selector;
+        const value = selector?.value;
+        const type = selector?.type;
+
+        return type === '3DSelector' ? (
+          <Html key={annotation.id} position={[value[0], value[1], value[2]]}>
+            <AnnotationMarker
+              number={(index + 1).toString()}
+              content={annotation.data.body.label}
+              isOpen={openAnnotationId === annotation.id}
+              onClick={() => {
+                setSelectedAnnotationId(annotation.id);
+              }}
+            />
+          </Html>
+        ) : (
+          <AreaMarker
+            key={annotation.id}
             number={(index + 1).toString()}
-            content={/*annotation.content*/ annotation.data.body.label}
+            annotation={annotation}
             isOpen={openAnnotationId === annotation.id}
             onClick={() => {
               setSelectedAnnotationId(annotation.id);
             }}
           />
-        </Html>
-      )
-      ))}
+        );
+        // }
+        return null;
+      })}
     </>
   );
 }

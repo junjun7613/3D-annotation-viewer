@@ -14,7 +14,7 @@ import CanvasComponent from '@/app/components/viewer/three/Canvas';
 import ManifestInput from '@/app/components/viewer/input';
 import Header3 from '@/app/components/viewer/header3';
 import Footer3 from '@/app/components/viewer/footer3';
-
+import { useRouter } from 'next/navigation';
 const Home: NextPage = () => {
   const [manifestUrl, setManifestUrl] = useAtom(manifestUrlAtom);
   const [, setManifest] = useAtom(manifestAtom);
@@ -22,16 +22,19 @@ const Home: NextPage = () => {
   const [, setLayout] = useState<'horizontal' | 'vertical'>('horizontal');
   const [, setViewerHeight] = useState('100vh');
   const [, setAnnotations] = useAtom(annotationsAtom);
-
+  const router = useRouter();
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const manifestParam = params.get('manifest');
     if (!manifestParam) return;
     setManifestUrl(manifestParam);
-  }, []);
+  }, [setManifestUrl]);
 
   useEffect(() => {
     if (!manifestUrl) return;
+
+    // routeに設定
+    router.push(`/viewer?manifest=${manifestUrl}`);
     fetchManifest(manifestUrl).then((manifest) => {
       setGlbUrl(manifest.items[0].items[0].items[0].body.id);
 
@@ -41,7 +44,7 @@ const Home: NextPage = () => {
     annotationService.getAnnotationsByManifestId(manifestUrl).then((annotations) => {
       setAnnotations(annotations);
     });
-  }, [manifestUrl]);
+  }, [manifestUrl, setManifest, setAnnotations, router]);
 
   // ウィンドウサイズとデバイスに応じてレイアウトを変更
   useEffect(() => {
