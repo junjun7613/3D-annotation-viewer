@@ -80,7 +80,7 @@ const Home: NextPage = () => {
         <main className="flex-1 flex overflow-hidden">
           {manifestUrl ? (
             <div className="flex flex-col sm:flex-row w-full">
-              <div className="h-[50vh] sm:h-full sm:w-[70%] relative bg-gray-100">
+              <div className="h-[50vh] sm:h-full sm:w-[70%] relative bg-gray-100 dark:bg-gray-900">
                 {glbUrl && <CanvasComponent glbUrl={glbUrl} />}
               </div>
               <div className="flex-1 sm:w-[30%] bg-white shadow-lg overflow-y-auto border-t sm:border-t-0 sm:border-l border-gray-200">

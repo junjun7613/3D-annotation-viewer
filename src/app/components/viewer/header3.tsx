@@ -17,10 +17,12 @@ const Header3 = () => {
   };
 
   return (
-    <header className="h-14 bg-white border-b border-gray-200 flex items-center px-3 sm:px-6 justify-between">
+    <header className="h-14 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center px-3 sm:px-6 justify-between">
       <div className="flex items-center space-x-2 sm:space-x-4 min-w-0">
         <button onClick={handleClick} className="hover:opacity-80 transition-opacity shrink-0">
-          <h1 className="text-lg sm:text-xl font-bold text-gray-800">3D Viewer</h1>
+          <h1 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100">
+            3D Viewer
+          </h1>
         </button>
         {manifestUrl && manifest && (
           <span className="text-sm text-gray-500 truncate">

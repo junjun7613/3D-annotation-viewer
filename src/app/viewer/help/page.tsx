@@ -3,12 +3,12 @@ import CommonLayout from '@/app/components/viewer/layout/common';
 export default function HelpPage() {
   return (
     <CommonLayout>
-      <div className="flex flex-col items-center justify-center min-h-[60vh] p-8">
+      <div className="flex flex-col items-center justify-center min-h-[60vh] p-8 bg-white dark:bg-gray-900">
         {/* アイコンと見出し */}
         <div className="mb-8 text-center">
-          <div className="inline-block p-4 bg-blue-50 rounded-full mb-4">
+          <div className="inline-block p-4 bg-blue-50 dark:bg-blue-900 rounded-full mb-4">
             <svg
-              className="w-16 h-16 text-blue-500"
+              className="w-16 h-16 text-blue-500 dark:text-blue-400"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -21,16 +21,18 @@ export default function HelpPage() {
               />
             </svg>
           </div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">ヘルプ</h1>
-          <p className="text-gray-600 max-w-lg mx-auto">
+          <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100 mb-2">ヘルプ</h1>
+          <p className="text-gray-600 dark:text-gray-300 max-w-lg mx-auto">
             当サービスのヘルプページは現在作成中です。
             より良いサービスをご提供するため、準備を進めています。
           </p>
         </div>
 
         {/* 予定セクション */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6 max-w-2xl w-full">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">記載予定の内容</h2>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 p-6 max-w-2xl w-full">
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">
+            記載予定の内容
+          </h2>
           <ul className="space-y-3">
             {[
               '基本的な使い方',
@@ -41,9 +43,9 @@ export default function HelpPage() {
               'システム要件',
               'お問い合わせ方法',
             ].map((item, index) => (
-              <li key={index} className="flex items-center text-gray-600">
+              <li key={index} className="flex items-center text-gray-600 dark:text-gray-300">
                 <svg
-                  className="w-5 h-5 text-blue-500 mr-3"
+                  className="w-5 h-5 text-blue-500 dark:text-blue-400 mr-3"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -62,7 +64,7 @@ export default function HelpPage() {
         </div>
 
         {/* 注意書き */}
-        <div className="mt-8 text-center text-sm text-gray-500">
+        <div className="mt-8 text-center text-sm text-gray-500 dark:text-gray-400">
           <p>
             ヘルプページの詳細は準備が整い次第、こちらに掲載いたします。
             <br />

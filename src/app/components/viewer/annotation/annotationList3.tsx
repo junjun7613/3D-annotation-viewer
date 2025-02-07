@@ -8,10 +8,13 @@ export default function AnnotationList3() {
   const focusOnAnnotation = (annotationId: string) => {
     setSelectedAnnotationId(annotationId);
   };
+
   return (
-    <div className="p-6">
-      <h2 className="text-xl font-bold mb-6 text-gray-800">アノテーション一覧</h2>
-      <div className="mb-4 text-gray-500">{annotations.length}件</div>
+    <div className="p-6 bg-white dark:bg-gray-900">
+      <h2 className="text-xl font-bold mb-6 text-gray-800 dark:text-gray-100">
+        アノテーション一覧
+      </h2>
+      <div className="mb-4 text-gray-500 dark:text-gray-400">{annotations.length}件</div>
       <div className="space-y-4">
         {annotations.map((annotation, index) => (
           <div
@@ -21,8 +24,8 @@ export default function AnnotationList3() {
                 cursor-pointer border overflow-hidden
                 ${
                   selectedAnnotationId === annotation.id
-                    ? 'bg-blue-50 border-blue-300'
-                    : 'bg-white border-gray-100 hover:border-blue-200'
+                    ? 'bg-blue-50 dark:bg-blue-900 border-blue-300 dark:border-blue-700'
+                    : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 hover:border-blue-200 dark:hover:border-blue-600'
                 }`}
           >
             <div className="p-4">
@@ -43,8 +46,8 @@ export default function AnnotationList3() {
                     className={`ml-3 text-sm font-medium
                                   ${
                                     selectedAnnotationId === annotation.id
-                                      ? 'text-blue-700'
-                                      : 'text-gray-600 group-hover:text-blue-600'
+                                      ? 'text-blue-700 dark:text-blue-300'
+                                      : 'text-gray-600 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400'
                                   }`}
                   >
                     {annotation.data.body.label}
@@ -59,7 +62,7 @@ export default function AnnotationList3() {
 
               {/* コンテンツ部分 */}
               <div
-                className="text-gray-700 text-sm pl-9"
+                className="text-gray-700 dark:text-gray-300 text-sm pl-9"
                 dangerouslySetInnerHTML={{ __html: annotation.data.body.value }}
               />
 

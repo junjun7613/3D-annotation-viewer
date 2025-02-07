@@ -9,16 +9,18 @@ const LoadingScreen = () => {
 
   return (
     <Html center>
-      <div className="flex flex-col items-center bg-white/80 p-6 rounded-lg backdrop-blur-sm">
+      <div className="flex flex-col items-center bg-white/80 dark:bg-gray-800/80 p-6 rounded-lg backdrop-blur-sm">
         <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <div className="text-gray-700 font-medium mb-2">3Dモデルを読み込み中...</div>
-        <div className="w-48 bg-gray-200 rounded-full h-2.5 mb-2">
+        <div className="text-gray-700 dark:text-gray-300 font-medium mb-2">
+          3Dモデルを読み込み中...
+        </div>
+        <div className="w-48 bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 mb-2">
           <div
             className="bg-blue-500 h-2.5 rounded-full transition-all duration-300"
             style={{ width: `${progress}%` }}
           ></div>
         </div>
-        <div className="text-sm text-gray-500">
+        <div className="text-sm text-gray-500 dark:text-gray-400">
           {Math.round(progress)}% ({(loaded / 1024 / 1024).toFixed(2)}MB /{' '}
           {(total / 1024 / 1024).toFixed(2)}MB)
         </div>

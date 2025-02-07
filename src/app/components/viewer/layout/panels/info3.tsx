@@ -35,14 +35,14 @@ const Info3 = () => {
   return (
     <div className="h-full flex flex-col">
       {/* タブヘッダー */}
-      <div className="flex border-b border-gray-200">
+      <div className="flex border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
         <button
           onClick={() => handleTabChange('metadata')}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors
             ${
               activeTab === 'metadata'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                : 'border-transparent text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'
             }`}
         >
           メタデータ
@@ -52,8 +52,8 @@ const Info3 = () => {
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors
             ${
               activeTab === 'annotations'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                : 'border-transparent text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'
             }`}
         >
           アノテーション
@@ -61,7 +61,7 @@ const Info3 = () => {
       </div>
 
       {/* タブコンテンツ */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto bg-white dark:bg-gray-900">
         {activeTab === 'metadata' ? <Metadata3 /> : <AnnotationList3 />}
       </div>
     </div>

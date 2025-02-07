@@ -67,7 +67,7 @@ const ManifestInput = ({ onSubmit }: { onSubmit: (url: string) => void }) => {
         <ul className="space-y-2">
           <li>
             <button
-              onClick={() => onSubmit('https://example.com/manifest.json')}
+              onClick={() => onSubmit('https://sukilam.aws.ldas.jp/iiif/3/11/manifest')}
               className="text-blue-500 dark:text-blue-400 hover:text-blue-600 dark:hover:text-blue-300"
             >
               サンプルマニフェスト1
