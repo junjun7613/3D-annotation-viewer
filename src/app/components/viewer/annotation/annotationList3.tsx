@@ -1,9 +1,20 @@
 import { annotationsAtom, selectedAnnotationIdAtom } from '@/app/atoms/infoPanelAtom';
 import { useAtom } from 'jotai';
+import { useEffect, useRef } from 'react';
 
 export default function AnnotationList3() {
   const [annotations] = useAtom(annotationsAtom);
   const [selectedAnnotationId, setSelectedAnnotationId] = useAtom(selectedAnnotationIdAtom);
+  const selectedRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (selectedAnnotationId && selectedRef.current) {
+      selectedRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    }
+  }, [selectedAnnotationId]);
 
   const focusOnAnnotation = (annotationId: string) => {
     setSelectedAnnotationId(annotationId);
@@ -19,6 +30,7 @@ export default function AnnotationList3() {
         {annotations.map((annotation, index) => (
           <div
             key={annotation.id}
+            ref={selectedAnnotationId === annotation.id ? selectedRef : null}
             onClick={() => focusOnAnnotation(annotation.id)}
             className={`group rounded-lg shadow-sm hover:shadow-md transition-all duration-200 
                 cursor-pointer border overflow-hidden

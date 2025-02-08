@@ -22,6 +22,13 @@ import { infoPanelAtom } from '@/app/atoms/infoPanelAtom';
 import db from '@/lib/firebase/firebase';
 import { deleteDoc, doc, getDoc, getDocs, updateDoc, collection } from 'firebase/firestore';
 
+interface WikidataItem {
+  type: string;
+  uri: string;
+  label: string;
+  wikipedia: string;
+}
+
 const Home: NextPage = () => {
   const [user] = useAuthState(auth);
 
@@ -114,7 +121,12 @@ const Home: NextPage = () => {
   };
 
   const saveWikidata = async () => {
-    let data = {}
+    let data: WikidataItem = {
+      type: '',
+      uri: '',
+      label: '',
+      wikipedia: '',
+    };
     if (wikiType === 'wikidata') {
       // wikidataのsparqlエンドポイントにアクセスして該当するデータのラベルを取得
       console.log(wikidata);
@@ -127,7 +139,9 @@ const Home: NextPage = () => {
         schema:isPartOf <https://en.wikipedia.org/> .
       }
       `; //wikidataのsparqlクエリ
-      const url = `https://query.wikidata.org/sparql?query=${encodeURIComponent(query)}&format=json`;
+      const url = `https://query.wikidata.org/sparql?query=${encodeURIComponent(
+        query
+      )}&format=json`;
       const result = await fetch(url).then((res) => res.json());
       const label = result['results']['bindings'][0]['itemLabel']['value'];
       const wikipedia = result['results']['bindings'][0]['wikipediaUrl']['value'];
@@ -144,9 +158,8 @@ const Home: NextPage = () => {
         label: label,
         wikipedia: wikipedia,
       };
-
     } else if (wikiType === 'pleiades') {
-      console.log("register pleiades");
+      console.log('register pleiades');
     }
 
     console.log(data);
