@@ -1,8 +1,10 @@
 import { annotationsAtom, selectedAnnotationIdAtom } from '@/app/atoms/infoPanelAtom';
 import { useAtom } from 'jotai';
 import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export default function AnnotationList3() {
+  const { t } = useTranslation('Annotation');
   const [annotations] = useAtom(annotationsAtom);
   const [selectedAnnotationId, setSelectedAnnotationId] = useAtom(selectedAnnotationIdAtom);
   const selectedRef = useRef<HTMLDivElement>(null);
@@ -23,9 +25,11 @@ export default function AnnotationList3() {
   return (
     <div className="p-6 bg-white dark:bg-gray-900">
       <h2 className="text-xl font-bold mb-6 text-gray-800 dark:text-gray-100">
-        アノテーション一覧
+        {t('annotations')}
       </h2>
-      <div className="mb-4 text-gray-500 dark:text-gray-400">{annotations.length}件</div>
+      <div className="mb-4 text-gray-500 dark:text-gray-400">
+        {t('annotationCount', { count: annotations.length })}
+      </div>
       <div className="space-y-4">
         {annotations.map((annotation, index) => (
           <div

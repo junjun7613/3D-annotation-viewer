@@ -4,10 +4,12 @@ import { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import AnnotationList3 from '@/app/components/viewer/annotation/annotationList3';
 import Metadata3 from '@/app/components/viewer/metadata/metadata3';
+import { useTranslation } from 'react-i18next';
 
 type TabType = 'metadata' | 'annotations';
 
 const Info3 = () => {
+  const { t } = useTranslation('Info');
   const searchParams = useSearchParams();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabType>(
@@ -45,7 +47,7 @@ const Info3 = () => {
                 : 'border-transparent text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'
             }`}
         >
-          メタデータ
+          {t('metadata')}
         </button>
         <button
           onClick={() => handleTabChange('annotations')}
@@ -56,7 +58,7 @@ const Info3 = () => {
                 : 'border-transparent text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'
             }`}
         >
-          アノテーション
+          {t('annotations')}
         </button>
       </div>
 

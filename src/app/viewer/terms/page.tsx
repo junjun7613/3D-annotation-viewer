@@ -1,6 +1,11 @@
+'use client';
+
 import CommonLayout from '@/app/components/viewer/layout/common';
+import { useTranslation } from 'react-i18next';
 
 export default function TermsPage() {
+  const { t } = useTranslation('Terms');
+
   return (
     <CommonLayout>
       <div className="flex flex-col items-center justify-center min-h-[60vh] p-8 bg-white dark:bg-gray-900">
@@ -21,7 +26,7 @@ export default function TermsPage() {
               />
             </svg>
           </div>
-          <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100 mb-2">利用規約</h1>
+          <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100 mb-2">{t('title')}</h1>
           <p className="text-gray-600 dark:text-gray-300 max-w-lg mx-auto">
             当サービスの利用規約は現在作成中です。
             ユーザーの皆様に安心してご利用いただけるよう、明確な利用条件を準備しています。

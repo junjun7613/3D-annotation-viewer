@@ -1,0 +1,49 @@
+{
+  "Header": {
+    "title": "3D ビューワ",
+    "download": "ダウンロード",
+    "downloadShort": "DL",
+    "english": "English",
+    "japanese": "日本語"
+  },
+  "Footer": {
+    "title": "3D ビューワ",
+    "help": "ヘルプ",
+    "privacy": "プライバシーポリシー",
+    "terms": "利用規約"
+  },
+  "Input": {
+    "title": "3Dモデルを表示",
+    "description": "IIIFマニフェストのURLを入力してください",
+    "submit": "表示する",
+    "sampleManifest": "サンプルマニフェスト",
+    "sampleManifest1": "サンプルマニフェスト1",
+    "sampleManifest2": "サンプルマニフェスト2",
+    "requiredUrl": "マニフェストURLを入力してください",
+    "invalidUrl": "有効なURLを入力してください"
+  },
+  "Metadata": {
+    "title": "メタデータ",
+    "description": "説明",
+    "metadata": "メタデータ",
+    "seeAlso": "参照"
+  },
+  "Info": {
+    "metadata": "メタデータ",
+    "annotations": "アノテーション"
+  },
+  "Annotation": {
+    "title": "アノテーション一覧",
+    "annotations": "アノテーション",
+    "annotationCount": "{{count}}件"
+  },
+  "Help": {
+    "title": "ヘルプ"
+  },
+  "Privacy": {
+    "title": "プライバシーポリシー"
+  },
+  "Terms": {
+    "title": "利用規約"
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "Header": {
+    "title": "3D Viewer",
+    "download": "Download",
+    "downloadShort": "DL",
+    "english": "English",
+    "japanese": "日本語"
+  },
+  "Footer": {
+    "title": "3D Viewer",
+    "help": "Help",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Service"
+  },
+  "Input": {
+    "title": "3D Model Viewer",
+    "description": "Enter the URL of the IIIF Manifest",
+    "submit": "View",
+    "sampleManifest": "Sample Manifest",
+    "sampleManifest1": "Sample Manifest 1",
+    "sampleManifest2": "Sample Manifest 2",
+    "requiredUrl": "Enter the Manifest URL",
+    "invalidUrl": "Enter a valid URL"
+  },
+  "Metadata": {
+    "title": "Metadata",
+    "description": "Description",
+    "metadata": "Metadata",
+    "seeAlso": "See Also"
+  },
+  "Info": {
+    "metadata": "Metadata",
+    "annotations": "Annotations"
+  },
+  "Annotation": {
+    "title": "Annotation List",
+    "annotations": "Annotations",
+    "annotationCount": "{{count}} items"
+  },
+  "Help": {
+    "title": "Help"
+  },
+  "Privacy": {
+    "title": "Privacy Policy"
+  },
+  "Terms": {
+    "title": "Terms of Service"
+  }
+}

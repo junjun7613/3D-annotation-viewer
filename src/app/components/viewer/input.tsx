@@ -1,14 +1,16 @@
 // 入力フォームコンポーネント
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const ManifestInput = ({ onSubmit }: { onSubmit: (url: string) => void }) => {
+  const { t } = useTranslation('Input');
   const [url, setUrl] = useState('');
   const [error, setError] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!url) {
-      setError('マニフェストURLを入力してください');
+      setError(t('requiredUrl'));
       return;
     }
     try {
@@ -16,7 +18,7 @@ const ManifestInput = ({ onSubmit }: { onSubmit: (url: string) => void }) => {
       setError('');
       onSubmit(url);
     } catch {
-      setError('有効なURLを入力してください');
+      setError(t('invalidUrl'));
     }
   };
 
@@ -38,8 +40,8 @@ const ManifestInput = ({ onSubmit }: { onSubmit: (url: string) => void }) => {
             />
           </svg>
         </div>
-        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-2">3Dモデルを表示</h2>
-        <p className="text-gray-600 dark:text-gray-300">IIIFマニフェストのURLを入力してください</p>
+        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-2">{t('title')}</h2>
+        <p className="text-gray-600 dark:text-gray-300">{t('description')}</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -58,19 +60,19 @@ const ManifestInput = ({ onSubmit }: { onSubmit: (url: string) => void }) => {
           type="submit"
           className="w-full px-4 py-2 text-white bg-blue-500 dark:bg-blue-600 hover:bg-blue-600 dark:hover:bg-blue-500 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-offset-2 dark:focus:ring-offset-gray-900 transition-colors"
         >
-          表示する
+          {t('submit')}
         </button>
       </form>
 
       <div className="mt-8 text-sm text-gray-500 dark:text-gray-400">
-        <h3 className="font-medium mb-2">サンプルマニフェスト:</h3>
+        <h3 className="font-medium mb-2">{t('sampleManifest')}:</h3>
         <ul className="space-y-2">
           <li>
             <button
               onClick={() => onSubmit('https://sukilam.aws.ldas.jp/iiif/3/11/manifest')}
               className="text-blue-500 dark:text-blue-400 hover:text-blue-600 dark:hover:text-blue-300"
             >
-              サンプルマニフェスト1
+              {t('sampleManifest1')}
             </button>
           </li>
         </ul>

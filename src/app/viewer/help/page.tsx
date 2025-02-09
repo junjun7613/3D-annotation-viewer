@@ -1,6 +1,11 @@
+'use client';
+
 import CommonLayout from '@/app/components/viewer/layout/common';
+import { useTranslation } from 'react-i18next';
 
 export default function HelpPage() {
+  const { t } = useTranslation('Help');
+
   return (
     <CommonLayout>
       <div className="flex flex-col items-center justify-center min-h-[60vh] p-8 bg-white dark:bg-gray-900">
@@ -21,7 +26,7 @@ export default function HelpPage() {
               />
             </svg>
           </div>
-          <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100 mb-2">ヘルプ</h1>
+          <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100 mb-2">{t('title')}</h1>
           <p className="text-gray-600 dark:text-gray-300 max-w-lg mx-auto">
             当サービスのヘルプページは現在作成中です。
             より良いサービスをご提供するため、準備を進めています。
