@@ -438,7 +438,7 @@ const Home: NextPage = () => {
     handleRDFCloseDialog();
   };
 
-  const downloadIIIFManifest = (manifestUrl) => {
+  const downloadIIIFManifest = (manifestUrl: string) => {
     //console.log(manifestUrl);
     // menifestUrlの中身を取得
     const url = manifestUrl;
