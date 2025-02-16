@@ -23,6 +23,7 @@ import {v4 as uuidv4} from 'uuid';
 
 import db from '@/lib/firebase/firebase';
 import { deleteDoc, doc, getDoc, getDocs, updateDoc, collection } from 'firebase/firestore';
+import { info } from 'console';
 
 interface WikidataItem {
   type: string;
@@ -437,6 +438,17 @@ const Home: NextPage = () => {
     handleRDFCloseDialog();
   };
 
+  const downloadIIIFManifest = (manifestUrl:any) => {
+    //console.log(manifestUrl);
+    // menifestUrlの中身を取得
+    const url = manifestUrl;
+    fetch(url)
+      .then((res) => res.json())
+      .then((data) => {
+        console.log(data);
+      });
+  };
+
   const deleteMedia = (id: string, index: number) => {
     if (infoPanelContent?.creator == user?.uid) {
       const confirmed = confirm('Are you sure you want to delete this Wiki Item?');
@@ -698,6 +710,7 @@ const Home: NextPage = () => {
                   padding: '10px 20px',
                   backgroundColor: '#006400',
                   color: 'white',
+                  fontWeight: 'bold',
                   border: 'none',
                   borderRadius: '5px',
                   cursor: 'pointer',
@@ -705,6 +718,23 @@ const Home: NextPage = () => {
                 }}
               >
                 RDF
+              </button>
+              <button
+                onClick={() => downloadIIIFManifest(manifestUrl)}
+                style={{
+                  marginLeft: '15px',
+                  height: '50px',
+                  padding: '10px 20px',
+                  backgroundColor: '#006400',
+                  color: 'white',
+                  fontWeight: 'bold',
+                  border: 'none',
+                  borderRadius: '5px',
+                  cursor: 'pointer',
+                  fontSize: '16px',
+                }}
+              >
+                IIIF Manifest
               </button>
             </div>
             <div
