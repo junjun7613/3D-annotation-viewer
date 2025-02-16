@@ -41,9 +41,19 @@ const Home: NextPage = () => {
   // infoPanelContentという連想配列を作成
 
   interface MediaItem {
+    id: string;
     type: string;
     source: string;
     caption: string;
+  }
+
+  interface BibItem {
+    id: string;
+    author: string;
+    title: string;
+    year: string;
+    page: string;
+    pdf: string;
   }
 
   const [infoPanelContent] = useAtom(infoPanelAtom);
@@ -303,7 +313,7 @@ const Home: NextPage = () => {
     // firebaseのannotationsコレクションのすべてのDocの中から、targetmanifestの値がidと一致するものを取得
     const querySnapshot = getDocs(collection(db, 'annotations'));
     querySnapshot.then((snapshot) => {
-      let turtleData = '@prefix : <https://www.example.com/vocabulary/> .\n@prefix schema: <https://schema.org/>'; // ベースURIを定義
+      let turtleData = '@prefix : <https://www.example.com/vocabulary/> .\n@prefix schema: <https://schema.org/> .\n@prefix dc: <http://purl.org/dc/elements/1.1/> .'; // ベースURIを定義
       turtleData += '\n';
 
       snapshot.forEach((doc) => {
@@ -339,6 +349,24 @@ const Home: NextPage = () => {
             });
           }
 
+          // mediaの情報を追加
+          if (data.media) {
+            data.media.forEach((item: MediaItem) => {
+              properties.push(
+                `  :media <${IRI}${item.id}>`,
+              );
+            });
+          }
+
+          // bibliographyの情報を追加
+          if (data.bibliography) {
+            data.bibliography.forEach((item: BibItem) => {
+              properties.push(
+                `  :bibliography <${IRI}${item.id}>`,
+              );
+            });
+          }
+
           // 各プロパティをセミコロンで終わらせ、最後のプロパティにはピリオドを付ける
           properties.forEach((prop, index) => {
             if (index < properties.length - 1) {
@@ -352,6 +380,46 @@ const Home: NextPage = () => {
           if (properties.length === 0) {
             turtleData += '.\n';
           }
+          
+          // mediaの情報を追加
+          if (data.media) {
+            data.media.forEach((item: MediaItem) => {
+              turtleData += `\n<${IRI}${item.id}> a :Media ;\n`;
+              turtleData += `  schema:uri "${item.source}" ;\n`;
+              turtleData += `  schema:description "${item.caption}" ;\n`;
+              turtleData += `  schema:additionalType :${item.type} .\n`;
+            });
+          }
+          
+          // bibiographyの情報を追加
+          if (data.bibliography) {
+            data.bibliography.forEach((item: BibItem) => {
+              turtleData += `\n<${IRI}${item.id}> a :Bibliography ;\n`;
+              const properties = [];
+
+              if (item.author) {
+                properties.push(`  dc:creator "${item.author}"`);
+              }
+              if (item.title) {
+                properties.push(`  dc:title "${item.title}"`);
+              }
+              if (item.year) {
+                properties.push(`  dc:date "${item.year}"`);
+              }
+              if (item.page) {
+                properties.push(`  schema:uri <${item.page}>`);
+              }
+
+              // プロパティを追加し、最後のプロパティにはピリオドを付ける
+              properties.forEach((prop, index) => {
+                if (index === properties.length - 1) {
+                  turtleData += prop + ' .\n';
+                } else {
+                  turtleData += prop + ' ;\n';
+                }
+              });
+            });
+          }  
         }
       });
 

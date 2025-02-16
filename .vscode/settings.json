@@ -15,5 +15,8 @@
   },
   "editor.codeActionsOnSave": {
     "source.fixAll.eslint": "always"
+  },
+  "[json]": {
+    "editor.defaultFormatter": "vscode.json-language-features"
   }
 }
