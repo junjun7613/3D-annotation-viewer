@@ -57,6 +57,14 @@ const Home: NextPage = () => {
     pdf: string;
   }
 
+  interface Annotation {
+    id: string;
+    type: string;
+    motivation: string;
+    body: any;
+    target: any;
+  }
+
   const [infoPanelContent] = useAtom(infoPanelAtom);
 
   const [isRDFDialogOpen, setIsRDFDialogOpen] = useState(false);
@@ -439,13 +447,53 @@ const Home: NextPage = () => {
   };
 
   const downloadIIIFManifest = (manifestUrl: string) => {
+    console.log(manifestUrl);
+    // manifestUrlを/でsplitして最後の要素を削除
+    const newUrl = manifestUrl.split('/').slice(0, -1).join('/');
+
+    let annotations: Annotation[] = [];
+
+    const querySnapshot = getDocs(collection(db, 'annotations'));
+    querySnapshot.then((snapshot) => {
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.target_manifest === manifestUrl) {
+          console.log(data);
+          const annotation = {
+            "id": `${newUrl}/annotation/${doc.id}`,
+            "type": "Annotation",
+            "motivation": "painting",
+            "body": data.data.body,
+            "target": data.data.target
+          };
+          annotations.push(annotation);
+        }
+      });
+    });
     //console.log(manifestUrl);
     // menifestUrlの中身を取得
     const url = manifestUrl;
     fetch(url)
       .then((res) => res.json())
       .then((data) => {
-        console.log(data);
+
+        //console.log(data);
+        const newData = {
+          "id": `${newUrl}/annotationPage/${uuidv4()}`,
+          "type": "AnnotationPage",
+          "items": annotations
+        }
+        data.items[0].items[0].items.push(newData);
+        console.log(data)
+
+        // manifestをjson形式でダウンロード
+        const element = document.createElement('a');
+        const file = new Blob([JSON.stringify(data)], { type: 'text/plain' });
+        element.href = URL.createObjectURL(file);
+        element.download = 'manifest.json';
+        document.body.appendChild(element); // Required for this to work in FireFox
+        element.click();
+      
       });
   };
 
