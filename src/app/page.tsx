@@ -19,6 +19,8 @@ import { IoDocumentTextOutline } from 'react-icons/io5';
 import { useAtom } from 'jotai';
 import { infoPanelAtom } from '@/app/atoms/infoPanelAtom';
 
+import {v4 as uuidv4} from 'uuid';
+
 import db from '@/lib/firebase/firebase';
 import { deleteDoc, doc, getDoc, getDocs, updateDoc, collection } from 'firebase/firestore';
 
@@ -92,6 +94,7 @@ const Home: NextPage = () => {
   const saveMedias = async () => {
     // const mediaData = { source, type, caption };
     const data = {
+      id: uuidv4(),
       source: source,
       type: type,
       caption: caption,
@@ -190,6 +193,7 @@ const Home: NextPage = () => {
   const saveBib = async () => {
     // const bibData = { bibAuthor, bibTitle, bibYear, bibPage, bibPDF };
     const data = {
+      id: uuidv4(),
       author: bibAuthor,
       title: bibTitle,
       year: bibYear,
@@ -299,7 +303,7 @@ const Home: NextPage = () => {
     // firebaseのannotationsコレクションのすべてのDocの中から、targetmanifestの値がidと一致するものを取得
     const querySnapshot = getDocs(collection(db, 'annotations'));
     querySnapshot.then((snapshot) => {
-      let turtleData = '@prefix : <https://junjun7613.github.io/MicroKnowledge/himiko.owl#> .\n'; // ベースURIを定義
+      let turtleData = '@prefix : <https://www.example.com/vocabulary/> .\n@prefix schema: <https://schema.org/>'; // ベースURIを定義
       turtleData += '\n';
 
       snapshot.forEach((doc) => {
@@ -307,12 +311,33 @@ const Home: NextPage = () => {
         if (data.target_manifest === id) {
           console.log(data);
           // 以下でannotationごとにTutleを生成・ダウンロード
-          turtleData += `\n<${IRI}${doc.id}> a <https://example.com/vocabulary/Annotation> ;\n`;
+          turtleData += `\n<${IRI}${doc.id}> a :Annotation ;\n`;
           const properties = [];
 
+          // labelおよびdescriptionの情報を追加
           properties.push(
-            `  <https://junjun7613.github.io/MicroKnowledge/himiko.owl#descriptionStart> <https://example.com/description/0001>`
+            `  rdfs:label "${data.data.body.label}"`,
           );
+          properties.push(
+            `  schema:description "${data.data.body.value}"`,
+          );
+
+          // manifestおよびcanvasの情報を追加
+          properties.push(
+            `  :targetManifest <${data.target_manifest}>`,
+          );
+          properties.push(
+            `  :targetCanvas <${data.target_canvas}>`,
+          );
+
+          // wikidataの情報を追加
+          if (data.wikidata) {
+            data.wikidata.forEach((item: WikidataItem) => {
+              properties.push(
+                `  :wikidata <${item.uri}>`,
+              );
+            });
+          }
 
           // 各プロパティをセミコロンで終わらせ、最後のプロパティにはピリオドを付ける
           properties.forEach((prop, index) => {
@@ -330,6 +355,7 @@ const Home: NextPage = () => {
         }
       });
 
+      
       const blob = new Blob([turtleData], { type: 'text/turtle' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -337,6 +363,7 @@ const Home: NextPage = () => {
       a.download = 'graph-data.ttl';
       a.click();
       URL.revokeObjectURL(url);
+      
     });
 
     handleRDFCloseDialog();
