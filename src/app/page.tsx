@@ -61,8 +61,8 @@ const Home: NextPage = () => {
     id: string;
     type: string;
     motivation: string;
-    body: any;
-    target: any;
+    body: { value: string; label: string; type: string };
+    target: { source: string; selector: { value: string; type: string } };
   }
 
   const [infoPanelContent] = useAtom(infoPanelAtom);
