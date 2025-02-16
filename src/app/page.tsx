@@ -451,7 +451,7 @@ const Home: NextPage = () => {
     // manifestUrlを/でsplitして最後の要素を削除
     const newUrl = manifestUrl.split('/').slice(0, -1).join('/');
 
-    let annotations: Annotation[] = [];
+    const annotations: Annotation[] = [];
 
     const querySnapshot = getDocs(collection(db, 'annotations'));
     querySnapshot.then((snapshot) => {
