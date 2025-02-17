@@ -604,6 +604,9 @@ const Home: NextPage = () => {
   const handleMediaCloseDialog = () => {
     setIsMediaDialogOpen(false);
   };
+  const handleMediaUpload = () => {
+    console.log("media uploaded");
+  }
 
   const handleBibOpenDialog = () => {
     if (infoPanelContent?.creator == user?.uid) {
@@ -867,11 +870,11 @@ const Home: NextPage = () => {
                     <h3 style={{ textAlign: 'center', fontWeight: 'bold', marginBottom: '10px' }}>
                       Image & Video
                     </h3>
+                    <div>
                     <button
                       onClick={handleMediaOpenDialog}
                       style={{
                         padding: '5px 10px',
-                        backgroundColor: '#333',
                         color: 'white',
                         border: 'none',
                         borderRadius: '5px',
@@ -880,8 +883,32 @@ const Home: NextPage = () => {
                         marginBottom: '10px',
                       }}
                     >
-                      +
+                      <img
+                      src="/images/queue.png"
+                      alt="Upload"
+                      style={{ width: '16px', height: '16px', verticalAlign: 'middle'}} // アイコンのサイズを調整
+                    />
                     </button>
+                    <button
+                      onClick={handleMediaUpload}
+                      style={{
+                        padding: '5px 10px',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '5px',
+                        cursor: 'pointer',
+                        fontSize: '10px',
+                        marginBottom: '10px',
+                        alignItems: 'center', // ボタン内のコンテンツを中央揃え
+                      }}
+                    >
+                    <img
+                      src="/images/upload.png"
+                      alt="Upload"
+                      style={{ width: '16px', height: '16px', verticalAlign: 'middle'}} // アイコンのサイズを調整
+                    />
+                    </button>
+                    </div>
                   </div>
                   <div
                     style={{
@@ -955,11 +982,11 @@ const Home: NextPage = () => {
                     <h3 style={{ textAlign: 'center', fontWeight: 'bold', marginBottom: '10px' }}>
                       Wiki Items
                     </h3>
+                    <div>
                     <button
                       onClick={handleWikidataOpenDialog}
                       style={{
                         padding: '5px 10px',
-                        backgroundColor: '#333',
                         color: 'white',
                         border: 'none',
                         borderRadius: '5px',
@@ -968,8 +995,32 @@ const Home: NextPage = () => {
                         marginBottom: '10px',
                       }}
                     >
-                      +
+                      <img
+                      src="/images/queue.png"
+                      alt="Upload"
+                      style={{ width: '16px', height: '16px', verticalAlign: 'middle'}} // アイコンのサイズを調整
+                    />
                     </button>
+                    <button
+                      onClick={handleMediaUpload}
+                      style={{
+                        padding: '5px 10px',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '5px',
+                        cursor: 'pointer',
+                        fontSize: '10px',
+                        marginBottom: '10px',
+                        alignItems: 'center', // ボタン内のコンテンツを中央揃え
+                      }}
+                    >
+                    <img
+                      src="/images/upload.png"
+                      alt="Upload"
+                      style={{ width: '16px', height: '16px', verticalAlign: 'middle'}} // アイコンのサイズを調整
+                    />
+                    </button>
+                    </div>
                   </div>
                   <div style={{ marginTop: '10px' }}>
                     {infoPanelContent?.wikidata && infoPanelContent.wikidata.length > 0
@@ -1050,11 +1101,11 @@ const Home: NextPage = () => {
                     <h3 style={{ textAlign: 'center', fontWeight: 'bold', marginBottom: '10px' }}>
                       Bibliography
                     </h3>
+                    <div>
                     <button
                       onClick={handleBibOpenDialog}
                       style={{
                         padding: '5px 10px',
-                        backgroundColor: '#333',
                         color: 'white',
                         border: 'none',
                         borderRadius: '5px',
@@ -1063,8 +1114,32 @@ const Home: NextPage = () => {
                         marginBottom: '10px',
                       }}
                     >
-                      +
+                      <img
+                      src="/images/queue.png"
+                      alt="Upload"
+                      style={{ width: '16px', height: '16px', verticalAlign: 'middle'}} // アイコンのサイズを調整
+                    />
                     </button>
+                    <button
+                      onClick={handleMediaUpload}
+                      style={{
+                        padding: '5px 10px',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '5px',
+                        cursor: 'pointer',
+                        fontSize: '10px',
+                        marginBottom: '10px',
+                        alignItems: 'center', // ボタン内のコンテンツを中央揃え
+                      }}
+                    >
+                    <img
+                      src="/images/upload.png"
+                      alt="Upload"
+                      style={{ width: '16px', height: '16px', verticalAlign: 'middle'}} // アイコンのサイズを調整
+                    />
+                    </button>
+                    </div>
                   </div>
                   <div style={{ marginTop: '10px' }}>
                     {infoPanelContent?.bibliography && infoPanelContent.bibliography.length > 0
