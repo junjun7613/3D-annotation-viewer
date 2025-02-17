@@ -16,6 +16,7 @@ import { FaLink } from 'react-icons/fa6';
 import { PiShareNetwork } from 'react-icons/pi';
 //import { FiUpload } from 'react-icons/fi';
 import { IoDocumentTextOutline } from 'react-icons/io5';
+import { LiaMapMarkedSolid } from "react-icons/lia";
 import { useAtom } from 'jotai';
 import { infoPanelAtom } from '@/app/atoms/infoPanelAtom';
 
@@ -29,7 +30,9 @@ interface WikidataItem {
   type: string;
   uri: string;
   label: string;
-  wikipedia: string;
+  wikipedia?: string;
+  lat?: string;
+  lng?: string;
 }
 
 const Home: NextPage = () => {
@@ -110,6 +113,8 @@ const Home: NextPage = () => {
     }
   }, []);
 
+  console.log(infoPanelContent)
+
   const saveMedias = async () => {
     // const mediaData = { source, type, caption };
     const data = {
@@ -148,6 +153,8 @@ const Home: NextPage = () => {
       uri: '',
       label: '',
       wikipedia: '',
+      lat: '',
+      lng: '',
     };
     if (wikiType === 'wikidata') {
       // wikidataのsparqlエンドポイントにアクセスして該当するデータのラベルを取得
@@ -180,11 +187,33 @@ const Home: NextPage = () => {
         label: label,
         wikipedia: wikipedia,
       };
-    } else if (wikiType === 'pleiades') {
-      console.log('register pleiades');
-    }
+    } else if (wikiType === 'geonames') {
+      console.log(wikidata);
+      const id = wikidata.split('/').pop();
+      const url = `http://api.geonames.org/getJSON?geonameId=${id}&username=${process.env.NEXT_PUBLIC_GEONAMES_USERNAME}`;
 
-    console.log(data);
+      //console.log(url);
+      const result = await fetch(url).then((res) => res.json());
+      //console.log(result);
+
+      const label = result.name;
+      const wikipedia = `https://${result.wikipediaURL}`;
+      const lat = result.lat;
+      const lng = result.lng;
+
+      data = {
+        type: wikiType,
+        uri: wikidata,
+        label: label,
+        lat: lat,
+        lng: lng,
+      };
+      if (wikipedia) {
+        data.wikipedia = wikipedia;
+      }
+
+      console.log(data);
+    }
 
     // firebaseのannotationsコレクションのidを持つdocのMediaフィールド(Array)のdataをfirebaseから取得
     const docRef = doc(db, 'annotations', infoPanelContent?.id || '');
@@ -635,6 +664,7 @@ const Home: NextPage = () => {
     if (infoPanelContent?.creator == user?.uid) {
       setWikidata(infoPanelContent?.wikidata.join(',') || '');
       setIsWikidataDialogOpen(true);
+      setWikidata('');
     } else {
       alert('You are not the creator of this annotation.');
     }
@@ -642,6 +672,9 @@ const Home: NextPage = () => {
   const handleWikidataCloseDialog = () => {
     setIsWikidataDialogOpen(false);
   };
+  const ShowMap = (lat: string, lng: string) => {
+    console.log(lat, lng);
+  }
 
   return (
     <>
@@ -1026,6 +1059,8 @@ const Home: NextPage = () => {
                     {infoPanelContent?.wikidata && infoPanelContent.wikidata.length > 0
                       ? infoPanelContent.wikidata.map((wikiItem, index) => (
                           <div key={index}>
+
+                            {wikiItem.type === 'wikidata' && (
                             <button
                               style={{
                                 padding: '5px 10px',
@@ -1041,6 +1076,11 @@ const Home: NextPage = () => {
                             >
                               <span>{wikiItem.label}</span>
                             </button>
+                            )}
+                            {wikiItem.type === 'geonames' && (
+                              <span>{wikiItem.label}</span>
+                            )}
+
                             {/*<div>*/}
                             <a href={wikiItem.uri} target="_blank" rel="noopener noreferrer">
                               <PiShareNetwork style={{ marginLeft: '5px', display: 'inline' }} />
@@ -1055,6 +1095,15 @@ const Home: NextPage = () => {
                                   style={{ marginLeft: '5px', display: 'inline' }}
                                 />
                               </a>
+                            )}
+                            {wikiItem.type === "geonames" && (
+                              <button
+                                onClick={() => ShowMap(wikiItem.lat, wikiItem.lng)} // 関数をラップして渡す
+                              >
+                                <LiaMapMarkedSolid
+                                  style={{ marginLeft: '5px', display: 'inline' }}
+                                />
+                              </button>
                             )}
                             <button
                               onClick={() =>
@@ -1445,7 +1494,7 @@ const Home: NextPage = () => {
                 }}
               >
                 <option value="wikidata">Wikidata</option>
-                <option value="pleiades">Pleiades</option>
+                <option value="geonames">GeoNames</option>
               </select>
             </label>
             <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
