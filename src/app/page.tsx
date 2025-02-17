@@ -785,7 +785,7 @@ const Home: NextPage = () => {
                   fontSize: '16px',
                 }}
               >
-                IIIF Manifest
+                IIIF
               </button>
             </div>
             <div
