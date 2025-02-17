@@ -868,7 +868,7 @@ const Home: NextPage = () => {
                     }}
                   >
                     <h3 style={{ textAlign: 'center', fontWeight: 'bold', marginBottom: '10px' }}>
-                      Image & Video
+                      Media
                     </h3>
                     <div>
                     <button
@@ -980,7 +980,7 @@ const Home: NextPage = () => {
                     }}
                   >
                     <h3 style={{ textAlign: 'center', fontWeight: 'bold', marginBottom: '10px' }}>
-                      Wiki Items
+                      Authority
                     </h3>
                     <div>
                     <button
@@ -1099,7 +1099,7 @@ const Home: NextPage = () => {
                     }}
                   >
                     <h3 style={{ textAlign: 'center', fontWeight: 'bold', marginBottom: '10px' }}>
-                      Bibliography
+                      Literature
                     </h3>
                     <div>
                     <button
