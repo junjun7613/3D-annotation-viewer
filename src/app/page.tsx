@@ -26,15 +26,6 @@ import db from '@/lib/firebase/firebase';
 import { deleteDoc, doc, getDoc, getDocs, updateDoc, collection } from 'firebase/firestore';
 //import { info } from 'console';
 
-interface WikidataItem {
-  type: string;
-  uri: string;
-  label: string;
-  wikipedia?: string;
-  lat?: string;
-  lng?: string;
-}
-
 const Home: NextPage = () => {
   const [user] = useAuthState(auth);
 
@@ -49,6 +40,15 @@ const Home: NextPage = () => {
     type: string;
     source: string;
     caption: string;
+  }
+
+  interface WikidataItem {
+    type: string;
+    uri: string;
+    label: string;
+    wikipedia?: string;
+    lat?: string;
+    lng?: string;
   }
 
   interface BibItem {
@@ -1096,9 +1096,13 @@ const Home: NextPage = () => {
                                 />
                               </a>
                             )}
-                            {wikiItem.type === "geonames" && (
+                            {wikiItem.type === "geonames" && wikiItem.lat && (
                               <button
-                                onClick={() => ShowMap(wikiItem.lat, wikiItem.lng)} // 関数をラップして渡す
+                              onClick={() => {
+                                if (wikiItem.lat !== undefined && wikiItem.lng !== undefined) {
+                                  ShowMap(wikiItem.lat, wikiItem.lng);
+                                }
+                              }}
                               >
                                 <LiaMapMarkedSolid
                                   style={{ marginLeft: '5px', display: 'inline' }}

@@ -60,6 +60,7 @@ const getAnnotations = async () => {
   const querySnapshot = await getDocs(q);
   querySnapshot.forEach((doc) => {
     const data = doc.data() as Annotation;
+    console.log(data);
     const annotationWithId = {
       ...data,
       id: doc.id,

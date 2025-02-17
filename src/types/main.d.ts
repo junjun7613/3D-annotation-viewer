@@ -37,9 +37,12 @@ interface MediaItem {
 }
 
 interface WikidataItem {
+  type: string;
   label: string;
   uri: string;
   wikipedia?: string;
+  lat?: string;
+  lng?: string;
 }
 
 interface BibliographyItem {
