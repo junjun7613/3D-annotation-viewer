@@ -24,6 +24,7 @@ import {v4 as uuidv4} from 'uuid';
 
 import db from '@/lib/firebase/firebase';
 import { deleteDoc, doc, getDoc, getDocs, updateDoc, collection } from 'firebase/firestore';
+import { info } from 'console';
 //import { info } from 'console';
 
 const Home: NextPage = () => {
@@ -70,11 +71,16 @@ const Home: NextPage = () => {
 
   const [infoPanelContent] = useAtom(infoPanelAtom);
 
+  const [uploadedAuthorityContent, setUploadedAuthorityContent] = useState('');
+
   const [isRDFDialogOpen, setIsRDFDialogOpen] = useState(false);
   const [isMediaDialogOpen, setIsMediaDialogOpen] = useState(false);
   const [isBibDialogOpen, setIsBibDialogOpen] = useState(false);
   const [isDescDialogOpen, setIsDescDialogOpen] = useState(false);
   const [isWikidataDialogOpen, setIsWikidataDialogOpen] = useState(false);
+
+  const [isMediaUploadDialogOpen, setIsMediaUploadDialogOpen] = useState(false);
+  const [isAuthorityUploadDialogOpen, setIsAuthorityUploadDialogOpen] = useState(false);
 
   const [IRI, setIRI] = useState('');
   //mediaの情報をstateで管理
@@ -114,6 +120,19 @@ const Home: NextPage = () => {
   }, []);
 
   console.log(infoPanelContent)
+
+  const uploadAuthorityCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (e.target?.result) {
+          setUploadedAuthorityContent(e.target.result.toString());
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const saveMedias = async () => {
     // const mediaData = { source, type, caption };
@@ -236,6 +255,144 @@ const Home: NextPage = () => {
     console.log(infoPanelContent);
 
     handleWikidataCloseDialog();
+  };
+
+  const base64ToCsv = (base64: string): string => {
+    const base64Data = base64.split(',')[1]; // `data:text/csv;base64,`の後ろの部分を取得
+    const decodedData = atob(base64Data); // Base64デコード
+    return decodedData;
+  };
+
+  const saveAuthorityUpload = async () => {
+    // const mediaData = { source, type, caption };
+    console.log(uploadedAuthorityContent);
+    // Base64デコードしてCSVデータを取得
+    const csvData = base64ToCsv(uploadedAuthorityContent);
+    //console.log(csvData);
+
+    // CSVデータを行ごとに分割して、最初の行を削除
+    const rows = csvData.split('\n').slice(1);
+    //console.log(rows);
+
+    //infoPanelContent.wikidataを一旦クリア
+    if (infoPanelContent){
+      infoPanelContent.wikidata = [];
+    } else {
+      alert('Please choose an annotation first.');
+    }
+    const authority = []
+
+    for (const item of rows) {
+      const authority_type = item.split(',')[0];
+      const authority_uri = item.split(',')[1].replace("\r", "");
+      console.log(authority_type, authority_uri);
+
+      let data: WikidataItem = {
+        type: '',
+        uri: '',
+        label: '',
+        wikipedia: '',
+        lat: '',
+        lng: '',
+      };
+      if (authority_type === 'wikidata') {
+        // wikidataのsparqlエンドポイントにアクセスして該当するデータのラベルを取得
+        console.log(authority_uri);
+  
+        const query = `SELECT ?item ?itemLabel ?wikipediaUrl WHERE {
+          VALUES ?item {wd:${authority_uri.split('/').pop()}}
+          SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],en". }
+          ?wikipediaUrl schema:about ?item ;
+          schema:inLanguage "en" ;
+          schema:isPartOf <https://en.wikipedia.org/> .
+        }
+        `; //wikidataのsparqlクエリ
+        const url = `https://query.wikidata.org/sparql?query=${encodeURIComponent(
+          query
+        )}&format=json`;
+        const result = await fetch(url).then((res) => res.json());
+        const label = result['results']['bindings'][0]['itemLabel']['value'];
+        const wikipedia = result['results']['bindings'][0]['wikipediaUrl']['value'];
+        /*
+        const data = {
+          uri: wikidata,
+          label: label,
+          wikipedia: wikipedia,
+        };
+        */
+        data = {
+          type: authority_type,
+          uri: authority_uri,
+          label: label,
+          wikipedia: wikipedia,
+        };
+        infoPanelContent?.wikidata.push(data);
+        authority.push(data);
+      } else if (authority_type === 'geonames') {
+        console.log(authority_uri);
+        const id = authority_uri.split('/').pop();
+        const url = `http://api.geonames.org/getJSON?geonameId=${id}&username=${process.env.NEXT_PUBLIC_GEONAMES_USERNAME}`;
+  
+        //console.log(url);
+        const result = await fetch(url).then((res) => res.json());
+        //console.log(result);
+  
+        const label = result.name;
+        const wikipedia = `https://${result.wikipediaURL}`;
+        const lat = result.lat;
+        const lng = result.lng;
+  
+        data = {
+          type: authority_type,
+          uri: authority_uri,
+          label: label,
+          lat: lat,
+          lng: lng,
+        };
+        if (wikipedia) {
+          data.wikipedia = wikipedia;
+        }
+        // infoPanelContentのwikidataにdataを追記
+        infoPanelContent?.wikidata.push(data);
+        authority.push(data);
+      }
+
+    }
+
+    console.log(authority);
+
+    
+    // firebaseのannotationsコレクションのidを持つdocのMediaフィールド(Array)のdataをfirebaseから取得
+    const docRef = doc(db, 'annotations', infoPanelContent?.id || '');
+    const docSnap = await getDoc(docRef);
+
+    //既存のWikidataのデータを、authorityデータで上書き
+    if (docSnap.exists()) {
+      const origData = docSnap.data();
+      // firebaseのannotationsコレクションのidを持つdocのMediaフィールド(Array)にdataを追記
+      await updateDoc(docRef, {
+        wikidata: authority,
+      });
+    } else {
+      console.warn('No such document!');
+    }
+
+    /*
+    if (docSnap.exists()) {
+      const origData = docSnap.data();
+      // firebaseのannotationsコレクションのidを持つdocのMediaフィールド(Array)にdataを追記
+      await updateDoc(docRef, {
+        media: [...origData.media, data],
+      });
+    } else {
+      console.warn('No such document!');
+    }
+
+    //console.log(updatedData?.wikidata);
+    
+    */
+
+    setIsAuthorityUploadDialogOpen(false);
   };
 
   const saveBib = async () => {
@@ -635,6 +792,7 @@ const Home: NextPage = () => {
   };
   const handleMediaUpload = () => {
     console.log("media uploaded");
+    setIsMediaUploadDialogOpen(true);
   }
 
   const handleBibOpenDialog = () => {
@@ -672,6 +830,16 @@ const Home: NextPage = () => {
   const handleWikidataCloseDialog = () => {
     setIsWikidataDialogOpen(false);
   };
+  const handleAuthorityUploadCloseDialog = () => {
+    setIsAuthorityUploadDialogOpen(false);
+  };
+  const handleAuthorityUpload = () => {
+    if (infoPanelContent?.creator == user?.uid) {
+      setIsAuthorityUploadDialogOpen(true);
+    } else {
+      alert('You are not the creator of this annotation.');
+    }
+  }
   const ShowMap = (lat: string, lng: string) => {
     console.log(lat, lng);
   }
@@ -1035,7 +1203,7 @@ const Home: NextPage = () => {
                     />
                     </button>
                     <button
-                      onClick={handleMediaUpload}
+                      onClick={handleAuthorityUpload}
                       style={{
                         padding: '5px 10px',
                         color: 'white',
@@ -1449,6 +1617,77 @@ const Home: NextPage = () => {
               <button
                 type="button"
                 onClick={handleMediaCloseDialog}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: '#333',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '5px',
+                  cursor: 'pointer',
+                  fontSize: '16px',
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {isAuthorityUploadDialogOpen && (
+        //csvファイルのアップロードダイアログ
+        <div
+          style={{
+            position: 'fixed',
+            width: '500px',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            backgroundColor: 'white',
+            padding: '20px',
+            border: '1px solid #ccc',
+            borderRadius: '5px',
+            zIndex: 1000,
+          }}
+        >
+          <form style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
+              Upload CSV File:
+              <input
+                type="file"
+                accept=".csv"
+                onChange={uploadAuthorityCSV}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  marginTop: '5px',
+                  border: '1px solid #ccc',
+                  borderRadius: '5px',
+                  fontSize: '16px',
+                }}
+              />
+            </label>
+            <p>【注意】既存のデータは上書きされます。</p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={saveAuthorityUpload}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: '#000080',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '5px',
+                  cursor: 'pointer',
+                  fontSize: '16px',
+                  marginRight: '10px',
+                }}
+              >
+                Upload
+              </button>
+              <button
+                type="button"
+                onClick={handleAuthorityUploadCloseDialog}
                 style={{
                   padding: '10px 20px',
                   backgroundColor: '#333',
