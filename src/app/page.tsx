@@ -24,6 +24,7 @@ import {v4 as uuidv4} from 'uuid';
 
 import db from '@/lib/firebase/firebase';
 import { deleteDoc, doc, getDoc, getDocs, updateDoc, collection } from 'firebase/firestore';
+import { info } from 'console';
 //import { info } from 'console';
 //import { info } from 'console';
 
@@ -72,6 +73,8 @@ const Home: NextPage = () => {
   const [infoPanelContent] = useAtom(infoPanelAtom);
 
   const [uploadedAuthorityContent, setUploadedAuthorityContent] = useState('');
+  const [uploadedMediaContent, setUploadedMediaContent] = useState('');
+  const [uploadedBibContent, setUploadedBibContent] = useState('');
 
   const [isRDFDialogOpen, setIsRDFDialogOpen] = useState(false);
   const [isMediaDialogOpen, setIsMediaDialogOpen] = useState(false);
@@ -81,6 +84,7 @@ const Home: NextPage = () => {
 
   const [isMediaUploadDialogOpen, setIsMediaUploadDialogOpen] = useState(false);
   const [isAuthorityUploadDialogOpen, setIsAuthorityUploadDialogOpen] = useState(false);
+  const [isBibUploadDialogOpen, setIsBibUploadDialogOpen] = useState(false);
 
   const [IRI, setIRI] = useState('');
   //mediaの情報をstateで管理
@@ -121,6 +125,12 @@ const Home: NextPage = () => {
 
   console.log(infoPanelContent)
 
+  const base64ToCsv = (base64: string): string => {
+    const base64Data = base64.split(',')[1]; // `data:text/csv;base64,`の後ろの部分を取得
+    const decodedData = atob(base64Data); // Base64デコード
+    return decodedData;
+  };
+
   const uploadAuthorityCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -128,6 +138,32 @@ const Home: NextPage = () => {
       reader.onload = (e) => {
         if (e.target?.result) {
           setUploadedAuthorityContent(e.target.result.toString());
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const uploadMediaCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (e.target?.result) {
+          setUploadedMediaContent(e.target.result.toString());
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const uploadBibCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (e.target?.result) {
+          setUploadedBibContent(e.target.result.toString());
         }
       };
       reader.readAsDataURL(file);
@@ -164,6 +200,82 @@ const Home: NextPage = () => {
     console.log(infoPanelContent);
 
     handleMediaCloseDialog();
+  };
+
+  const saveMediaUpload = async () => {
+    console.log(uploadedMediaContent);
+    // Base64デコードしてCSVデータを取得
+    const csvData = base64ToCsv(uploadedMediaContent);
+    //console.log(csvData);
+
+    // CSVデータを行ごとに分割して、最初の行を削除
+    const rows = csvData.split('\n').slice(1);
+    //console.log(rows);
+
+    //infoPanelContent.wikidataを一旦クリア
+    if (infoPanelContent){
+      infoPanelContent.media = [];
+    } else {
+      alert('Please choose an annotation first.');
+    }
+    const media = []
+
+    for (const item of rows) {
+      const media_id = item.split(',')[0];
+      const media_type = item.split(',')[1];
+      const media_source = item.split(',')[2];
+      const media_caption = item.split(',')[3].replace("\r", "");
+
+      let data = {
+        id: '',
+        source: '',
+        type: '',
+        caption: '',
+      };
+
+      if (media_id !== ''){
+        // idがすでに存在する場合には、既存のidを使う
+        //console.log(media_id, media_type, media_source, media_caption);
+        data = {
+          id: media_id,
+          source: media_source,
+          type: media_type,
+          caption: media_caption,
+        }
+        //console.log(data);
+        infoPanelContent?.media.push(data);
+        media.push(data);
+      } else {
+        // idが存在しない場合には、uuidを生成
+        data = {
+          id: uuidv4(),
+          source: media_source,
+          type: media_type,
+          caption: media_caption,
+        }
+        //console.log(data);
+        infoPanelContent?.media.push(data);
+        media.push(data);
+      };
+
+      // firebaseのannotationsコレクションのidを持つdocのmediaフィールド(Array)のdataをfirebaseから取得
+      const docRef = doc(db, 'annotations', infoPanelContent?.id || '');
+      const docSnap = await getDoc(docRef);
+
+      //既存のmediaのデータを、mediaデータで上書き
+      if (docSnap.exists()) {
+        //const origData = docSnap.data();
+        // firebaseのannotationsコレクションのidを持つdocのMediaフィールド(Array)にdataを追記
+        await updateDoc(docRef, {
+          media: media,
+        });
+      } else {
+        console.warn('No such document!');
+      }
+
+    }
+
+    handleMediaUploadCloseDialog();
   };
 
   const saveWikidata = async () => {
@@ -257,12 +369,6 @@ const Home: NextPage = () => {
     handleWikidataCloseDialog();
   };
 
-  const base64ToCsv = (base64: string): string => {
-    const base64Data = base64.split(',')[1]; // `data:text/csv;base64,`の後ろの部分を取得
-    const decodedData = atob(base64Data); // Base64デコード
-    return decodedData;
-  };
-
   const saveAuthorityUpload = async () => {
     // const mediaData = { source, type, caption };
     console.log(uploadedAuthorityContent);
@@ -295,6 +401,7 @@ const Home: NextPage = () => {
         lat: '',
         lng: '',
       };
+
       if (authority_type === 'wikidata') {
         // wikidataのsparqlエンドポイントにアクセスして該当するデータのラベルを取得
         console.log(authority_uri);
@@ -362,14 +469,14 @@ const Home: NextPage = () => {
     console.log(authority);
 
     
-    // firebaseのannotationsコレクションのidを持つdocのMediaフィールド(Array)のdataをfirebaseから取得
+    // firebaseのannotationsコレクションのidを持つdocのWikidataフィールド(Array)のdataをfirebaseから取得
     const docRef = doc(db, 'annotations', infoPanelContent?.id || '');
     const docSnap = await getDoc(docRef);
 
     //既存のWikidataのデータを、authorityデータで上書き
     if (docSnap.exists()) {
       //const origData = docSnap.data();
-      // firebaseのannotationsコレクションのidを持つdocのMediaフィールド(Array)にdataを追記
+      // firebaseのannotationsコレクションのidを持つdocのWikidataフィールド(Array)にdataを追記
       await updateDoc(docRef, {
         wikidata: authority,
       });
@@ -428,6 +535,90 @@ const Home: NextPage = () => {
 
     handleBibCloseDialog();
   };
+
+  const saveBibUpload = async () => {
+    console.log(uploadedBibContent);
+    // Base64デコードしてCSVデータを取得
+    const csvData = base64ToCsv(uploadedBibContent);
+    //console.log(csvData);
+
+    // CSVデータを行ごとに分割して、最初の行を削除
+    const rows = csvData.split('\n').slice(1);
+    //console.log(rows);
+
+    //infoPanelContent.wikidataを一旦クリア
+    if (infoPanelContent){
+      infoPanelContent.bibliography = [];
+    } else {
+      alert('Please choose an annotation first.');
+    }
+    const bibliography = []
+
+    for (const item of rows) {
+      const bib_id = item.split(',')[0];
+      const bib_title = item.split(',')[1];
+      const bib_author = item.split(',')[2];
+      const bib_year = item.split(',')[3];
+      const bib_uri = item.split(',')[4];
+      const bib_pdf = item.split(',')[5].replace("\r", "");
+
+      let data = {
+        id: '',
+        title: '',
+        author: '',
+        year: '',
+        page: '',
+        pdf: '',
+      };
+
+      if (bib_id !== ''){
+        // idがすでに存在する場合には、既存のidを使う
+        //console.log(media_id, media_type, media_source, media_caption);
+        data = {
+          id: bib_id,
+          title: bib_title,
+          author: bib_author,
+          year: bib_year,
+          page: bib_uri,
+          pdf: bib_pdf,
+        }
+        //console.log(data);
+        infoPanelContent?.bibliography.push(data);
+        bibliography.push(data);
+      } else {
+        // idが存在しない場合には、uuidを生成
+        data = {
+          id: uuidv4(),
+          title: bib_title,
+          author: bib_author,
+          year: bib_year,
+          page: bib_uri,
+          pdf: bib_pdf,
+        }
+        //console.log(data);
+        infoPanelContent?.bibliography.push(data);
+        bibliography.push(data);
+      };
+
+      // firebaseのannotationsコレクションのidを持つdocのmediaフィールド(Array)のdataをfirebaseから取得
+      const docRef = doc(db, 'annotations', infoPanelContent?.id || '');
+      const docSnap = await getDoc(docRef);
+
+      //既存のmediaのデータを、mediaデータで上書き
+      if (docSnap.exists()) {
+        //const origData = docSnap.data();
+        // firebaseのannotationsコレクションのidを持つdocのMediaフィールド(Array)にdataを追記
+        await updateDoc(docRef, {
+          bibliography: bibliography,
+        });
+      } else {
+        console.warn('No such document!');
+      }
+    }
+
+    handleBibUploadCloseDialog();
+
+  }
 
   const saveDesc = async () => {
     console.log(desc);
@@ -790,6 +981,9 @@ const Home: NextPage = () => {
   const handleMediaCloseDialog = () => {
     setIsMediaDialogOpen(false);
   };
+  const handleMediaUploadCloseDialog = () => {
+    setIsMediaUploadDialogOpen(false);
+  };
   const handleMediaUpload = () => {
     console.log("media uploaded");
     setIsMediaUploadDialogOpen(true);
@@ -806,6 +1000,13 @@ const Home: NextPage = () => {
   const handleBibCloseDialog = () => {
     setIsBibDialogOpen(false);
   };
+  const handleBibUploadCloseDialog = () => {
+    setIsBibUploadDialogOpen(false);
+  }
+  const handleBibUpload = () => {
+    console.log("bib uploaded");
+    setIsBibUploadDialogOpen(true);
+  }
 
   const handleDescOpenDialog = () => {
     if (infoPanelContent?.creator == user?.uid) {
@@ -1343,7 +1544,7 @@ const Home: NextPage = () => {
                     />
                     </button>
                     <button
-                      onClick={handleMediaUpload}
+                      onClick={handleBibUpload}
                       style={{
                         padding: '5px 10px',
                         color: 'white',
@@ -1542,7 +1743,60 @@ const Home: NextPage = () => {
             borderRadius: '5px',
             zIndex: 1000,
           }}
-        >Under construction</div>
+        >
+          <form style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
+              Upload CSV File:
+              <input
+                type="file"
+                accept=".csv"
+                onChange={uploadMediaCSV}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  marginTop: '5px',
+                  border: '1px solid #ccc',
+                  borderRadius: '5px',
+                  fontSize: '16px',
+                }}
+              />
+            </label>
+            <p>【注意】既存のデータは上書きされます。</p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={saveMediaUpload}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: '#000080',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '5px',
+                  cursor: 'pointer',
+                  fontSize: '16px',
+                  marginRight: '10px',
+                }}
+              >
+                Upload
+              </button>
+              <button
+                type="button"
+                onClick={handleMediaUploadCloseDialog}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: '#333',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '5px',
+                  cursor: 'pointer',
+                  fontSize: '16px',
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </form>
+        </div>
       )}
 
       {isMediaDialogOpen && (
@@ -1594,8 +1848,7 @@ const Home: NextPage = () => {
                 }}
               >
                 <option value="img">Image</option>
-                <option value="video">Video</option>
-                <option value="audio">Audio</option>
+                <option value="video">Youtube</option>
               </select>
             </label>
             <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
@@ -1796,6 +2049,77 @@ const Home: NextPage = () => {
               <button
                 type="button"
                 onClick={handleWikidataCloseDialog}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: '#333',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '5px',
+                  cursor: 'pointer',
+                  fontSize: '16px',
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {isBibUploadDialogOpen && (
+        //csvファイルのアップロードダイアログ
+        <div
+          style={{
+            position: 'fixed',
+            width: '500px',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            backgroundColor: 'white',
+            padding: '20px',
+            border: '1px solid #ccc',
+            borderRadius: '5px',
+            zIndex: 1000,
+          }}
+        >
+          <form style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
+              Upload CSV File:
+              <input
+                type="file"
+                accept=".csv"
+                onChange={uploadBibCSV}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  marginTop: '5px',
+                  border: '1px solid #ccc',
+                  borderRadius: '5px',
+                  fontSize: '16px',
+                }}
+              />
+            </label>
+            <p>【注意】既存のデータは上書きされます。</p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={saveBibUpload}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: '#000080',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '5px',
+                  cursor: 'pointer',
+                  fontSize: '16px',
+                  marginRight: '10px',
+                }}
+              >
+                Upload
+              </button>
+              <button
+                type="button"
+                onClick={handleBibUploadCloseDialog}
                 style={{
                   padding: '10px 20px',
                   backgroundColor: '#333',
