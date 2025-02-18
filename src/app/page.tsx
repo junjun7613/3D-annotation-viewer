@@ -1069,7 +1069,7 @@ const Home: NextPage = () => {
             alignItems: 'center',
           }}
         >
-          <h1 style={{ margin: 0 }}>3D Annotation Editor</h1>
+          <h1 style={{ margin: 0 }}>Semantic 3D Annotation Editor</h1>
           <nav>
             <a href="#home" style={{ color: 'white', marginRight: '20px' }}>
               Home
@@ -1651,7 +1651,7 @@ const Home: NextPage = () => {
             textAlign: 'center',
           }}
         >
-          &copy; 2025 3D Annotation Editor. All rights reserved.
+          &copy; 2025 Semantic 3D Annotatino Editor. All rights reserved.
         </footer>
       </div>
 
