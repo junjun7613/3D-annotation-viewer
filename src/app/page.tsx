@@ -79,7 +79,7 @@ const Home: NextPage = () => {
   const [isDescDialogOpen, setIsDescDialogOpen] = useState(false);
   const [isWikidataDialogOpen, setIsWikidataDialogOpen] = useState(false);
 
-  const [isMediaUploadDialogOpen, setIsMediaUploadDialogOpen] = useState(false);
+  //const [isMediaUploadDialogOpen, setIsMediaUploadDialogOpen] = useState(false);
   const [isAuthorityUploadDialogOpen, setIsAuthorityUploadDialogOpen] = useState(false);
 
   const [IRI, setIRI] = useState('');
