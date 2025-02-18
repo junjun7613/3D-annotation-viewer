@@ -79,7 +79,7 @@ const Home: NextPage = () => {
   const [isDescDialogOpen, setIsDescDialogOpen] = useState(false);
   const [isWikidataDialogOpen, setIsWikidataDialogOpen] = useState(false);
 
-  //const [isMediaUploadDialogOpen, setIsMediaUploadDialogOpen] = useState(false);
+  const [isMediaUploadDialogOpen, setIsMediaUploadDialogOpen] = useState(false);
   const [isAuthorityUploadDialogOpen, setIsAuthorityUploadDialogOpen] = useState(false);
 
   const [IRI, setIRI] = useState('');
@@ -794,6 +794,7 @@ const Home: NextPage = () => {
     console.log("media uploaded");
     setIsMediaUploadDialogOpen(true);
   }
+  
 
   const handleBibOpenDialog = () => {
     if (infoPanelContent?.creator == user?.uid) {
@@ -1524,6 +1525,24 @@ const Home: NextPage = () => {
             </div>
           </form>
         </div>
+      )}
+
+      {isMediaUploadDialogOpen && (
+        //csvファイルのアップロードダイアログ
+        <div
+          style={{
+            position: 'fixed',
+            width: '500px',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            backgroundColor: 'white',
+            padding: '20px',
+            border: '1px solid #ccc',
+            borderRadius: '5px',
+            zIndex: 1000,
+          }}
+        >Under construction</div>
       )}
 
       {isMediaDialogOpen && (
