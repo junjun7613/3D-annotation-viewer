@@ -24,9 +24,6 @@ import {v4 as uuidv4} from 'uuid';
 
 import db from '@/lib/firebase/firebase';
 import { deleteDoc, doc, getDoc, getDocs, updateDoc, collection } from 'firebase/firestore';
-import { info } from 'console';
-//import { info } from 'console';
-//import { info } from 'console';
 
 const Home: NextPage = () => {
   const [user] = useAuthState(auth);
