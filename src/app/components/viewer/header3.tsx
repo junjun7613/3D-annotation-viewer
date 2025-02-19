@@ -6,6 +6,7 @@ import { manifestAtom, manifestUrlAtom } from '@/app/atoms/infoPanelAtom';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
+import LoginButton from '@/app/components/viewer/login';
 
 const Header3 = () => {
   const [manifest] = useAtom(manifestAtom);
@@ -46,6 +47,7 @@ const Header3 = () => {
         >
           {i18n.language === 'ja' ? t('english') : t('japanese')}
         </button>
+        <LoginButton />
         {/*
         <button className="hidden sm:block px-4 py-2 text-sm text-gray-600 hover:text-gray-800">
           共有

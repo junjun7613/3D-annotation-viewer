@@ -17,6 +17,7 @@
     "ckeditor5": "^44.1.0",
     "ckeditor5-premium-features": "^44.1.0",
     "firebase": "^11.1.0",
+    "firebase-admin": "^13.1.0",
     "gsap": "^3.12.7",
     "i18next": "^24.2.2",
     "i18next-browser-languagedetector": "^8.0.2",
