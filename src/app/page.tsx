@@ -291,28 +291,31 @@ const Home: NextPage = () => {
       const query = `SELECT ?item ?itemLabel ?wikipediaUrl WHERE {
         VALUES ?item {wd:${wikidata.split('/').pop()}}
         SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],en". }
+        OPTIONAL{
         ?wikipediaUrl schema:about ?item ;
         schema:inLanguage "en" ;
         schema:isPartOf <https://en.wikipedia.org/> .
+    }
       }
       `; //wikidataのsparqlクエリ
       const url = `https://query.wikidata.org/sparql?query=${encodeURIComponent(
         query
       )}&format=json`;
       const result = await fetch(url).then((res) => res.json());
+      console.log(result);
+
       const label = result['results']['bindings'][0]['itemLabel']['value'];
-      const wikipedia = result['results']['bindings'][0]['wikipediaUrl']['value'];
-      /*
-      const data = {
-        uri: wikidata,
-        label: label,
-        wikipedia: wikipedia,
-      };
-      */
+      //もしbidingsの中にwikipediaUrlがあれば、その値を取得
+      let wikipedia = '';
+      if (result['results']['bindings'][0]['wikipediaUrl']) {
+        wikipedia = result['results']['bindings'][0]['wikipediaUrl']['value'];
+      }
+    
       data = {
         type: wikiType,
         uri: wikidata,
         label: label,
+        //もしwikipediaがあれば、dataに追加
         wikipedia: wikipedia,
       };
     } else if (wikiType === 'geonames') {
