@@ -752,7 +752,8 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
         data: {
           body: {
             label: title,
-            value: description,
+            //value: description,
+            value: '',
             type: 'TextualBody',
           },
           target: {
@@ -780,7 +781,8 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
         data: {
           body: {
             label: title,
-            value: description,
+            //value: description,
+            value: '',
             type: 'TextualBody',
           },
           target: {
@@ -876,6 +878,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
               />
             </label>
             <br />
+            {/*
             <label>
               Description:
               <br />
@@ -893,6 +896,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
                 }}
               />
             </label>
+            */}
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
               <button
                 type="button"
@@ -905,6 +909,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
                   borderRadius: '5px',
                   cursor: 'pointer',
                   fontSize: '16px',
+                  marginTop: '10px',
                 }}
               >
                 Save
@@ -926,6 +931,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
                   borderRadius: '5px',
                   cursor: 'pointer',
                   fontSize: '16px',
+                  marginTop: '10px',
                 }}
               >
                 Cancel
