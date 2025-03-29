@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { auth } from '@/lib/firebase/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
@@ -21,6 +21,15 @@ import { LiaMapMarkedSolid } from "react-icons/lia";
 import { useAtom } from 'jotai';
 import { infoPanelAtom } from '@/app/atoms/infoPanelAtom';
 
+import EditorJS from "@editorjs/editorjs";
+import Header from "@editorjs/header";
+import List from "@editorjs/list";
+//import Embed from "@editorjs/embed";
+
+type BlockToolConstructable = {
+  new (config: any): any;
+};
+
 import {v4 as uuidv4} from 'uuid';
 
 const Editor = dynamic(() => import('./components/Editor'), { ssr: false });
@@ -30,6 +39,7 @@ import db from '@/lib/firebase/firebase';
 import { deleteDoc, doc, getDoc, getDocs, updateDoc, collection } from 'firebase/firestore';
 
 const Home: NextPage = () => {
+  const editorRef = useRef<EditorJS | null>(null);
   const [user] = useAuthState(auth);
 
   const [annotationsVisible, setAnnotationsVisible] = useState(true);
@@ -129,6 +139,7 @@ const Home: NextPage = () => {
 
   // description editor関連
   useEffect(() => {
+
     if (infoPanelContent?.description) {
       setDesc(infoPanelContent.description);
       setEditorData({
@@ -145,8 +156,48 @@ const Home: NextPage = () => {
       setDesc('');
       setEditorData(undefined);
     }
+    
   }, [infoPanelContent]);
 
+  // description editorの初期化
+  useEffect(() => {
+    if (typeof window !== "undefined" && isDescDialogOpen) {
+      editorRef.current = new EditorJS({
+        holder: "editorJS",
+        tools: {
+          header: {
+            class: Header as unknown as BlockToolConstructable,
+            inlineToolbar: ["link"],
+          },
+          list: {
+            class: List as unknown as BlockToolConstructable,
+            inlineToolbar: true,
+          },
+        },
+        data: infoPanelContent?.description
+        ? {
+            blocks: [
+              {
+                type: "paragraph",
+                data: {
+                  text: infoPanelContent.description,
+                },
+              },
+            ],
+          }
+        : undefined, // デフォルト値がない場合は空の状態にする
+      });
+
+      return () => {
+        if (editorRef.current) {
+          editorRef.current.destroy();
+          editorRef.current = null;
+        }
+      };
+    }
+  }, [isDescDialogOpen]);
+
+  /*
   const handleEditorChange = (data: OutputData) => {
     console.log(data);
     setEditorData(data);
@@ -155,8 +206,21 @@ const Home: NextPage = () => {
     console.log(updatedDesc);
     setDesc(updatedDesc);
   };
+  */
 
-  console.log(infoPanelContent)
+  console.log(infoPanelContent);
+
+  const btnSaves = () => {
+    if (editorRef.current) {
+      editorRef.current.save().then((outputData) => {
+        console.log('Article data: ', outputData);
+      }).catch((error) => {
+        console.log('Saving failed: ', error);
+      });
+    } else {
+      console.warn('Editor instance is not initialized.');
+    }
+  };
 
   const base64ToCsv = (base64: string): string => {
     const base64Data = base64.split(',')[1]; // `data:text/csv;base64,`の後ろの部分を取得
@@ -2353,8 +2417,8 @@ const Home: NextPage = () => {
         <div
           style={{
             position: 'fixed',
-            height: '300px',
-            width: '500px',
+            height: '500px',
+            width: '900px',
             top: '50%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
@@ -2365,8 +2429,25 @@ const Home: NextPage = () => {
             zIndex: 1000,
           }}
         >
-          <form style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            
+          <form 
+            style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '15px',
+             }}
+              >
+            <div
+              id="editorJS"
+              style={{
+                height: "350px", // 高さを自動調整
+                minHeight: "350px", // 必要に応じて最小高さを設定
+                marginBottom: "20px", // ボタンとの間に余白を追加
+                overflowY: "auto", // 縦方向のスクロールを有効化
+                border: "1px solid #ccc", // 視覚的な区切りを追加（オプション）
+                padding: "10px", // 内側の余白を追加（オプション）
+              }}
+              />
+            {/*
             <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
               Description:
               <textarea
@@ -2386,7 +2467,7 @@ const Home: NextPage = () => {
                 }}
               />
             </label>
-            
+            */}
             {/*
             <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
               Description:
@@ -2396,7 +2477,8 @@ const Home: NextPage = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
               <button
                 type="button"
-                onClick={saveDesc}
+                //onClick={saveDesc}
+                onClick={btnSaves}
                 style={{
                   padding: '10px 20px',
                   backgroundColor: '#000080',
@@ -2406,6 +2488,7 @@ const Home: NextPage = () => {
                   cursor: 'pointer',
                   fontSize: '16px',
                   marginRight: '10px',
+                  marginTop: '10px',
                 }}
               >
                 Save
@@ -2421,6 +2504,7 @@ const Home: NextPage = () => {
                   borderRadius: '5px',
                   cursor: 'pointer',
                   fontSize: '16px',
+                  marginTop: '10px',
                 }}
               >
                 Close
