@@ -56,7 +56,8 @@ interface ThreeCanvasProps {
 //firebaseからデータを取得する関数
 const getAnnotations = async () => {
   const annotations: Annotation[] = [];
-  const q = query(collection(db, 'annotations'));
+  //const q = query(collection(db, 'annotations'));
+  const q = query(collection(db, 'test'));
   const querySnapshot = await getDocs(q);
   querySnapshot.forEach((doc) => {
     const data = doc.data() as Annotation;
@@ -138,7 +139,8 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   }, [annotationMode, manifestUrl, infoPanelContent]);
 
   useEffect(() => {
-    const q = query(collection(db, 'annotations'));
+    //const q = query(collection(db, 'annotations'));
+    const q = query(collection(db, 'test'));
     
 
       // ここでシーンの再描画や他の処理を行う
@@ -765,7 +767,8 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
           },
         },
       };
-      addDoc(collection(db, 'annotations'), data);
+      //addDoc(collection(db, 'annotations'), data);
+      addDoc(collection(db, 'test'), data);
 
       setAnnotationInputVisible(false);
       return;
@@ -794,7 +797,8 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
           },
         },
       };
-      addDoc(collection(db, 'annotations'), data);
+      //addDoc(collection(db, 'annotations'), data);
+      addDoc(collection(db, 'test'), data);
 
       setAnnotationInputVisible(false);
     }
@@ -819,7 +823,8 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
 
   // Firebaseのリアルタイム更新を監視
   useEffect(() => {
-    const q = query(collection(db, 'annotations'));
+    //const q = query(collection(db, 'annotations'));
+    const q = query(collection(db, 'test'));
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const annotations: Annotation[] = [];
       querySnapshot.forEach((doc) => {

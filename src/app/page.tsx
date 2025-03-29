@@ -21,6 +21,7 @@ import { LiaMapMarkedSolid } from "react-icons/lia";
 import { useAtom } from 'jotai';
 import { infoPanelAtom } from '@/app/atoms/infoPanelAtom';
 
+import EditorJSHtml from 'editorjs-html';
 import EditorJS from "@editorjs/editorjs";
 import Header from "@editorjs/header";
 import List from "@editorjs/list";
@@ -37,6 +38,8 @@ import { OutputData } from '@editorjs/editorjs'; // OutputDataをインポート
 
 import db from '@/lib/firebase/firebase';
 import { deleteDoc, doc, getDoc, getDocs, updateDoc, collection } from 'firebase/firestore';
+import { set } from 'lodash';
+import { info } from 'console';
 
 const Home: NextPage = () => {
   const editorRef = useRef<EditorJS | null>(null);
@@ -141,7 +144,16 @@ const Home: NextPage = () => {
   useEffect(() => {
 
     if (infoPanelContent?.description) {
-      setDesc(infoPanelContent.description);
+
+      console.log(infoPanelContent.description);
+
+      const parser = EditorJSHtml();
+      const html = parser.parse(infoPanelContent.description);
+
+      console.log(html);
+
+      //setDesc(infoPanelContent.description);
+      setDesc(html);
       setEditorData({
         blocks: [
           {
@@ -175,16 +187,7 @@ const Home: NextPage = () => {
           },
         },
         data: infoPanelContent?.description
-        ? {
-            blocks: [
-              {
-                type: "paragraph",
-                data: {
-                  text: infoPanelContent.description,
-                },
-              },
-            ],
-          }
+        ? infoPanelContent.description
         : undefined, // デフォルト値がない場合は空の状態にする
       });
 
@@ -277,7 +280,8 @@ const Home: NextPage = () => {
     };
 
     // firebaseのannotationsコレクションのidを持つdocのMediaフィールド(Array)のdataをfirebaseから取得
-    const docRef = doc(db, 'annotations', infoPanelContent?.id || '');
+    //const docRef = doc(db, 'annotations', infoPanelContent?.id || '');
+    const docRef = doc(db, 'test', infoPanelContent?.id || '');
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
@@ -356,7 +360,8 @@ const Home: NextPage = () => {
       };
 
       // firebaseのannotationsコレクションのidを持つdocのmediaフィールド(Array)のdataをfirebaseから取得
-      const docRef = doc(db, 'annotations', infoPanelContent?.id || '');
+      //const docRef = doc(db, 'annotations', infoPanelContent?.id || '');
+      const docRef = doc(db, 'test', infoPanelContent?.id || '');
       const docSnap = await getDoc(docRef);
 
       //既存のmediaのデータを、mediaデータで上書き
@@ -447,7 +452,8 @@ const Home: NextPage = () => {
     }
 
     // firebaseのannotationsコレクションのidを持つdocのMediaフィールド(Array)のdataをfirebaseから取得
-    const docRef = doc(db, 'annotations', infoPanelContent?.id || '');
+    //const docRef = doc(db, 'annotations', infoPanelContent?.id || '');
+    const docRef = doc(db, 'test', infoPanelContent?.id || '');
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
@@ -570,7 +576,8 @@ const Home: NextPage = () => {
 
     
     // firebaseのannotationsコレクションのidを持つdocのWikidataフィールド(Array)のdataをfirebaseから取得
-    const docRef = doc(db, 'annotations', infoPanelContent?.id || '');
+    //const docRef = doc(db, 'annotations', infoPanelContent?.id || '');
+    const docRef = doc(db, 'test', infoPanelContent?.id || '');
     const docSnap = await getDoc(docRef);
 
     //既存のWikidataのデータを、authorityデータで上書き
@@ -614,7 +621,8 @@ const Home: NextPage = () => {
     };
 
     // firebaseのannotationsコレクションのidを持つdocのMediaフィールド(Array)のdataをfirebaseから取得
-    const docRef = doc(db, 'annotations', infoPanelContent?.id || '');
+    //const docRef = doc(db, 'annotations', infoPanelContent?.id || '');
+    const docRef = doc(db, 'test', infoPanelContent?.id || '');
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
@@ -701,7 +709,8 @@ const Home: NextPage = () => {
       };
 
       // firebaseのannotationsコレクションのidを持つdocのmediaフィールド(Array)のdataをfirebaseから取得
-      const docRef = doc(db, 'annotations', infoPanelContent?.id || '');
+      //const docRef = doc(db, 'annotations', infoPanelContent?.id || '');
+      const docRef = doc(db, 'test', infoPanelContent?.id || '');
       const docSnap = await getDoc(docRef);
 
       //既存のmediaのデータを、mediaデータで上書き
@@ -724,7 +733,8 @@ const Home: NextPage = () => {
   const saveDesc = async () => {
     console.log(desc);
     // descriptionの情報をfirebaseのannotationsコレクションのidを持つdocのdata/body/valueに保存
-    const docRef = doc(db, 'annotations', infoPanelContent?.id || '');
+    //const docRef = doc(db, 'annotations', infoPanelContent?.id || '');
+    const docRef = doc(db, 'test', infoPanelContent?.id || '');
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
@@ -796,7 +806,8 @@ const Home: NextPage = () => {
       const confirmed = confirm('Are you sure you want to delete this annotation?');
       if (confirmed) {
         //idのdocをfirebaseデータベースから削除
-        deleteDoc(doc(db, 'annotations', id));
+        //deleteDoc(doc(db, 'annotations', id));
+        deleteDoc(doc(db, 'test', id));
       }
     } else {
       alert('You are not the creator of this annotation.');
@@ -805,7 +816,8 @@ const Home: NextPage = () => {
 
   const downloadAnnotation = (id: string) => {
     // idのdocをfirebaseデータベースから取得
-    const docRef = doc(db, 'annotations', id);
+    //const docRef = doc(db, 'annotations', id);
+    const docRef = doc(db, 'test', id);
     const download = async () => {
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
@@ -830,7 +842,8 @@ const Home: NextPage = () => {
     console.log('RDF download');
     console.log(id);
     // firebaseのannotationsコレクションのすべてのDocの中から、targetmanifestの値がidと一致するものを取得
-    const querySnapshot = getDocs(collection(db, 'annotations'));
+    //const querySnapshot = getDocs(collection(db, 'annotations'));
+    const querySnapshot = getDocs(collection(db, 'test'));
     querySnapshot.then((snapshot) => {
       let turtleData = '@prefix : <https://www.example.com/vocabulary/> .\n@prefix schema: <https://schema.org/> .\n@prefix dc: <http://purl.org/dc/elements/1.1/> .'; // ベースURIを定義
       turtleData += '\n';
@@ -963,7 +976,8 @@ const Home: NextPage = () => {
 
     const annotations: Annotation[] = [];
 
-    const querySnapshot = getDocs(collection(db, 'annotations'));
+    //const querySnapshot = getDocs(collection(db, 'annotations'));
+    const querySnapshot = getDocs(collection(db, 'test'));
     querySnapshot.then((snapshot) => {
       snapshot.forEach((doc) => {
         const data = doc.data();
@@ -1012,7 +1026,8 @@ const Home: NextPage = () => {
       const confirmed = confirm('Are you sure you want to delete this Wiki Item?');
       if (confirmed) {
         //idのdocのBibliographyフィールドのindexの要素を削除
-        const docRef = doc(db, 'annotations', id);
+        //const docRef = doc(db, 'annotations', id);
+        const docRef = doc(db, 'test', id);
         const deleteField = async () => {
           const docSnap = await getDoc(docRef);
           if (docSnap.exists()) {
@@ -1042,7 +1057,8 @@ const Home: NextPage = () => {
       const confirmed = confirm('Are you sure you want to delete this bibliography?');
       if (confirmed) {
         //idのdocのBibliographyフィールドのindexの要素を削除
-        const docRef = doc(db, 'annotations', id);
+        //const docRef = doc(db, 'annotations', id);
+        const docRef = doc(db, 'test', id);
         const deleteField = async () => {
           const docSnap = await getDoc(docRef);
           if (docSnap.exists()) {
@@ -1072,7 +1088,8 @@ const Home: NextPage = () => {
       const confirmed = confirm('Are you sure you want to delete this Wiki Item?');
       if (confirmed) {
         //idのdocのBibliographyフィールドのindexの要素を削除
-        const docRef = doc(db, 'annotations', id);
+        //const docRef = doc(db, 'annotations', id);
+        const docRef = doc(db, 'test', id);
         const deleteField = async () => {
           const docSnap = await getDoc(docRef);
           if (docSnap.exists()) {
@@ -1143,7 +1160,7 @@ const Home: NextPage = () => {
 
   const handleDescOpenDialog = () => {
     if (infoPanelContent?.creator == user?.uid) {
-      setDesc(infoPanelContent?.description || '');
+      //setDesc(infoPanelContent?.description || '');
       setIsDescDialogOpen(true);
     } else {
       alert('You are not the creator of this annotation.');
@@ -1378,7 +1395,8 @@ const Home: NextPage = () => {
                   </button>
                 </div>
                 <div
-                  dangerouslySetInnerHTML={{ __html: infoPanelContent?.description || '' }}
+                  //dangerouslySetInnerHTML={{ __html: infoPanelContent?.description || '' }}
+                  dangerouslySetInnerHTML={{ __html: desc || '' }}
                   // infoPanelContent?.descriptionのマークダウンをHTMLに変換
                 ></div>
               </div>
