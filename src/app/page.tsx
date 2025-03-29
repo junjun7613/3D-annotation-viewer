@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { auth } from '@/lib/firebase/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 //import { useAuth } from "@/context/auth"; // AuthProviderとuseAuthをインポート
@@ -22,6 +23,9 @@ import { infoPanelAtom } from '@/app/atoms/infoPanelAtom';
 
 import {v4 as uuidv4} from 'uuid';
 
+const Editor = dynamic(() => import('./components/Editor'), { ssr: false });
+import { OutputData } from '@editorjs/editorjs'; // OutputDataをインポート
+
 import db from '@/lib/firebase/firebase';
 import { deleteDoc, doc, getDoc, getDocs, updateDoc, collection } from 'firebase/firestore';
 
@@ -33,6 +37,8 @@ const Home: NextPage = () => {
   const [annotationMode, setAnnotationMode] = useState(false);
   const [manifestUrl, setManifestUrl] = useState<string>('');
   // infoPanelContentという連想配列を作成
+
+  const [editorData, setEditorData] = useState<OutputData | undefined>();
 
   interface MediaItem {
     id: string;
@@ -63,7 +69,8 @@ const Home: NextPage = () => {
     id: string;
     type: string;
     motivation: string;
-    body: { value: string; label: string; type: string };
+    //body: { value: string; label: string; type: string };
+    body: { value: Record<string, any>; label: string; type: string };
     target: { source: string; selector: { value: string; type: string } };
   }
 
@@ -119,6 +126,35 @@ const Home: NextPage = () => {
       setManifestUrl(manifestParam);
     }
   }, []);
+
+  // description editor関連
+  useEffect(() => {
+    if (infoPanelContent?.description) {
+      setDesc(infoPanelContent.description);
+      setEditorData({
+        blocks: [
+          {
+            type: 'paragraph',
+            data: {
+              text: infoPanelContent.description,
+            },
+          },
+        ],
+      });
+    } else {
+      setDesc('');
+      setEditorData(undefined);
+    }
+  }, [infoPanelContent]);
+
+  const handleEditorChange = (data: OutputData) => {
+    console.log(data);
+    setEditorData(data);
+    // Editor.jsのデータをdescに変換してセット
+    const updatedDesc = data.blocks.map((block) => block.data.text).join('\n');
+    console.log(updatedDesc);
+    setDesc(updatedDesc);
+  };
 
   console.log(infoPanelContent)
 
@@ -620,6 +656,7 @@ const Home: NextPage = () => {
 
   }
 
+  
   const saveDesc = async () => {
     console.log(desc);
     // descriptionの情報をfirebaseのannotationsコレクションのidを持つdocのdata/body/valueに保存
@@ -645,6 +682,38 @@ const Home: NextPage = () => {
 
     handleDescCloseDialog();
   };
+  
+  /*
+  const saveDesc = async () => {
+    if (editorData) {
+      const description = editorData.blocks.map((block) => block.data.text).join('\n');
+      console.log('Saving description:', description);
+
+      // Firebaseに保存
+      const docRef = doc(db, 'annotations', infoPanelContent?.id || '');
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        const origData = docSnap.data();
+        await updateDoc(docRef, {
+          data: {
+            body: {
+              value: description,
+              label: origData.data.body.label,
+              type: origData.data.body.type,
+            },
+            target: origData.data.target,
+          },
+        });
+      } else {
+        console.warn('No such document!');
+      }
+
+      alert('Description saved successfully!');
+      handleDescCloseDialog();
+    }
+  };
+  */
 
   const handleSwitchChange = (checked: boolean) => {
     setAnnotationsVisible(checked);
@@ -2013,7 +2082,7 @@ const Home: NextPage = () => {
               </select>
             </label>
             <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
-              Wikidata URI:
+              URI:
               <input
                 name="wikidata"
                 value={wikidata}
@@ -2208,7 +2277,7 @@ const Home: NextPage = () => {
               />
             </label>
             <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
-              Page:
+              Page URL:
               <input
                 name="bibPage"
                 value={bibPage}
@@ -2297,6 +2366,7 @@ const Home: NextPage = () => {
           }}
         >
           <form style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            
             <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
               Description:
               <textarea
@@ -2315,14 +2385,14 @@ const Home: NextPage = () => {
                   resize: 'vertical',
                 }}
               />
-              {/* 
-              <CustomEditor 
-                value={desc}
-                // 入力されたテキストをセット
-                onChange={setDesc}
-                />
-              */}
             </label>
+            
+            {/*
+            <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
+              Description:
+              <Editor data={editorData} onChange={handleEditorChange} />
+            </label>
+            */}
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
               <button
                 type="button"

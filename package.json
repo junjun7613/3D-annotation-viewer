@@ -10,6 +10,10 @@
   },
   "dependencies": {
     "@ckeditor/ckeditor5-react": "^9.5.0",
+    "@editorjs/editorjs": "^2.30.8",
+    "@editorjs/header": "^2.8.8",
+    "@editorjs/list": "^2.0.6",
+    "@editorjs/paragraph": "^2.11.7",
     "@react-three/drei": "^10.0.4",
     "@react-three/fiber": "^9.1.0",
     "@samvera/clover-iiif": "^2.12.4",
