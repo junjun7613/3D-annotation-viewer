@@ -60,6 +60,16 @@ const Home: NextPage = () => {
     caption: string;
   }
 
+  interface InfoPanelContent {
+    title: string;
+    description: OutputData | undefined; // descriptionをOutputData型に変更
+    id: string;
+    creator?: string;
+    media?: MediaItem[];
+    wikidata?: WikidataItem[];
+    bibliography?: BibItem[];
+  }
+
   interface WikidataItem {
     type: string;
     uri: string;
@@ -154,6 +164,8 @@ const Home: NextPage = () => {
 
       //setDesc(infoPanelContent.description);
       setDesc(html);
+      setEditorData(infoPanelContent.description); // descriptionをOutputData型に変換してセット
+      /*
       setEditorData({
         blocks: [
           {
@@ -164,6 +176,7 @@ const Home: NextPage = () => {
           },
         ],
       });
+      */
     } else {
       setDesc('');
       setEditorData(undefined);
@@ -213,13 +226,41 @@ const Home: NextPage = () => {
 
   console.log(infoPanelContent);
 
-  const btnSaves = () => {
+  const btnSaves = async () => {
     if (editorRef.current) {
-      editorRef.current.save().then((outputData) => {
+      try {
+        const outputData = await editorRef.current.save();
         console.log('Article data: ', outputData);
-      }).catch((error) => {
+
+        // undefinedを削除
+        const cleanedData = JSON.parse(JSON.stringify(outputData));
+        console.log('OutputData after cleaning:', cleanedData);
+  
+        const docRef = doc(db, 'test', infoPanelContent?.id || '');
+        const docSnap = await getDoc(docRef);
+  
+        if (docSnap.exists()) {
+          const origData = docSnap.data();
+          console.log(origData.data.body.value);
+          // origData.data.body.valueにoutputDataをセット
+          await updateDoc(docRef, {
+            data: {
+              body: {
+                value: cleanedData,
+                label: origData.data.body.label,
+                type: origData.data.body.type,
+              },
+              target: origData.data.target,
+            },
+          });
+        } else {
+          console.warn('No such document!');
+        }
+  
+        handleDescCloseDialog();
+      } catch (error) {
         console.log('Saving failed: ', error);
-      });
+      }
     } else {
       console.warn('Editor instance is not initialized.');
     }
@@ -850,6 +891,9 @@ const Home: NextPage = () => {
 
       snapshot.forEach((doc) => {
         const data = doc.data();
+        //const parser = EditorJSHtml();
+        //const cleanedData = JSON.parse(JSON.stringify(data.data.body.value));
+        //const html = parser.parse(cleanedData);
         if (data.target_manifest === id) {
           console.log(data);
           // 以下でannotationごとにTutleを生成・ダウンロード
@@ -862,6 +906,7 @@ const Home: NextPage = () => {
           );
           properties.push(
             `  schema:description "${data.data.body.value}"`,
+            //`  schema:description "${html}"`,
           );
 
           // manifestおよびcanvasの情報を追加
@@ -1396,8 +1441,8 @@ const Home: NextPage = () => {
                 </div>
                 <div
                   //dangerouslySetInnerHTML={{ __html: infoPanelContent?.description || '' }}
+                  //descのhtmlをHTMLとして表示
                   dangerouslySetInnerHTML={{ __html: desc || '' }}
-                  // infoPanelContent?.descriptionのマークダウンをHTMLに変換
                 ></div>
               </div>
             </div>

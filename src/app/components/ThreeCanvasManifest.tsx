@@ -15,6 +15,9 @@ import { addDoc, collection, getDocs, query, onSnapshot } from 'firebase/firesto
 import { useSetAtom } from 'jotai';
 import { infoPanelAtom } from '@/app/atoms/infoPanelAtom';
 
+// uuidをインポート
+import { v4 as uuidv4 } from 'uuid';
+
 //firebaseのデータを格納するための型
 interface Annotation {
   id: string;
@@ -135,8 +138,11 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   //もしannotationModeが変更されたら、annotationModeRefを更新
   //menifestUrlが変更されたら、manifestUrlを出力
   useEffect(() => {
+    //console.log(annotationMode);
     annotationModeRef.current = annotationMode;
-  }, [annotationMode, manifestUrl, infoPanelContent]);
+    //console.log(annotationModeRef.current);
+  //}, [annotationMode, manifestUrl, infoPanelContent]);
+}, [annotationMode]);
 
   useEffect(() => {
     //const q = query(collection(db, 'annotations'));
@@ -516,6 +522,8 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
             };
 
             const onMouseDblClick = (event: MouseEvent) => {
+
+              console.log('annotationModeRef.current:', annotationModeRef.current);
               // マウスの位置を正規化
               const rect = renderer.domElement.getBoundingClientRect();
               mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -529,7 +537,8 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
               if (intersects.length > 0) {
                 const intersectedPoint = intersects[0].point;
 
-                if (!annotationModeRef.current) {
+                if (annotationModeRef.current == false) {
+                  console.log("point annotation mode")
                   const cameraDirection = new THREE.Vector3();
                   camera.getWorldDirection(cameraDirection);
                   const offset = cameraDirection.multiplyScalar(-0.01); // オフセットの距離を調整
@@ -565,6 +574,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
 
                   setAnnotationInputVisible(true);
                 } else {
+                  console.log("polygon annotation mode")
                   // 頂点を追加
                   const cameraDirection = new THREE.Vector3();
                   camera.getWorldDirection(cameraDirection);
@@ -623,8 +633,9 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
             };
 
             window.removeEventListener('click', onMouseClick);
-
+            //window.removeEventListener('dblclick', onMouseDblClick);
             window.addEventListener('click', onMouseClick);
+            //window.addEventListener('dblclick', onMouseDblClick);
 
             if (editable) {
               window.removeEventListener('dblclick', onMouseDblClick);
@@ -737,6 +748,8 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   };
 
   const saveAnnotation = () => {
+    // uuidを生成
+    const id = uuidv4();
     if (annotationModeRef.current) {
       //alert("Please create a polygon annotation!");
 
@@ -755,7 +768,20 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
           body: {
             label: title,
             //value: description,
-            value: '',
+            //value: '',
+            value: {
+              "blocks": [
+                  {
+                      "type": "paragraph",
+                      "id":id,
+                      "data": {
+                          "text": '',
+                      }
+                  }
+              ],
+              "time":"",
+              "version":"",
+          },
             type: 'TextualBody',
           },
           target: {
@@ -771,6 +797,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
       addDoc(collection(db, 'test'), data);
 
       setAnnotationInputVisible(false);
+      setTitle('');
       return;
     } else {
       //firebaseにデータを格納
@@ -785,7 +812,20 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
           body: {
             label: title,
             //value: description,
-            value: '',
+            //value: '',
+            value: {
+              "blocks": [
+                  {
+                      "type": "paragraph",
+                      "id":id,
+                      "data": {
+                          "text": '',
+                      }
+                  }
+              ],
+              "time":"",
+              "version":"",
+          },
             type: 'TextualBody',
           },
           target: {
@@ -801,6 +841,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
       addDoc(collection(db, 'test'), data);
 
       setAnnotationInputVisible(false);
+      setTitle('');
     }
 
     //titleの値を初期化
