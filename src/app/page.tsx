@@ -27,6 +27,8 @@ import Header from "@editorjs/header";
 import List from "@editorjs/list";
 //import Embed from "@editorjs/embed";
 
+import HTMLViewer from './components/HTMLviewer';
+
 type BlockToolConstructable = {
   new (config: any): any;
 };
@@ -891,9 +893,11 @@ const Home: NextPage = () => {
 
       snapshot.forEach((doc) => {
         const data = doc.data();
-        //const parser = EditorJSHtml();
-        //const cleanedData = JSON.parse(JSON.stringify(data.data.body.value));
-        //const html = parser.parse(cleanedData);
+        //console.log(data);
+        const parser = EditorJSHtml();
+        const cleanedData = JSON.parse(JSON.stringify(data.data.body.value || { blocks: [] })); // デフォルト値を設定
+        console.log(cleanedData);
+        const html = parser.parse(cleanedData);
         if (data.target_manifest === id) {
           console.log(data);
           // 以下でannotationごとにTutleを生成・ダウンロード
@@ -905,8 +909,8 @@ const Home: NextPage = () => {
             `  rdfs:label "${data.data.body.label}"`,
           );
           properties.push(
-            `  schema:description "${data.data.body.value}"`,
-            //`  schema:description "${html}"`,
+            //`  schema:description "${data.data.body.value}"`,
+            `  schema:description "${html}"`,
           );
 
           // manifestおよびcanvasの情報を追加
@@ -1401,6 +1405,7 @@ const Home: NextPage = () => {
                 <DisplayTEI />
               </div>
               */}
+              {/*
               <div
                 style={{
                   flex: 0.3,
@@ -1412,9 +1417,10 @@ const Home: NextPage = () => {
               >
                 {infoPanelContent?.title || ''}
               </div>
+              */}
               <div
                 style={{
-                  flex: 0.7,
+                  flex: 1,
                   height: '270px',
                   paddingLeft: '20px',
                   marginTop: '10px',
@@ -1423,6 +1429,7 @@ const Home: NextPage = () => {
                 <div
                   style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
                 >
+                  <h3 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '10px' }}>{infoPanelContent?.title || ''}</h3>
                   <button
                     onClick={handleDescOpenDialog}
                     style={{
@@ -1442,8 +1449,11 @@ const Home: NextPage = () => {
                 <div
                   //dangerouslySetInnerHTML={{ __html: infoPanelContent?.description || '' }}
                   //descのhtmlをHTMLとして表示
-                  dangerouslySetInnerHTML={{ __html: desc || '' }}
-                ></div>
+                  //dangerouslySetInnerHTML={{ __html: desc || '' }}
+                  style={{ overflowY: 'auto', height: '100%' }}
+                >
+                  <HTMLViewer htmlContent={desc || ''} />
+                </div>
               </div>
             </div>
             <div style={{ flex: 1.2, paddingTop: '20px' }}>
