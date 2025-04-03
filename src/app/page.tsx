@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import dynamic from 'next/dynamic';
+// import dynamic from 'next/dynamic';
 import { auth } from '@/lib/firebase/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 //import { useAuth } from "@/context/auth"; // AuthProviderとuseAuthをインポート
@@ -17,33 +17,44 @@ import { FaLink } from 'react-icons/fa6';
 import { PiShareNetwork } from 'react-icons/pi';
 //import { FiUpload } from 'react-icons/fi';
 import { IoDocumentTextOutline } from 'react-icons/io5';
-import { LiaMapMarkedSolid } from "react-icons/lia";
+import { LiaMapMarkedSolid } from 'react-icons/lia';
 import { useAtom } from 'jotai';
 import { infoPanelAtom } from '@/app/atoms/infoPanelAtom';
 
 import EditorJSHtml from 'editorjs-html';
-import EditorJS from "@editorjs/editorjs";
-import Header from "@editorjs/header";
-import List from "@editorjs/list";
+// import EditorJS from '@editorjs/editorjs';
+import Header from '@editorjs/header';
+import List from '@editorjs/list';
 //import Embed from "@editorjs/embed";
 
 import HTMLViewer from './components/HTMLviewer';
 
+/*
 type BlockToolConstructable = {
-  new (config: any): any;
+  new (config: unknown): unknown;
 };
+*/
 
-import {v4 as uuidv4} from 'uuid';
+import type { ToolConstructable } from '@editorjs/editorjs';
 
-const Editor = dynamic(() => import('./components/Editor'), { ssr: false });
+import { v4 as uuidv4 } from 'uuid';
+
+// const Editor = dynamic(() => import('./components/Editor'), { ssr: false });
 import { OutputData } from '@editorjs/editorjs'; // OutputDataをインポート
 
 import db from '@/lib/firebase/firebase';
 import { deleteDoc, doc, getDoc, getDocs, updateDoc, collection } from 'firebase/firestore';
-import { set } from 'lodash';
-import { info } from 'console';
+
+import type EditorJS from '@editorjs/editorjs';
+// import { set } from 'lodash';
+// import { info } from 'console';
 
 const Home: NextPage = () => {
+  /*
+  import("@editorjs/editorjs").then((EditorJS) => {
+    const editor = new EditorJS.default();
+  });
+  */
   const editorRef = useRef<EditorJS | null>(null);
   const [user] = useAuthState(auth);
 
@@ -53,7 +64,7 @@ const Home: NextPage = () => {
   const [manifestUrl, setManifestUrl] = useState<string>('');
   // infoPanelContentという連想配列を作成
 
-  const [editorData, setEditorData] = useState<OutputData | undefined>();
+  const [, /*editorData*/ setEditorData] = useState<OutputData | undefined>();
 
   interface MediaItem {
     id: string;
@@ -62,6 +73,7 @@ const Home: NextPage = () => {
     caption: string;
   }
 
+  /*
   interface InfoPanelContent {
     title: string;
     description: OutputData | undefined; // descriptionをOutputData型に変更
@@ -71,6 +83,7 @@ const Home: NextPage = () => {
     wikidata?: WikidataItem[];
     bibliography?: BibItem[];
   }
+  */
 
   interface WikidataItem {
     type: string;
@@ -95,7 +108,7 @@ const Home: NextPage = () => {
     type: string;
     motivation: string;
     //body: { value: string; label: string; type: string };
-    body: { value: Record<string, any>; label: string; type: string };
+    body: { value: Record<string, unknown>; label: string; type: string };
     target: { source: string; selector: { value: string; type: string } };
   }
 
@@ -154,19 +167,17 @@ const Home: NextPage = () => {
 
   // description editor関連
   useEffect(() => {
-
     if (infoPanelContent?.description) {
-
       console.log(infoPanelContent.description);
 
       const parser = EditorJSHtml();
-      const html = parser.parse(infoPanelContent.description);
+      const html = parser.parse(infoPanelContent.description as unknown as OutputData);
 
       console.log(html);
 
       //setDesc(infoPanelContent.description);
       setDesc(html);
-      setEditorData(infoPanelContent.description); // descriptionをOutputData型に変換してセット
+      setEditorData(infoPanelContent.description as unknown as OutputData); // descriptionをOutputData型に変換してセット
       /*
       setEditorData({
         blocks: [
@@ -183,28 +194,54 @@ const Home: NextPage = () => {
       setDesc('');
       setEditorData(undefined);
     }
-    
   }, [infoPanelContent]);
 
   // description editorの初期化
   useEffect(() => {
-    if (typeof window !== "undefined" && isDescDialogOpen) {
+    if (typeof window !== 'undefined' && isDescDialogOpen) {
+      /*
       editorRef.current = new EditorJS({
-        holder: "editorJS",
+        holder: 'editorJS',
         tools: {
           header: {
-            class: Header as unknown as BlockToolConstructable,
-            inlineToolbar: ["link"],
+            class: Header as unknown as ToolConstructable,
+            inlineToolbar: ['link'],
           },
           list: {
-            class: List as unknown as BlockToolConstructable,
+            class: List as unknown as ToolConstructable, // Block
             inlineToolbar: true,
           },
         },
         data: infoPanelContent?.description
-        ? infoPanelContent.description
-        : undefined, // デフォルト値がない場合は空の状態にする
+          ? (infoPanelContent.description as unknown as OutputData)
+          : undefined, // デフォルト値がない場合は空の状態にする
       });
+      */
+
+      const initEditor = async () => {
+        const EditorJS = (await import('@editorjs/editorjs')).default;
+
+        if (!editorRef.current) {
+          editorRef.current = new EditorJS({
+            holder: 'editorJS',
+            tools: {
+              header: {
+                class: Header as unknown as ToolConstructable,
+                inlineToolbar: ['link'],
+              },
+              list: {
+                class: List as unknown as ToolConstructable, // Block
+                inlineToolbar: true,
+              },
+            },
+            data: infoPanelContent?.description
+              ? (infoPanelContent.description as unknown as OutputData)
+              : undefined, // デフォルト値がない場合は空の状態にする
+          });
+        }
+      };
+
+      initEditor();
 
       return () => {
         if (editorRef.current) {
@@ -237,10 +274,10 @@ const Home: NextPage = () => {
         // undefinedを削除
         const cleanedData = JSON.parse(JSON.stringify(outputData));
         console.log('OutputData after cleaning:', cleanedData);
-  
+
         const docRef = doc(db, 'test', infoPanelContent?.id || '');
         const docSnap = await getDoc(docRef);
-  
+
         if (docSnap.exists()) {
           const origData = docSnap.data();
           console.log(origData.data.body.value);
@@ -258,7 +295,7 @@ const Home: NextPage = () => {
         } else {
           console.warn('No such document!');
         }
-  
+
         handleDescCloseDialog();
       } catch (error) {
         console.log('Saving failed: ', error);
@@ -357,18 +394,18 @@ const Home: NextPage = () => {
     //console.log(rows);
 
     //infoPanelContent.wikidataを一旦クリア
-    if (infoPanelContent){
+    if (infoPanelContent) {
       infoPanelContent.media = [];
     } else {
       alert('Please choose an annotation first.');
     }
-    const media = []
+    const media = [];
 
     for (const item of rows) {
       const media_id = item.split(',')[0];
       const media_type = item.split(',')[1];
       const media_source = item.split(',')[2];
-      const media_caption = item.split(',')[3].replace("\r", "");
+      const media_caption = item.split(',')[3].replace('\r', '');
 
       let data = {
         id: '',
@@ -377,7 +414,7 @@ const Home: NextPage = () => {
         caption: '',
       };
 
-      if (media_id !== ''){
+      if (media_id !== '') {
         // idがすでに存在する場合には、既存のidを使う
         //console.log(media_id, media_type, media_source, media_caption);
         data = {
@@ -385,7 +422,7 @@ const Home: NextPage = () => {
           source: media_source,
           type: media_type,
           caption: media_caption,
-        }
+        };
         //console.log(data);
         infoPanelContent?.media.push(data);
         media.push(data);
@@ -396,11 +433,11 @@ const Home: NextPage = () => {
           source: media_source,
           type: media_type,
           caption: media_caption,
-        }
+        };
         //console.log(data);
         infoPanelContent?.media.push(data);
         media.push(data);
-      };
+      }
 
       // firebaseのannotationsコレクションのidを持つdocのmediaフィールド(Array)のdataをfirebaseから取得
       //const docRef = doc(db, 'annotations', infoPanelContent?.id || '');
@@ -417,7 +454,6 @@ const Home: NextPage = () => {
       } else {
         console.warn('No such document!');
       }
-
     }
 
     handleMediaUploadCloseDialog();
@@ -458,7 +494,7 @@ const Home: NextPage = () => {
       if (result['results']['bindings'][0]['wikipediaUrl']) {
         wikipedia = result['results']['bindings'][0]['wikipediaUrl']['value'];
       }
-    
+
       data = {
         type: wikiType,
         uri: wikidata,
@@ -530,16 +566,16 @@ const Home: NextPage = () => {
     //console.log(rows);
 
     //infoPanelContent.wikidataを一旦クリア
-    if (infoPanelContent){
+    if (infoPanelContent) {
       infoPanelContent.wikidata = [];
     } else {
       alert('Please choose an annotation first.');
     }
-    const authority = []
+    const authority = [];
 
     for (const item of rows) {
       const authority_type = item.split(',')[0];
-      const authority_uri = item.split(',')[1].replace("\r", "");
+      const authority_uri = item.split(',')[1].replace('\r', '');
       console.log(authority_type, authority_uri);
 
       let data: WikidataItem = {
@@ -554,7 +590,7 @@ const Home: NextPage = () => {
       if (authority_type === 'wikidata') {
         // wikidataのsparqlエンドポイントにアクセスして該当するデータのラベルを取得
         console.log(authority_uri);
-  
+
         const query = `SELECT ?item ?itemLabel ?wikipediaUrl WHERE {
           VALUES ?item {wd:${authority_uri.split('/').pop()}}
           SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],en". }
@@ -588,16 +624,16 @@ const Home: NextPage = () => {
         console.log(authority_uri);
         const id = authority_uri.split('/').pop();
         const url = `http://api.geonames.org/getJSON?geonameId=${id}&username=${process.env.NEXT_PUBLIC_GEONAMES_USERNAME}`;
-  
+
         //console.log(url);
         const result = await fetch(url).then((res) => res.json());
         //console.log(result);
-  
+
         const label = result.name;
         const wikipedia = `https://${result.wikipediaURL}`;
         const lat = result.lat;
         const lng = result.lng;
-  
+
         data = {
           type: authority_type,
           uri: authority_uri,
@@ -612,12 +648,10 @@ const Home: NextPage = () => {
         infoPanelContent?.wikidata.push(data);
         authority.push(data);
       }
-
     }
 
     console.log(authority);
 
-    
     // firebaseのannotationsコレクションのidを持つdocのWikidataフィールド(Array)のdataをfirebaseから取得
     //const docRef = doc(db, 'annotations', infoPanelContent?.id || '');
     const docRef = doc(db, 'test', infoPanelContent?.id || '');
@@ -698,12 +732,12 @@ const Home: NextPage = () => {
     //console.log(rows);
 
     //infoPanelContent.wikidataを一旦クリア
-    if (infoPanelContent){
+    if (infoPanelContent) {
       infoPanelContent.bibliography = [];
     } else {
       alert('Please choose an annotation first.');
     }
-    const bibliography = []
+    const bibliography = [];
 
     for (const item of rows) {
       const bib_id = item.split(',')[0];
@@ -711,7 +745,7 @@ const Home: NextPage = () => {
       const bib_author = item.split(',')[2];
       const bib_year = item.split(',')[3];
       const bib_uri = item.split(',')[4];
-      const bib_pdf = item.split(',')[5].replace("\r", "");
+      const bib_pdf = item.split(',')[5].replace('\r', '');
 
       let data = {
         id: '',
@@ -722,7 +756,7 @@ const Home: NextPage = () => {
         pdf: '',
       };
 
-      if (bib_id !== ''){
+      if (bib_id !== '') {
         // idがすでに存在する場合には、既存のidを使う
         //console.log(media_id, media_type, media_source, media_caption);
         data = {
@@ -732,7 +766,7 @@ const Home: NextPage = () => {
           year: bib_year,
           page: bib_uri,
           pdf: bib_pdf,
-        }
+        };
         //console.log(data);
         infoPanelContent?.bibliography.push(data);
         bibliography.push(data);
@@ -745,11 +779,11 @@ const Home: NextPage = () => {
           year: bib_year,
           page: bib_uri,
           pdf: bib_pdf,
-        }
+        };
         //console.log(data);
         infoPanelContent?.bibliography.push(data);
         bibliography.push(data);
-      };
+      }
 
       // firebaseのannotationsコレクションのidを持つdocのmediaフィールド(Array)のdataをfirebaseから取得
       //const docRef = doc(db, 'annotations', infoPanelContent?.id || '');
@@ -769,10 +803,9 @@ const Home: NextPage = () => {
     }
 
     handleBibUploadCloseDialog();
+  };
 
-  }
-
-  
+  /*
   const saveDesc = async () => {
     console.log(desc);
     // descriptionの情報をfirebaseのannotationsコレクションのidを持つdocのdata/body/valueに保存
@@ -799,7 +832,8 @@ const Home: NextPage = () => {
 
     handleDescCloseDialog();
   };
-  
+  */
+
   /*
   const saveDesc = async () => {
     if (editorData) {
@@ -888,7 +922,8 @@ const Home: NextPage = () => {
     //const querySnapshot = getDocs(collection(db, 'annotations'));
     const querySnapshot = getDocs(collection(db, 'test'));
     querySnapshot.then((snapshot) => {
-      let turtleData = '@prefix : <https://www.example.com/vocabulary/> .\n@prefix schema: <https://schema.org/> .\n@prefix dc: <http://purl.org/dc/elements/1.1/> .'; // ベースURIを定義
+      let turtleData =
+        '@prefix : <https://www.example.com/vocabulary/> .\n@prefix schema: <https://schema.org/> .\n@prefix dc: <http://purl.org/dc/elements/1.1/> .'; // ベースURIを定義
       turtleData += '\n';
 
       snapshot.forEach((doc) => {
@@ -905,46 +940,34 @@ const Home: NextPage = () => {
           const properties = [];
 
           // labelおよびdescriptionの情報を追加
-          properties.push(
-            `  rdfs:label "${data.data.body.label}"`,
-          );
+          properties.push(`  rdfs:label "${data.data.body.label}"`);
           properties.push(
             //`  schema:description "${data.data.body.value}"`,
-            `  schema:description "${html}"`,
+            `  schema:description "${html}"`
           );
 
           // manifestおよびcanvasの情報を追加
-          properties.push(
-            `  :targetManifest <${data.target_manifest}>`,
-          );
-          properties.push(
-            `  :targetCanvas <${data.target_canvas}>`,
-          );
+          properties.push(`  :targetManifest <${data.target_manifest}>`);
+          properties.push(`  :targetCanvas <${data.target_canvas}>`);
 
           // wikidataの情報を追加
           if (data.wikidata) {
             data.wikidata.forEach((item: WikidataItem) => {
-              properties.push(
-                `  :wikidata <${item.uri}>`,
-              );
+              properties.push(`  :wikidata <${item.uri}>`);
             });
           }
 
           // mediaの情報を追加
           if (data.media) {
             data.media.forEach((item: MediaItem) => {
-              properties.push(
-                `  :media <${IRI}${item.id}>`,
-              );
+              properties.push(`  :media <${IRI}${item.id}>`);
             });
           }
 
           // bibliographyの情報を追加
           if (data.bibliography) {
             data.bibliography.forEach((item: BibItem) => {
-              properties.push(
-                `  :bibliography <${IRI}${item.id}>`,
-              );
+              properties.push(`  :bibliography <${IRI}${item.id}>`);
             });
           }
 
@@ -961,7 +984,7 @@ const Home: NextPage = () => {
           if (properties.length === 0) {
             turtleData += '.\n';
           }
-          
+
           // mediaの情報を追加
           if (data.media) {
             data.media.forEach((item: MediaItem) => {
@@ -971,7 +994,7 @@ const Home: NextPage = () => {
               turtleData += `  schema:additionalType :${item.type} .\n`;
             });
           }
-          
+
           // bibiographyの情報を追加
           if (data.bibliography) {
             data.bibliography.forEach((item: BibItem) => {
@@ -1000,11 +1023,10 @@ const Home: NextPage = () => {
                 }
               });
             });
-          }  
+          }
         }
       });
 
-      
       const blob = new Blob([turtleData], { type: 'text/turtle' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -1012,7 +1034,6 @@ const Home: NextPage = () => {
       a.download = 'graph-data.ttl';
       a.click();
       URL.revokeObjectURL(url);
-      
     });
 
     handleRDFCloseDialog();
@@ -1033,11 +1054,11 @@ const Home: NextPage = () => {
         if (data.target_manifest === manifestUrl) {
           console.log(data);
           const annotation = {
-            "id": `${newUrl}/annotation/${doc.id}`,
-            "type": "Annotation",
-            "motivation": "painting",
-            "body": data.data.body,
-            "target": data.data.target
+            id: `${newUrl}/annotation/${doc.id}`,
+            type: 'Annotation',
+            motivation: 'painting',
+            body: data.data.body,
+            target: data.data.target,
           };
           annotations.push(annotation);
         }
@@ -1049,15 +1070,14 @@ const Home: NextPage = () => {
     fetch(url)
       .then((res) => res.json())
       .then((data) => {
-
         //console.log(data);
         const newData = {
-          "id": `${newUrl}/annotationPage/${uuidv4()}`,
-          "type": "AnnotationPage",
-          "items": annotations
-        }
+          id: `${newUrl}/annotationPage/${uuidv4()}`,
+          type: 'AnnotationPage',
+          items: annotations,
+        };
         data.items[0].items[0].items.push(newData);
-        console.log(data)
+        console.log(data);
 
         // manifestをjson形式でダウンロード
         const element = document.createElement('a');
@@ -1066,7 +1086,6 @@ const Home: NextPage = () => {
         element.download = 'manifest.json';
         document.body.appendChild(element); // Required for this to work in FireFox
         element.click();
-      
       });
   };
 
@@ -1184,10 +1203,9 @@ const Home: NextPage = () => {
     setIsMediaUploadDialogOpen(false);
   };
   const handleMediaUpload = () => {
-    console.log("media uploaded");
+    console.log('media uploaded');
     setIsMediaUploadDialogOpen(true);
-  }
-  
+  };
 
   const handleBibOpenDialog = () => {
     if (infoPanelContent?.creator == user?.uid) {
@@ -1201,11 +1219,11 @@ const Home: NextPage = () => {
   };
   const handleBibUploadCloseDialog = () => {
     setIsBibUploadDialogOpen(false);
-  }
+  };
   const handleBibUpload = () => {
-    console.log("bib uploaded");
+    console.log('bib uploaded');
     setIsBibUploadDialogOpen(true);
-  }
+  };
 
   const handleDescOpenDialog = () => {
     if (infoPanelContent?.creator == user?.uid) {
@@ -1240,10 +1258,10 @@ const Home: NextPage = () => {
     } else {
       alert('You are not the creator of this annotation.');
     }
-  }
+  };
   const ShowMap = (lat: string, lng: string) => {
     console.log(lat, lng);
-  }
+  };
 
   return (
     <>
@@ -1429,7 +1447,9 @@ const Home: NextPage = () => {
                 <div
                   style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
                 >
-                  <h3 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '10px' }}>{infoPanelContent?.title || ''}</h3>
+                  <h3 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '10px' }}>
+                    {infoPanelContent?.title || ''}
+                  </h3>
                   <button
                     onClick={handleDescOpenDialog}
                     style={{
@@ -1480,43 +1500,43 @@ const Home: NextPage = () => {
                       Media
                     </h3>
                     <div>
-                    <button
-                      onClick={handleMediaOpenDialog}
-                      style={{
-                        padding: '5px 10px',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '5px',
-                        cursor: 'pointer',
-                        fontSize: '10px',
-                        marginBottom: '10px',
-                      }}
-                    >
-                      <img
-                      src="/images/queue.png"
-                      alt="Upload"
-                      style={{ width: '16px', height: '16px', verticalAlign: 'middle'}} // アイコンのサイズを調整
-                    />
-                    </button>
-                    <button
-                      onClick={handleMediaUpload}
-                      style={{
-                        padding: '5px 10px',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '5px',
-                        cursor: 'pointer',
-                        fontSize: '10px',
-                        marginBottom: '10px',
-                        alignItems: 'center', // ボタン内のコンテンツを中央揃え
-                      }}
-                    >
-                    <img
-                      src="/images/upload.png"
-                      alt="Upload"
-                      style={{ width: '16px', height: '16px', verticalAlign: 'middle'}} // アイコンのサイズを調整
-                    />
-                    </button>
+                      <button
+                        onClick={handleMediaOpenDialog}
+                        style={{
+                          padding: '5px 10px',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '5px',
+                          cursor: 'pointer',
+                          fontSize: '10px',
+                          marginBottom: '10px',
+                        }}
+                      >
+                        <img
+                          src="/images/queue.png"
+                          alt="Upload"
+                          style={{ width: '16px', height: '16px', verticalAlign: 'middle' }} // アイコンのサイズを調整
+                        />
+                      </button>
+                      <button
+                        onClick={handleMediaUpload}
+                        style={{
+                          padding: '5px 10px',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '5px',
+                          cursor: 'pointer',
+                          fontSize: '10px',
+                          marginBottom: '10px',
+                          alignItems: 'center', // ボタン内のコンテンツを中央揃え
+                        }}
+                      >
+                        <img
+                          src="/images/upload.png"
+                          alt="Upload"
+                          style={{ width: '16px', height: '16px', verticalAlign: 'middle' }} // アイコンのサイズを調整
+                        />
+                      </button>
                     </div>
                   </div>
                   <div
@@ -1592,70 +1612,67 @@ const Home: NextPage = () => {
                       Authority
                     </h3>
                     <div>
-                    <button
-                      onClick={handleWikidataOpenDialog}
-                      style={{
-                        padding: '5px 10px',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '5px',
-                        cursor: 'pointer',
-                        fontSize: '10px',
-                        marginBottom: '10px',
-                      }}
-                    >
-                      <img
-                      src="/images/queue.png"
-                      alt="Upload"
-                      style={{ width: '16px', height: '16px', verticalAlign: 'middle'}} // アイコンのサイズを調整
-                    />
-                    </button>
-                    <button
-                      onClick={handleAuthorityUpload}
-                      style={{
-                        padding: '5px 10px',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '5px',
-                        cursor: 'pointer',
-                        fontSize: '10px',
-                        marginBottom: '10px',
-                        alignItems: 'center', // ボタン内のコンテンツを中央揃え
-                      }}
-                    >
-                    <img
-                      src="/images/upload.png"
-                      alt="Upload"
-                      style={{ width: '16px', height: '16px', verticalAlign: 'middle'}} // アイコンのサイズを調整
-                    />
-                    </button>
+                      <button
+                        onClick={handleWikidataOpenDialog}
+                        style={{
+                          padding: '5px 10px',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '5px',
+                          cursor: 'pointer',
+                          fontSize: '10px',
+                          marginBottom: '10px',
+                        }}
+                      >
+                        <img
+                          src="/images/queue.png"
+                          alt="Upload"
+                          style={{ width: '16px', height: '16px', verticalAlign: 'middle' }} // アイコンのサイズを調整
+                        />
+                      </button>
+                      <button
+                        onClick={handleAuthorityUpload}
+                        style={{
+                          padding: '5px 10px',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '5px',
+                          cursor: 'pointer',
+                          fontSize: '10px',
+                          marginBottom: '10px',
+                          alignItems: 'center', // ボタン内のコンテンツを中央揃え
+                        }}
+                      >
+                        <img
+                          src="/images/upload.png"
+                          alt="Upload"
+                          style={{ width: '16px', height: '16px', verticalAlign: 'middle' }} // アイコンのサイズを調整
+                        />
+                      </button>
                     </div>
                   </div>
                   <div style={{ marginTop: '10px' }}>
                     {infoPanelContent?.wikidata && infoPanelContent.wikidata.length > 0
                       ? infoPanelContent.wikidata.map((wikiItem, index) => (
                           <div key={index}>
-
                             {wikiItem.type === 'wikidata' && (
-                            <button
-                              style={{
-                                padding: '5px 10px',
-                                backgroundColor: '#333',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '5px',
-                                cursor: 'pointer',
-                                fontSize: '12px',
-                                marginBottom: '5px',
-                                marginTop: '10px',
-                              }}
-                            >
-                              <span>{wikiItem.label}</span>
-                            </button>
+                              <button
+                                style={{
+                                  padding: '5px 10px',
+                                  backgroundColor: '#333',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '5px',
+                                  cursor: 'pointer',
+                                  fontSize: '12px',
+                                  marginBottom: '5px',
+                                  marginTop: '10px',
+                                }}
+                              >
+                                <span>{wikiItem.label}</span>
+                              </button>
                             )}
-                            {wikiItem.type === 'geonames' && (
-                              <span>{wikiItem.label}</span>
-                            )}
+                            {wikiItem.type === 'geonames' && <span>{wikiItem.label}</span>}
 
                             {/*<div>*/}
                             <a href={wikiItem.uri} target="_blank" rel="noopener noreferrer">
@@ -1672,13 +1689,13 @@ const Home: NextPage = () => {
                                 />
                               </a>
                             )}
-                            {wikiItem.type === "geonames" && wikiItem.lat && (
+                            {wikiItem.type === 'geonames' && wikiItem.lat && (
                               <button
-                              onClick={() => {
-                                if (wikiItem.lat !== undefined && wikiItem.lng !== undefined) {
-                                  ShowMap(wikiItem.lat, wikiItem.lng);
-                                }
-                              }}
+                                onClick={() => {
+                                  if (wikiItem.lat !== undefined && wikiItem.lng !== undefined) {
+                                    ShowMap(wikiItem.lat, wikiItem.lng);
+                                  }
+                                }}
                               >
                                 <LiaMapMarkedSolid
                                   style={{ marginLeft: '5px', display: 'inline' }}
@@ -1731,43 +1748,43 @@ const Home: NextPage = () => {
                       Literature
                     </h3>
                     <div>
-                    <button
-                      onClick={handleBibOpenDialog}
-                      style={{
-                        padding: '5px 10px',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '5px',
-                        cursor: 'pointer',
-                        fontSize: '10px',
-                        marginBottom: '10px',
-                      }}
-                    >
-                      <img
-                      src="/images/queue.png"
-                      alt="Upload"
-                      style={{ width: '16px', height: '16px', verticalAlign: 'middle'}} // アイコンのサイズを調整
-                    />
-                    </button>
-                    <button
-                      onClick={handleBibUpload}
-                      style={{
-                        padding: '5px 10px',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '5px',
-                        cursor: 'pointer',
-                        fontSize: '10px',
-                        marginBottom: '10px',
-                        alignItems: 'center', // ボタン内のコンテンツを中央揃え
-                      }}
-                    >
-                    <img
-                      src="/images/upload.png"
-                      alt="Upload"
-                      style={{ width: '16px', height: '16px', verticalAlign: 'middle'}} // アイコンのサイズを調整
-                    />
-                    </button>
+                      <button
+                        onClick={handleBibOpenDialog}
+                        style={{
+                          padding: '5px 10px',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '5px',
+                          cursor: 'pointer',
+                          fontSize: '10px',
+                          marginBottom: '10px',
+                        }}
+                      >
+                        <img
+                          src="/images/queue.png"
+                          alt="Upload"
+                          style={{ width: '16px', height: '16px', verticalAlign: 'middle' }} // アイコンのサイズを調整
+                        />
+                      </button>
+                      <button
+                        onClick={handleBibUpload}
+                        style={{
+                          padding: '5px 10px',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '5px',
+                          cursor: 'pointer',
+                          fontSize: '10px',
+                          marginBottom: '10px',
+                          alignItems: 'center', // ボタン内のコンテンツを中央揃え
+                        }}
+                      >
+                        <img
+                          src="/images/upload.png"
+                          alt="Upload"
+                          style={{ width: '16px', height: '16px', verticalAlign: 'middle' }} // アイコンのサイズを調整
+                        />
+                      </button>
                     </div>
                   </div>
                   <div style={{ marginTop: '10px' }}>
@@ -2502,24 +2519,24 @@ const Home: NextPage = () => {
             zIndex: 1000,
           }}
         >
-          <form 
-            style={{ 
-              display: 'flex', 
-              flexDirection: 'column', 
+          <form
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
               gap: '15px',
-             }}
-              >
+            }}
+          >
             <div
               id="editorJS"
               style={{
-                height: "350px", // 高さを自動調整
-                minHeight: "350px", // 必要に応じて最小高さを設定
-                marginBottom: "20px", // ボタンとの間に余白を追加
-                overflowY: "auto", // 縦方向のスクロールを有効化
-                border: "1px solid #ccc", // 視覚的な区切りを追加（オプション）
-                padding: "10px", // 内側の余白を追加（オプション）
+                height: '350px', // 高さを自動調整
+                minHeight: '350px', // 必要に応じて最小高さを設定
+                marginBottom: '20px', // ボタンとの間に余白を追加
+                overflowY: 'auto', // 縦方向のスクロールを有効化
+                border: '1px solid #ccc', // 視覚的な区切りを追加（オプション）
+                padding: '10px', // 内側の余白を追加（オプション）
               }}
-              />
+            />
             {/*
             <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
               Description:

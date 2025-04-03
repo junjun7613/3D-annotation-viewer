@@ -102,11 +102,15 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   const polygonArea = useRef<Float32Array | null>(null); // 型を明示的に指定
   const polygonRef = useRef<THREE.Mesh | null>(null);
   const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
+  const [, /*description*/ setDescription] = useState('');
   const polygonVertices = useRef<THREE.Vector3[]>([]);
   const annotationModeRef = useRef<boolean>(annotationMode);
 
-  const [infoPanelContent, setInfoPanelContent] = useState({ title: '', description: '', id: '' });
+  const [, /*infoPanelContent*/ setInfoPanelContent] = useState({
+    title: '',
+    description: '',
+    id: '',
+  });
 
   const targetManifest = useRef<string | null>(null);
   const tagetCanvas = useRef<string | null>(null);
@@ -141,106 +145,105 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
     //console.log(annotationMode);
     annotationModeRef.current = annotationMode;
     //console.log(annotationModeRef.current);
-  //}, [annotationMode, manifestUrl, infoPanelContent]);
-}, [annotationMode]);
+    //}, [annotationMode, manifestUrl, infoPanelContent]);
+  }, [annotationMode]);
 
   useEffect(() => {
     //const q = query(collection(db, 'annotations'));
     const q = query(collection(db, 'test'));
-    
 
-      // ここでシーンの再描画や他の処理を行う
+    // ここでシーンの再描画や他の処理を行う
 
-      // canvas要素を取得
-      const canvas = document.getElementById('canvas') as HTMLCanvasElement;
+    // canvas要素を取得
+    const canvas = document.getElementById('canvas') as HTMLCanvasElement;
 
-      // シーン
-      const scene = new THREE.Scene();
-      sceneRef.current = scene;
+    // シーン
+    const scene = new THREE.Scene();
+    sceneRef.current = scene;
 
-      // 既存のinfoPanelを削除
-      if (infoPanelRef.current) {
-        scene.remove(infoPanelRef.current);
-        infoPanelRef.current = null;
-      }
+    // 既存のinfoPanelを削除
+    if (infoPanelRef.current) {
+      scene.remove(infoPanelRef.current);
+      infoPanelRef.current = null;
+    }
 
-      // サイズ
-      const sizes = {
-        width: canvas.clientWidth,
-        height: canvas.clientHeight,
-      };
+    // サイズ
+    const sizes = {
+      width: canvas.clientWidth,
+      height: canvas.clientHeight,
+    };
 
-      // カメラ
-      const camera = new THREE.PerspectiveCamera(75, sizes.width / sizes.height, 0.1, 1000);
-      camera.position.z = 2;
+    // カメラ
+    const camera = new THREE.PerspectiveCamera(75, sizes.width / sizes.height, 0.1, 1000);
+    camera.position.z = 2;
 
-      // レンダラー
-      const renderer = new THREE.WebGLRenderer({
-        canvas: canvas,
-        antialias: true,
-        alpha: true,
-      });
-      renderer.setSize(sizes.width, sizes.height);
-      renderer.setPixelRatio(window.devicePixelRatio);
-      renderer.setClearColor(0x000000); // 背景色を黒に設定
+    // レンダラー
+    const renderer = new THREE.WebGLRenderer({
+      canvas: canvas,
+      antialias: true,
+      alpha: true,
+    });
+    renderer.setSize(sizes.width, sizes.height);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setClearColor(0x000000); // 背景色を黒に設定
 
-      // CSS2DRenderer
-      const labelRenderer = new CSS2DRenderer();
-      labelRenderer.setSize(sizes.width, sizes.height);
-      labelRenderer.domElement.style.position = 'absolute';
-      labelRenderer.domElement.style.top = '0px';
-      labelRenderer.domElement.style.pointerEvents = 'none';
-      document.body.appendChild(labelRenderer.domElement);
+    // CSS2DRenderer
+    const labelRenderer = new CSS2DRenderer();
+    labelRenderer.setSize(sizes.width, sizes.height);
+    labelRenderer.domElement.style.position = 'absolute';
+    labelRenderer.domElement.style.top = '0px';
+    labelRenderer.domElement.style.pointerEvents = 'none';
+    document.body.appendChild(labelRenderer.domElement);
 
-      // manifestファイルの読み込み
-      const fetchManifest = async () => {
-        const response = await fetch(manifestUrl);
-        const data = await response.json();
-        return data;
-      };
+    // manifestファイルの読み込み
+    const fetchManifest = async () => {
+      const response = await fetch(manifestUrl);
+      const data = await response.json();
+      return data;
+    };
 
-      fetchManifest().then((manifest) => {
-        //getAnnotations().then(annotationData => {
+    fetchManifest().then((manifest) => {
+      //getAnnotations().then(annotationData => {
 
-        const importedModel = manifest.items[0].items[0].items[0].body.id;
-        //const importedModelType = manifest.items[0].items[0].items[0].body.type;
-        targetManifest.current = manifest.id;
-        tagetCanvas.current = manifest.items[0].id;
+      const importedModel = manifest.items[0].items[0].items[0].body.id;
+      //const importedModelType = manifest.items[0].items[0].items[0].body.type;
+      targetManifest.current = manifest.id;
+      tagetCanvas.current = manifest.items[0].id;
 
-        // GLTFLoader
-        const loader = new GLTFLoader();
-        const dracoLoader = new DRACOLoader();
-        dracoLoader.setDecoderPath('https://www.gstatic.com/draco/v1/decoders/');
-        loader.setDRACOLoader(dracoLoader)
-        loader.load(
-          //'/models/inscription_1.glb', // Replace with the path to your .glb file
-          importedModel,
+      // GLTFLoader
+      const loader = new GLTFLoader();
+      const dracoLoader = new DRACOLoader();
+      dracoLoader.setDecoderPath('https://www.gstatic.com/draco/v1/decoders/');
+      loader.setDRACOLoader(dracoLoader);
+      loader.load(
+        //'/models/inscription_1.glb', // Replace with the path to your .glb file
+        importedModel,
 
-          (gltf) => {
-            const model = gltf.scene;
-            scene.add(model);
-          },
-          undefined,
-          (error) => {
-            console.error('An error happened', error);
-          }
-        );
+        (gltf) => {
+          const model = gltf.scene;
+          scene.add(model);
+        },
+        undefined,
+        (error) => {
+          console.error('An error happened', error);
+        }
+      );
 
-        const unsubscribe = onSnapshot(q, (querySnapshot) => {
-          const annotations: Annotation[] = [];
-          querySnapshot.forEach((doc) => {
-            const data = doc.data() as Annotation;
-            const annotationWithId = {
-              ...data,
-              id: doc.id,
-              creator: data.creator,
-              media: data.media || [],
-              bibliography: data.bibliography || [],
-            };
-            annotations.push(annotationWithId);
-          });
-          // アノテーションの更新を反映
-          // 必要に応じて、シーンの再描画や他の処理を行う
+      const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const annotations: Annotation[] = [];
+        querySnapshot.forEach((doc) => {
+          const data = doc.data() as Annotation;
+          const annotationWithId = {
+            ...data,
+            id: doc.id,
+            creator: data.creator,
+            media: data.media || [],
+            bibliography: data.bibliography || [],
+          };
+          annotations.push(annotationWithId);
+        });
+        // アノテーションの更新を反映
+        // 必要に応じて、シーンの再描画や他の処理を行う
         // アノテーションの読み込み
         getAnnotations()
           .then((data) => {
@@ -396,8 +399,8 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
 
                 const intersectedObject = intersects[0].object;
 
-                console.log(intersectedObject)
-                
+                console.log(intersectedObject);
+
                 // カメラの位置をcamPosにスムーズに移動
                 /*
                 camera.position.set(intersectedObject.userData.camPos[0], intersectedObject.userData.camPos[1], intersectedObject.userData.camPos[2]);
@@ -522,7 +525,6 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
             };
 
             const onMouseDblClick = (event: MouseEvent) => {
-
               console.log('annotationModeRef.current:', annotationModeRef.current);
               // マウスの位置を正規化
               const rect = renderer.domElement.getBoundingClientRect();
@@ -538,7 +540,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
                 const intersectedPoint = intersects[0].point;
 
                 if (annotationModeRef.current == false) {
-                  console.log("point annotation mode")
+                  console.log('point annotation mode');
                   const cameraDirection = new THREE.Vector3();
                   camera.getWorldDirection(cameraDirection);
                   const offset = cameraDirection.multiplyScalar(-0.01); // オフセットの距離を調整
@@ -574,7 +576,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
 
                   setAnnotationInputVisible(true);
                 } else {
-                  console.log("polygon annotation mode")
+                  console.log('polygon annotation mode');
                   // 頂点を追加
                   const cameraDirection = new THREE.Vector3();
                   camera.getWorldDirection(cameraDirection);
@@ -770,18 +772,18 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
             //value: description,
             //value: '',
             value: {
-              "blocks": [
-                  {
-                      "type": "paragraph",
-                      "id":id,
-                      "data": {
-                          "text": '',
-                      }
-                  }
+              blocks: [
+                {
+                  type: 'paragraph',
+                  id: id,
+                  data: {
+                    text: '',
+                  },
+                },
               ],
-              "time":"",
-              "version":"",
-          },
+              time: '',
+              version: '',
+            },
             type: 'TextualBody',
           },
           target: {
@@ -814,18 +816,18 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
             //value: description,
             //value: '',
             value: {
-              "blocks": [
-                  {
-                      "type": "paragraph",
-                      "id":id,
-                      "data": {
-                          "text": '',
-                      }
-                  }
+              blocks: [
+                {
+                  type: 'paragraph',
+                  id: id,
+                  data: {
+                    text: '',
+                  },
+                },
               ],
-              "time":"",
-              "version":"",
-          },
+              time: '',
+              version: '',
+            },
             type: 'TextualBody',
           },
           target: {
