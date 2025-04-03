@@ -17,7 +17,6 @@ import { infoPanelAtom } from '@/app/atoms/infoPanelAtom';
 
 // uuidをインポート
 import { v4 as uuidv4 } from 'uuid';
-import { FontSize } from 'ckeditor5';
 
 //firebaseのデータを格納するための型
 interface Annotation {
