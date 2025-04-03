@@ -17,6 +17,7 @@ import { infoPanelAtom } from '@/app/atoms/infoPanelAtom';
 
 // uuidをインポート
 import { v4 as uuidv4 } from 'uuid';
+import { FontSize } from 'ckeditor5';
 
 //firebaseのデータを格納するための型
 interface Annotation {
@@ -105,6 +106,8 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   const [, /*description*/ setDescription] = useState('');
   const polygonVertices = useRef<THREE.Vector3[]>([]);
   const annotationModeRef = useRef<boolean>(annotationMode);
+
+  const [isProgressVisible, setIsProgressVisible] = useState(true);
 
   const [, /*infoPanelContent*/ setInfoPanelContent] = useState({
     title: '',
@@ -222,8 +225,20 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
         (gltf) => {
           const model = gltf.scene;
           scene.add(model);
+
+          // モデルのロードが完了したらprogress barを非表示にする
+          setIsProgressVisible(false);
         },
-        undefined,
+        (xhr) => {
+          // ロード進捗を取得
+          const progress = (xhr.loaded / xhr.total) * 100;
+          console.log(`Model loading progress: ${progress.toFixed(2)}%`);
+          // 進捗バーを更新する場合
+          const progressBar = document.getElementById('progress-bar');
+          if (progressBar) {
+            progressBar.style.width = `${progress}%`;
+          }
+        },
         (error) => {
           console.error('An error happened', error);
         }
@@ -988,6 +1003,33 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
           </form>
         </div>
       )}
+      {isProgressVisible && (
+      <div
+        id="progress-container"
+        style={{
+          position: 'absolute',
+          top: '50%', // 垂直方向の中央
+          left: '50%', // 水平方向の中央
+          transform: 'translate(-50%, -50%)', // 中央に配置
+          width: '300px', // コンテナの幅
+          height: '20px', // コンテナの高さ
+          backgroundColor: '#ccc', // 背景色
+          borderRadius: '5px', // 角を丸くする
+          overflow: 'hidden', // 子要素がはみ出さないようにする
+          zIndex: 1000, // 他の要素より前面に表示
+        }}
+      >
+        <div
+          id="progress-bar"
+          style={{
+            width: '0%', // 初期幅を0%に設定
+            height: '100%', // 親要素の高さに合わせる
+            backgroundColor: '#4caf50', // プログレスバーの色
+            transition: 'width 0.2s ease', // 幅の変更をアニメーション化
+          }}
+        ></div>
+      </div>
+    )}
     </div>
   );
 };
