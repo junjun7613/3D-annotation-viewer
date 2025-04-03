@@ -19,9 +19,13 @@ const HTMLViewer: React.FC<HTMLViewerProps> = ({ htmlContent }) => {
     };
   }, [htmlContent]);
 
+  if (!iframeSrc) {
+    return null; // iframeSrcがnullの場合は何もレンダリングしない
+  }
+
   return (
     <iframe
-      src={iframeSrc || ''}
+      src={iframeSrc}
       style={{
         width: '100%',
         height: '100%',
