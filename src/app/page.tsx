@@ -1051,6 +1051,12 @@ const Home: NextPage = () => {
     querySnapshot.then((snapshot) => {
       snapshot.forEach((doc) => {
         const data = doc.data();
+        //console.log(data.data.body.value);
+        const parser = EditorJSHtml();
+        const html = parser.parse(data.data.body.value as unknown as OutputData);
+        // bodyのvalueをhtmlに置き換え
+        data.data.body.value = html;
+
         if (data.target_manifest === manifestUrl) {
           console.log(data);
           const annotation = {
@@ -1060,6 +1066,7 @@ const Home: NextPage = () => {
             body: data.data.body,
             target: data.data.target,
           };
+          console.log(annotation);
           annotations.push(annotation);
         }
       });
