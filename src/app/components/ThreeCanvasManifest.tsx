@@ -87,6 +87,9 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
 }) => {
   //const canvasRef = useRef<HTMLDivElement>(null);
   //const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  // イベントリスナーの存在を追跡するフラグ
+  const clickListenerAdded = useRef(false);
+  const dblClickListenerAdded = useRef(false);
   const [user] = useAuthState(auth);
   const setInfoPanel = useSetAtom(infoPanelAtom);
   const selectedSpriteRef = useRef<THREE.Sprite | null>(null);
@@ -648,20 +651,25 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
               }
             };
 
-            window.removeEventListener('click', onMouseClick);
-            //window.removeEventListener('dblclick', onMouseDblClick);
-            window.addEventListener('click', onMouseClick);
-            //window.addEventListener('dblclick', onMouseDblClick);
+            // イベントリスナーの設定
+            if (!clickListenerAdded.current) {
+              window.addEventListener('click', onMouseClick);
+              clickListenerAdded.current = true;
+            }
 
-            if (editable) {
-              window.removeEventListener('dblclick', onMouseDblClick);
+            if (editable && !dblClickListenerAdded.current) {
               window.addEventListener('dblclick', onMouseDblClick);
+              dblClickListenerAdded.current = true;
             }
 
             return () => {
-              window.removeEventListener('click', onMouseClick);
-              if (editable) {
+              if (clickListenerAdded.current) {
+                window.removeEventListener('click', onMouseClick);
+                clickListenerAdded.current = false;
+              }
+              if (dblClickListenerAdded.current) {
                 window.removeEventListener('dblclick', onMouseDblClick);
+                dblClickListenerAdded.current = false;
               }
             };
           })
@@ -1003,32 +1011,32 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
         </div>
       )}
       {isProgressVisible && (
-      <div
-        id="progress-container"
-        style={{
-          position: 'absolute',
-          top: '50%', // 垂直方向の中央
-          left: '50%', // 水平方向の中央
-          transform: 'translate(-50%, -50%)', // 中央に配置
-          width: '300px', // コンテナの幅
-          height: '20px', // コンテナの高さ
-          backgroundColor: '#ccc', // 背景色
-          borderRadius: '5px', // 角を丸くする
-          overflow: 'hidden', // 子要素がはみ出さないようにする
-          zIndex: 1000, // 他の要素より前面に表示
-        }}
-      >
         <div
-          id="progress-bar"
+          id="progress-container"
           style={{
-            width: '0%', // 初期幅を0%に設定
-            height: '100%', // 親要素の高さに合わせる
-            backgroundColor: '#4caf50', // プログレスバーの色
-            transition: 'width 0.2s ease', // 幅の変更をアニメーション化
+            position: 'absolute',
+            top: '50%', // 垂直方向の中央
+            left: '50%', // 水平方向の中央
+            transform: 'translate(-50%, -50%)', // 中央に配置
+            width: '300px', // コンテナの幅
+            height: '20px', // コンテナの高さ
+            backgroundColor: '#ccc', // 背景色
+            borderRadius: '5px', // 角を丸くする
+            overflow: 'hidden', // 子要素がはみ出さないようにする
+            zIndex: 1000, // 他の要素より前面に表示
           }}
-        ></div>
-      </div>
-    )}
+        >
+          <div
+            id="progress-bar"
+            style={{
+              width: '0%', // 初期幅を0%に設定
+              height: '100%', // 親要素の高さに合わせる
+              backgroundColor: '#4caf50', // プログレスバーの色
+              transition: 'width 0.2s ease', // 幅の変更をアニメーション化
+            }}
+          ></div>
+        </div>
+      )}
     </div>
   );
 };
