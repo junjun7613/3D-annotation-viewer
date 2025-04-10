@@ -29,7 +29,6 @@ export default function Annotations({ model }: { model: GLTF }) {
         meshes.push(child as Mesh);
       }
     });
-    console.log({ meshes });
     setMeshList(meshes);
   }, [model]);
 

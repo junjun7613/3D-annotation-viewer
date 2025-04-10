@@ -1,39 +1,27 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-// import dynamic from 'next/dynamic';
 import { auth } from '@/lib/firebase/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
-//import { useAuth } from "@/context/auth"; // AuthProviderとuseAuthをインポート
 import type { NextPage } from 'next';
-//import ThreeCanvas from './components/ThreeCanvas'
 import SignIn from './components/SignIn';
 import ThreeCanvas from './components/ThreeCanvasManifest';
 import SwitchButton from './components/SwitchButton';
-// import CustomEditor from './components/CustomEditor';
-//import DisplayTEI from './components/DisplayTEI';
 import { FaPencilAlt, FaBook, FaRegFilePdf, FaTrashAlt } from 'react-icons/fa';
 import { FaLink } from 'react-icons/fa6';
 import { PiShareNetwork } from 'react-icons/pi';
-//import { FiUpload } from 'react-icons/fi';
 import { IoDocumentTextOutline } from 'react-icons/io5';
 import { LiaMapMarkedSolid } from 'react-icons/lia';
 import { useAtom } from 'jotai';
 import { infoPanelAtom } from '@/app/atoms/infoPanelAtom';
 
 import EditorJSHtml from 'editorjs-html';
-// import EditorJS from '@editorjs/editorjs';
 import Header from '@editorjs/header';
 import List from '@editorjs/list';
-//import Embed from "@editorjs/embed";
 
 import HTMLViewer from './components/HTMLviewer';
 
-/*
-type BlockToolConstructable = {
-  new (config: unknown): unknown;
-};
-*/
+import { createSlug } from '@/utils/converter';
 
 import type { ToolConstructable } from '@editorjs/editorjs';
 
@@ -46,15 +34,8 @@ import db from '@/lib/firebase/firebase';
 import { deleteDoc, doc, getDoc, getDocs, updateDoc, collection } from 'firebase/firestore';
 
 import type EditorJS from '@editorjs/editorjs';
-// import { set } from 'lodash';
-// import { info } from 'console';
 
 const Home: NextPage = () => {
-  /*
-  import("@editorjs/editorjs").then((EditorJS) => {
-    const editor = new EditorJS.default();
-  });
-  */
   const editorRef = useRef<EditorJS | null>(null);
   const [user] = useAuthState(auth);
 
@@ -101,15 +82,6 @@ const Home: NextPage = () => {
     year: string;
     page: string;
     pdf: string;
-  }
-
-  interface Annotation {
-    id: string;
-    type: string;
-    motivation: string;
-    //body: { value: string; label: string; type: string };
-    body: { value: Record<string, unknown>; label: string; type: string };
-    target: { source: string; selector: { value: string; type: string } };
   }
 
   const [infoPanelContent] = useAtom(infoPanelAtom);
@@ -1040,60 +1012,11 @@ const Home: NextPage = () => {
   };
 
   const downloadIIIFManifest = (manifestUrl: string) => {
-    console.log(manifestUrl);
-    // manifestUrlを/でsplitして最後の要素を削除
-    const newUrl = manifestUrl.split('/').slice(0, -1).join('/');
+    const slug = createSlug(manifestUrl);
 
-    const annotations: Annotation[] = [];
+    const url = `/api/3/${slug}/manifest`;
 
-    //const querySnapshot = getDocs(collection(db, 'annotations'));
-    const querySnapshot = getDocs(collection(db, 'test'));
-    querySnapshot.then((snapshot) => {
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        //console.log(data.data.body.value);
-        const parser = EditorJSHtml();
-        const html = parser.parse(data.data.body.value as unknown as OutputData);
-        // bodyのvalueをhtmlに置き換え
-        data.data.body.value = html;
-
-        if (data.target_manifest === manifestUrl) {
-          console.log(data);
-          const annotation = {
-            id: `${newUrl}/annotation/${doc.id}`,
-            type: 'Annotation',
-            motivation: 'painting',
-            body: data.data.body,
-            target: data.data.target,
-          };
-          console.log(annotation);
-          annotations.push(annotation);
-        }
-      });
-    });
-    //console.log(manifestUrl);
-    // menifestUrlの中身を取得
-    const url = manifestUrl;
-    fetch(url)
-      .then((res) => res.json())
-      .then((data) => {
-        //console.log(data);
-        const newData = {
-          id: `${newUrl}/annotationPage/${uuidv4()}`,
-          type: 'AnnotationPage',
-          items: annotations,
-        };
-        data.items[0].items[0].items.push(newData);
-        console.log(data);
-
-        // manifestをjson形式でダウンロード
-        const element = document.createElement('a');
-        const file = new Blob([JSON.stringify(data)], { type: 'text/plain' });
-        element.href = URL.createObjectURL(file);
-        element.download = 'manifest.json';
-        document.body.appendChild(element); // Required for this to work in FireFox
-        element.click();
-      });
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   const deleteMedia = (id: string, index: number) => {

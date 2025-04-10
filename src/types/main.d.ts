@@ -30,6 +30,45 @@ export interface Annotation {
   };
 }
 
+export interface NewAnnotation {
+  id: string;
+  creator: string;
+  title: string;
+  description: string;
+  media: [];
+  wikidata: [];
+  bibliography: [];
+  position: {
+    x: number;
+    y: number;
+    z: number;
+  };
+  target_manifest: string;
+  target_canvas: string;
+  data: {
+    body: {
+      value: OutputData;
+      label: string;
+      type: string;
+    };
+    target: {
+      selector: {
+        type: string;
+        value: [number, number, number];
+        area: [number, number, number];
+        camPos: [number, number, number];
+      };
+    };
+  };
+}
+
+export interface IIIFAnnotation {
+  id: string;
+  type: string;
+  motivation: string;
+  body: { value: string; label: string; type: string };
+  target: { source: string; selector: { value: [number, number, number]; type: string } };
+}
 interface MediaItem {
   type: string;
   source: string;
