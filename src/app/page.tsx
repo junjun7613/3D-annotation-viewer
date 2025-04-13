@@ -15,9 +15,12 @@ import { LiaMapMarkedSolid } from 'react-icons/lia';
 import { useAtom } from 'jotai';
 import { infoPanelAtom } from '@/app/atoms/infoPanelAtom';
 
+//import dynamic from 'next/dynamic';
+
 import EditorJSHtml from 'editorjs-html';
 import Header from '@editorjs/header';
 import List from '@editorjs/list';
+//import ImageTools from '@editorjs/image';
 
 import HTMLViewer from './components/HTMLviewer';
 
