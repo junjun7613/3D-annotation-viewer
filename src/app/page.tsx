@@ -21,6 +21,7 @@ import EditorJSHtml from 'editorjs-html';
 import Header from '@editorjs/header';
 import List from '@editorjs/list';
 //import ImageTools from '@editorjs/image';
+//import LinkTool from '@editorjs/link';
 
 import HTMLViewer from './components/HTMLviewer';
 
@@ -209,6 +210,14 @@ const Home: NextPage = () => {
                 class: List as unknown as ToolConstructable, // Block
                 inlineToolbar: true,
               },
+              /*
+              linkTool: {
+                class: LinkTool,
+                config: {
+                  endpoint: '/api/fetch-link'
+                }
+              }
+              */
             },
             data: infoPanelContent?.description
               ? (infoPanelContent.description as unknown as OutputData)
