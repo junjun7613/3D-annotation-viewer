@@ -23,7 +23,7 @@ import List from '@editorjs/list';
 //import ImageTools from '@editorjs/image';
 //import LinkTool from '@editorjs/link';
 
-import HTMLViewer from './components/HTMLviewer';
+// import HTMLViewer from './components/HTMLviewer';
 
 import { createSlug } from '@/utils/converter';
 
@@ -1412,11 +1412,9 @@ const Home: NextPage = () => {
                 <div
                   //dangerouslySetInnerHTML={{ __html: infoPanelContent?.description || '' }}
                   //descのhtmlをHTMLとして表示
-                  //dangerouslySetInnerHTML={{ __html: desc || '' }}
                   style={{ overflowY: 'auto', height: '100%' }}
-                >
-                  <HTMLViewer htmlContent={desc || ''} />
-                </div>
+                  dangerouslySetInnerHTML={{ __html: desc || '' }}
+                ></div>
               </div>
             </div>
             <div style={{ flex: 1.2, paddingTop: '20px' }}>

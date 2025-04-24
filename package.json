@@ -16,6 +16,7 @@
     "@editorjs/link": "^2.6.2",
     "@editorjs/list": "^2.0.6",
     "@editorjs/paragraph": "^2.11.7",
+    "@editorjs/simple-image": "^1.6.0",
     "@react-three/drei": "^10.0.4",
     "@react-three/fiber": "^9.1.0",
     "@samvera/clover-iiif": "^2.12.4",
