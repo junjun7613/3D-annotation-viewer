@@ -38,7 +38,7 @@ import db from '@/lib/firebase/firebase';
 import { deleteDoc, doc, getDoc, getDocs, updateDoc, collection } from 'firebase/firestore';
 
 import type EditorJS from '@editorjs/editorjs';
-import { link } from 'fs';
+// import { link } from 'fs';
 
 const Home: NextPage = () => {
   const editorRef = useRef<EditorJS | null>(null);

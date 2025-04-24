@@ -8,6 +8,7 @@ export default function TestPage() {
   const [editorData, setEditorData] = useState<any>(null);
 
   useEffect(() => {
+    console.log('useEffect');
     if (!editorRef.current) {
       Promise.all([import('@editorjs/editorjs')]).then(([EditorJS]) => {
         editorRef.current = new EditorJS.default({
@@ -38,6 +39,7 @@ export default function TestPage() {
     return () => {
       if (editorRef.current) {
         editorRef.current.destroy();
+        editorRef.current = null;
       }
     };
   }, []);
