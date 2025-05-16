@@ -13,12 +13,12 @@ const Info3 = () => {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabType>(
-    (searchParams.get('tab') as TabType) || 'annotations'
+    (searchParams?.get('tab') as TabType) || 'annotations'
   );
 
   const handleTabChange = (tab: TabType) => {
     // 現在のURLパラメータを取得
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(searchParams?.toString() || '');
     // タブパラメータを更新
     params.set('tab', tab);
     // URLを更新（履歴に追加）
@@ -28,7 +28,7 @@ const Info3 = () => {
 
   // URLパラメータが変更されたときにタブを更新
   useEffect(() => {
-    const tabParam = searchParams.get('tab') as TabType;
+    const tabParam = searchParams?.get('tab') as TabType;
     if (tabParam && (tabParam === 'metadata' || tabParam === 'annotations')) {
       setActiveTab(tabParam);
     }

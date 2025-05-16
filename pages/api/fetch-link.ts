@@ -20,11 +20,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const titleMatch = html.match(/<title>(.*?)<\/title>/);
     const title = titleMatch ? titleMatch[1] : 'No title';
 
-    const descriptionMatch = html.match(/<meta name="description" content="(.*?)"/);
-    const description = descriptionMatch ? descriptionMatch[1] : 'No description';
+    // const descriptionMatch = html.match(/<meta name="description" content="(.*?)"/);
+    // const description = descriptionMatch ? descriptionMatch[1] : 'No description';
 
-    const imageMatch = html.match(/<meta property="og:image" content="(.*?)"/);
-    const image = imageMatch ? imageMatch[1] : null;
+    // const imageMatch = html.match(/<meta property="og:image" content="(.*?)"/);
+    // const image = imageMatch ? imageMatch[1] : null;
 
     res.status(200).json({
       success: 1,
@@ -32,8 +32,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         title,
       },
     });
-  } catch (error) {
-    console.error('Error fetching link data:', error.message);
-    res.status(500).json({ success: 0, message: 'Failed to fetch link data', error: error.message });
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error('Error fetching link data:', error.message);
+      res
+        .status(500)
+        .json({ success: 0, message: 'Failed to fetch link data', error: error.message });
+    } else {
+      console.error('Error fetching link data:', error);
+      res.status(500).json({ success: 0, message: 'Failed to fetch link data' });
+    }
   }
 }

@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type EditorJS from '@editorjs/editorjs';
-
+import { OutputData } from '@editorjs/editorjs';
 export default function TestPage() {
   const editorRef = useRef<EditorJS | null>(null);
-  const [editorData, setEditorData] = useState<any>(null);
+  const [editorData, setEditorData] = useState<OutputData | undefined>();
 
   useEffect(() => {
     console.log('useEffect');
