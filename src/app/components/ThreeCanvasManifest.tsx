@@ -64,7 +64,6 @@ const getAnnotations = async () => {
   const querySnapshot = await getDocs(q);
   querySnapshot.forEach((doc) => {
     const data = doc.data() as Annotation;
-    console.log(data);
     const annotationWithId = {
       ...data,
       id: doc.id,
@@ -147,10 +146,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   //もしannotationModeが変更されたら、annotationModeRefを更新
   //menifestUrlが変更されたら、manifestUrlを出力
   useEffect(() => {
-    //console.log(annotationMode);
     annotationModeRef.current = annotationMode;
-    //console.log(annotationModeRef.current);
-    //}, [annotationMode, manifestUrl, infoPanelContent]);
   }, [annotationMode]);
 
   useEffect(() => {
@@ -234,7 +230,6 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
         (xhr) => {
           // ロード進捗を取得
           const progress = (xhr.loaded / xhr.total) * 100;
-          console.log(`Model loading progress: ${progress.toFixed(2)}%`);
           // 進捗バーを更新する場合
           const progressBar = document.getElementById('progress-bar');
           if (progressBar) {
@@ -416,8 +411,6 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
 
                 const intersectedObject = intersects[0].object;
 
-                console.log(intersectedObject);
-
                 // カメラの位置をcamPosにスムーズに移動
                 /*
                 camera.position.set(intersectedObject.userData.camPos[0], intersectedObject.userData.camPos[1], intersectedObject.userData.camPos[2]);
@@ -542,7 +535,6 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
             };
 
             const onMouseDblClick = (event: MouseEvent) => {
-              console.log('annotationModeRef.current:', annotationModeRef.current);
               // マウスの位置を正規化
               const rect = renderer.domElement.getBoundingClientRect();
               mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -557,7 +549,6 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
                 const intersectedPoint = intersects[0].point;
 
                 if (annotationModeRef.current == false) {
-                  console.log('point annotation mode');
                   const cameraDirection = new THREE.Vector3();
                   camera.getWorldDirection(cameraDirection);
                   const offset = cameraDirection.multiplyScalar(-0.01); // オフセットの距離を調整
@@ -593,7 +584,6 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
 
                   setAnnotationInputVisible(true);
                 } else {
-                  console.log('polygon annotation mode');
                   // 頂点を追加
                   const cameraDirection = new THREE.Vector3();
                   camera.getWorldDirection(cameraDirection);

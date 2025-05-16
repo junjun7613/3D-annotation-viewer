@@ -1220,6 +1220,16 @@ const Home: NextPage = () => {
         * {
           box-sizing: border-box;
         }
+        .description-content a {
+          color: #0066cc;
+          text-decoration: none;
+          border-bottom: 1px solid #0066cc;
+          transition: all 0.3s ease;
+        }
+        .description-content a:hover {
+          color: #004499;
+          border-bottom: 2px solid #004499;
+        }
       `}</style>
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}>
         <header
@@ -1414,6 +1424,7 @@ const Home: NextPage = () => {
                   //descのhtmlをHTMLとして表示
                   style={{ overflowY: 'auto', height: '100%' }}
                   dangerouslySetInnerHTML={{ __html: desc || '' }}
+                  className="description-content"
                 ></div>
               </div>
             </div>

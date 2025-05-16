@@ -8,7 +8,6 @@ export default function TestPage() {
   const [editorData, setEditorData] = useState<OutputData | undefined>();
 
   useEffect(() => {
-    console.log('useEffect');
     if (!editorRef.current) {
       Promise.all([import('@editorjs/editorjs')]).then(([EditorJS]) => {
         editorRef.current = new EditorJS.default({
@@ -27,7 +26,6 @@ export default function TestPage() {
           onChange: async () => {
             const savedData = await editorRef.current?.save();
             setEditorData(savedData);
-            console.log('Saved data:', savedData);
           },
           onReady: () => {
             console.log('Editor.js is ready to work!');
