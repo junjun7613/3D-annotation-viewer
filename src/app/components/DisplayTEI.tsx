@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import CETEI from 'CETEIcean';
+import './CETEIcean.css';
 
 const DisplayTEI: React.FC = () => {
   const [teiHTML, setTeiHTML] = useState<string>('');
@@ -55,7 +56,6 @@ const DisplayTEI: React.FC = () => {
         {/*divの内容を表示*/}
         <div dangerouslySetInnerHTML={{ __html: teiHTML }} />
       </header>
-      <link rel="stylesheet" href="/css/CETEIcean.css" />
     </div>
   );
 };

@@ -8,6 +8,12 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ vol: string; id: string }> }
 ) {
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  };
+
   const { id } = await params;
 
   const manifestId = decodeSlug(id);
@@ -26,5 +32,16 @@ export async function GET(
 
   const manfiestWithAnnotations = await downloadIIIFManifest(manifestId, annotations);
 
-  return NextResponse.json(manfiestWithAnnotations);
+  return NextResponse.json(manfiestWithAnnotations, { headers });
+}
+
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    },
+  });
 }

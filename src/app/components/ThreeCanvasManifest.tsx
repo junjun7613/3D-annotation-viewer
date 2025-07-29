@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { auth } from '@/lib/firebase/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import * as THREE from 'three';
@@ -8,7 +8,8 @@ import { OrbitControls } from 'three-stdlib';
 import { GLTFLoader } from 'three-stdlib';
 import { DRACOLoader } from 'three-stdlib';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
-//import {gsap} from 'gsap';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import {gsap} from 'gsap';
 
 import db from '@/lib/firebase/firebase';
 import { addDoc, collection, getDocs, query, onSnapshot } from 'firebase/firestore';
@@ -131,7 +132,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
     setInfoPanelContent(content);
   };
 
-  const handleAnnotationClick = (
+  const handleAnnotationClick = useCallback((
     id: string,
     creator: string,
     title: string,
@@ -141,7 +142,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
     bibliography: []
   ) => {
     setInfoPanel({ id, creator, title, description, media, wikidata, bibliography });
-  };
+  }, [setInfoPanel]);
 
   //もしannotationModeが変更されたら、annotationModeRefを更新
   //menifestUrlが変更されたら、manifestUrlを出力
@@ -753,7 +754,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
       });
       */
     });
-  }, [manifestUrl]);
+  }, [manifestUrl, editable, handleAnnotationClick]);
 
   const handleAnnotationSubmit = (event: React.FormEvent) => {
     event.preventDefault();

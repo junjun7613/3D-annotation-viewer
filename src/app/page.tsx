@@ -235,7 +235,7 @@ const Home: NextPage = () => {
         }
       };
     }
-  }, [isDescDialogOpen]);
+  }, [isDescDialogOpen, infoPanelContent?.description]);
 
   /*
   const handleEditorChange = (data: OutputData) => {
