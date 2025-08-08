@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@iiif/presentation-3": "^2.1.0",
     "@ckeditor/ckeditor5-react": "^9.5.0",
     "@editorjs/editorjs": "^2.30.8",
     "@editorjs/header": "^2.8.8",

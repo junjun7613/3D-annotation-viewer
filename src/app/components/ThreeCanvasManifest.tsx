@@ -9,7 +9,7 @@ import { GLTFLoader } from 'three-stdlib';
 import { DRACOLoader } from 'three-stdlib';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import {gsap} from 'gsap';
+import { gsap } from 'gsap';
 
 import db from '@/lib/firebase/firebase';
 import { addDoc, collection, getDocs, query, onSnapshot } from 'firebase/firestore';
@@ -132,17 +132,20 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
     setInfoPanelContent(content);
   };
 
-  const handleAnnotationClick = useCallback((
-    id: string,
-    creator: string,
-    title: string,
-    description: string,
-    media: [],
-    wikidata: [],
-    bibliography: []
-  ) => {
-    setInfoPanel({ id, creator, title, description, media, wikidata, bibliography });
-  }, [setInfoPanel]);
+  const handleAnnotationClick = useCallback(
+    (
+      id: string,
+      creator: string,
+      title: string,
+      description: string,
+      media: [],
+      wikidata: [],
+      bibliography: []
+    ) => {
+      setInfoPanel({ id, creator, title, description, media, wikidata, bibliography });
+    },
+    [setInfoPanel]
+  );
 
   //もしannotationModeが変更されたら、annotationModeRefを更新
   //menifestUrlが変更されたら、manifestUrlを出力
