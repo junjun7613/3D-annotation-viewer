@@ -7,6 +7,7 @@ import type { NextPage } from 'next';
 import SignIn from './components/SignIn';
 import ThreeCanvas from './components/ThreeCanvasManifest';
 import SwitchButton from './components/SwitchButton';
+import TEIViewer from './components/TEIViewer';
 import { FaPencilAlt, FaBook, FaRegFilePdf, FaTrashAlt } from 'react-icons/fa';
 import { FaLink } from 'react-icons/fa6';
 import { PiShareNetwork } from 'react-icons/pi';
@@ -902,7 +903,8 @@ const Home: NextPage = () => {
 
   const downloadRDF = (id: string) => {
     console.log('RDF download');
-    console.log(id);
+    console.log('Manifest URL (id):', id);
+    console.log('IRI prefix:', IRI);
     // firebaseのannotationsコレクションのすべてのDocの中から、targetmanifestの値がidと一致するものを取得
     //const querySnapshot = getDocs(collection(db, 'annotations'));
     const querySnapshot = getDocs(collection(db, 'test'));
@@ -911,15 +913,23 @@ const Home: NextPage = () => {
         '@prefix : <https://www.example.com/vocabulary/> .\n@prefix schema: <https://schema.org/> .\n@prefix dc: <http://purl.org/dc/elements/1.1/> .'; // ベースURIを定義
       turtleData += '\n';
 
+      console.log(`Total documents in 'test' collection: ${snapshot.size}`);
+      let matchedCount = 0;
+
       snapshot.forEach((doc) => {
         const data = doc.data();
+        console.log(`Document ${doc.id}:`, {
+          target_manifest: data.target_manifest,
+          matches: data.target_manifest === id,
+        });
         //console.log(data);
         const parser = EditorJSHtml();
         const cleanedData = JSON.parse(JSON.stringify(data.data.body.value || { blocks: [] })); // デフォルト値を設定
         console.log(cleanedData);
         const html = parser.parse(cleanedData);
         if (data.target_manifest === id) {
-          console.log(data);
+          matchedCount++;
+          console.log(`✓ Matched annotation ${matchedCount}:`, data);
           // 以下でannotationごとにTutleを生成・ダウンロード
           turtleData += `\n<${IRI}${doc.id}> a :Annotation ;\n`;
           const properties = [];
@@ -1012,6 +1022,18 @@ const Home: NextPage = () => {
         }
       });
 
+      console.log(`\n=== RDF Download Summary ===`);
+      console.log(`Total annotations matched: ${matchedCount}`);
+      console.log(`RDF data length: ${turtleData.length} characters`);
+      console.log(`Preview of RDF data:\n${turtleData.substring(0, 500)}...`);
+
+      if (matchedCount === 0) {
+        console.warn('⚠ No annotations matched! Check if:');
+        console.warn('1. manifestUrl matches target_manifest in Firebase');
+        console.warn('2. Annotations exist in the "test" collection');
+        console.warn('3. IRI is set correctly');
+      }
+
       const blob = new Blob([turtleData], { type: 'text/turtle' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -1025,9 +1047,15 @@ const Home: NextPage = () => {
   };
 
   const downloadIIIFManifest = (manifestUrl: string) => {
+    console.log('=== IIIF Manifest Download ===');
+    console.log('Original manifest URL:', manifestUrl);
+
     const slug = createSlug(manifestUrl);
+    console.log('Encoded slug:', slug);
 
     const url = `/api/3/${slug}/manifest`;
+    console.log('API endpoint:', url);
+    console.log('Opening in new tab...');
 
     window.open(url, '_blank', 'noopener,noreferrer');
   };
@@ -1220,295 +1248,108 @@ const Home: NextPage = () => {
         * {
           box-sizing: border-box;
         }
-        .description-content a {
-          color: #0066cc;
-          text-decoration: none;
-          border-bottom: 1px solid #0066cc;
-          transition: all 0.3s ease;
-        }
-        .description-content a:hover {
-          color: #004499;
-          border-bottom: 2px solid #004499;
-        }
       `}</style>
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}>
-        <header
-          style={{
-            backgroundColor: '#333',
-            color: 'white',
-            padding: '10px 20px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
-          <h1 style={{ margin: 0 }}>Semantic 3D Annotation Editor</h1>
-          <nav>
-            <a href="#home" style={{ color: 'white', marginRight: '20px' }}>
+      <div className="flex flex-col h-full w-full bg-[var(--background)]">
+        <header className="bg-white border-b border-[var(--border)] py-4 px-6 flex justify-between items-center shadow-sm">
+          <h1 className="m-0 text-xl font-bold text-[var(--text-primary)]">IIIF 3D Viewer</h1>
+          <nav className="flex items-center gap-6">
+            <a href="#home" className="text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors text-sm font-medium">
               Home
             </a>
-            <a href="#about" style={{ color: 'white', marginRight: '20px' }}>
+            <a href="#about" className="text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors text-sm font-medium">
               About
             </a>
-            {/*<a href="#contact" style={{ color: 'white' }}>Contact</a>*/}
             <SignIn />
-            {/*{user && <span style={{ color: 'white', marginLeft: '20px' }}>logged in</span>}*/}
           </nav>
         </header>
-        <div style={{ display: 'flex', flex: 1 }}>
-          <div style={{ flex: 1, borderRight: '1px solid #ccc', position: 'relative' }}>
+        <div className="flex flex-1">
+          <div className="flex-1 border-r border-[var(--border)] relative">
             <ThreeCanvas
               annotationsVisible={annotationsVisible}
               annotationMode={annotationMode}
               manifestUrl={manifestUrl}
             />
-            <div
-              style={{
-                position: 'absolute',
-                top: '10px',
-                left: '10px',
-                zIndex: 100,
-                backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                padding: '10px',
-                borderRadius: '5px',
-              }}
-            >
-              <div style={{ flex: '1 1 45%' }}>
-                <p>Display annotations</p>
+            <div className="absolute top-4 left-4 z-[100] bg-white/95 p-4 rounded-lg shadow-lg backdrop-blur-sm border border-[var(--border)]">
+              <div className="mb-4">
+                <p className="text-sm font-medium mb-2 text-[var(--text-primary)]">Display annotations</p>
                 <SwitchButton checked={annotationsVisible} onChange={handleSwitchChange} />
               </div>
-              <div style={{ flex: '1 1 45%' }}>
-                <p>Polygon annotation mode</p>
+              <div>
+                <p className="text-sm font-medium mb-2 text-[var(--text-primary)]">Polygon annotation mode</p>
                 <SwitchButton checked={annotationMode} onChange={handleAnnotationModeChange} />
               </div>
             </div>
           </div>
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '20px' }}>
-            <div
-              style={{
-                flex: 0.2,
-                display: 'flex',
-                borderBottom: '2px solid #ccc',
-                paddingBottom: '10px',
-              }}
-            >
-              {/* user && <input type="text" value={manifestUrl} onChange={handleManifestUrlChange} placeholder="Enter IIIF Manifest URL" style={{ 
-                width: '100%',
-                padding: '10px',
-                border: '2px solid #333',
-                borderRadius: '5px',
-                marginBottom: '10px',
-                fontSize: '16px'
-                }} />*/}
+          <div className="flex-1 flex flex-col p-6 bg-[var(--secondary-bg)]">
+            <div className="flex-[0.2] flex items-center gap-3 border-b border-[var(--border)] pb-4 mb-5">
               <input
                 type="text"
                 value={manifestUrl}
                 onChange={handleManifestUrlChange}
                 placeholder="Enter IIIF Manifest URL"
-                style={{
-                  width: '70%',
-                  height: '50px',
-                  padding: '10px',
-                  border: '2px solid #333',
-                  borderRadius: '5px',
-                  marginBottom: '10px',
-                  fontSize: '16px',
-                }}
+                className="input-field flex-1 mb-0"
               />
-              {/*<button onClick={handleButtonClick} style={{
-                 marginTop: '10px', 
-                 padding: '10px 20px',
-                 backgroundColor: '#333',
-                 color: 'white',
-                 border: 'none',
-                 borderRadius: '5px',
-                 cursor: 'pointer',
-                 fontSize: '16px'
-                 }}>Load Manifest</button>
-              */}
-              <button
-                onClick={() => handleRDFOpenDialog()}
-                style={{
-                  marginLeft: '30px',
-                  height: '50px',
-                  padding: '10px 20px',
-                  backgroundColor: '#006400',
-                  color: 'white',
-                  fontWeight: 'bold',
-                  border: 'none',
-                  borderRadius: '5px',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                }}
-              >
-                RDF
+              <button onClick={() => handleRDFOpenDialog()} className="btn-primary whitespace-nowrap">
+                Export RDF
               </button>
-              <button
-                onClick={() => downloadIIIFManifest(manifestUrl)}
-                style={{
-                  marginLeft: '15px',
-                  height: '50px',
-                  padding: '10px 20px',
-                  backgroundColor: '#006400',
-                  color: 'white',
-                  fontWeight: 'bold',
-                  border: 'none',
-                  borderRadius: '5px',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                }}
-              >
-                IIIF
+              <button onClick={() => downloadIIIFManifest(manifestUrl)} className="btn-primary whitespace-nowrap">
+                View Manifest
               </button>
             </div>
-            <div
-              style={{
-                flex: 0.8,
-                display: 'flex',
-                borderBottom: '2px solid #ccc',
-                paddingBottom: '20px',
-                marginTop: '10px',
-              }}
-            >
-              {/* 上側のコンテンツをここに追加 */}
-              {/*
-              <div style={{ flex: 1, borderRight: '2px solid #ccc', paddingRight: '20px' }}>
-                <DisplayTEI />
-              </div>
-              */}
-              {/*
-              <div
-                style={{
-                  flex: 0.3,
-                  height: '270px',
-                  borderRight: '2px solid #ccc',
-                  paddingRight: '20px',
-                  marginTop: '10px',
-                }}
-              >
-                {infoPanelContent?.title || ''}
-              </div>
-              */}
-              <div
-                style={{
-                  flex: 1,
-                  height: '270px',
-                  paddingLeft: '20px',
-                  marginTop: '10px',
-                }}
-              >
-                <div
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
-                >
-                  <h3 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '10px' }}>
-                    {infoPanelContent?.title || ''}
+            <div className="flex-[0.8] flex gap-5 border-b border-[var(--border)] pb-6 mb-6">
+              <div className="flex-1 card">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold m-0 text-[var(--text-primary)]">
+                    {infoPanelContent?.title || 'Annotation Details'}
                   </h3>
                   <button
                     onClick={handleDescOpenDialog}
-                    style={{
-                      padding: '5px 10px',
-                      marginBottom: '10px',
-                      backgroundColor: '#333',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '5px',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                    }}
+                    className="btn-icon btn-icon-sm btn-secondary"
+                    title="Edit description"
                   >
                     <FaPencilAlt />
                   </button>
                 </div>
                 <div
-                  //dangerouslySetInnerHTML={{ __html: infoPanelContent?.description || '' }}
-                  //descのhtmlをHTMLとして表示
-                  style={{ overflowY: 'auto', height: '100%' }}
+                  className="description-content overflow-y-auto max-h-56 text-sm leading-relaxed text-[var(--text-secondary)]"
                   dangerouslySetInnerHTML={{ __html: desc || '' }}
-                  className="description-content"
                 ></div>
               </div>
+              <div className="flex-1 card">
+                <TEIViewer />
+              </div>
             </div>
-            <div style={{ flex: 1.2, paddingTop: '20px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '20px' }}>
-                <div
-                  style={{
-                    flex: 1,
-                    border: '1px solid #ccc',
-                    marginTop: '10px',
-                    padding: '10px',
-                    borderRadius: '5px',
-                    height: '320px',
-                  }}
-                >
-                  <div
-                    style={{
-                      borderBottom: '2px solid #ccc',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <h3 style={{ textAlign: 'center', fontWeight: 'bold', marginBottom: '10px' }}>
-                      Media
-                    </h3>
-                    <div>
+            <div className="flex-[1.2] pt-4">
+              <div className="flex justify-between gap-5">
+                <div className="flex-1 card h-80 overflow-hidden">
+                  <div className="border-b border-[var(--border)] flex items-center justify-between mb-4 pb-3">
+                    <h3 className="text-base font-semibold m-0 text-[var(--text-primary)]">Resources</h3>
+                    <div className="flex gap-1.5">
                       <button
                         onClick={handleMediaOpenDialog}
-                        style={{
-                          padding: '5px 10px',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '5px',
-                          cursor: 'pointer',
-                          fontSize: '10px',
-                          marginBottom: '10px',
-                        }}
+                        className="btn-icon btn-icon-sm btn-secondary"
+                        title="Add resource"
                       >
-                        <img
-                          src="/images/queue.png"
-                          alt="Upload"
-                          style={{ width: '16px', height: '16px', verticalAlign: 'middle' }} // アイコンのサイズを調整
-                        />
+                        <img src="/images/queue.png" alt="Add" className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={handleMediaUpload}
-                        style={{
-                          padding: '5px 10px',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '5px',
-                          cursor: 'pointer',
-                          fontSize: '10px',
-                          marginBottom: '10px',
-                          alignItems: 'center', // ボタン内のコンテンツを中央揃え
-                        }}
+                        className="btn-icon btn-icon-sm btn-secondary"
+                        title="Upload CSV"
                       >
-                        <img
-                          src="/images/upload.png"
-                          alt="Upload"
-                          style={{ width: '16px', height: '16px', verticalAlign: 'middle' }} // アイコンのサイズを調整
-                        />
+                        <img src="/images/upload.png" alt="Upload" className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
-                  <div
-                    style={{
-                      marginTop: '10px',
-                      overflowY: 'auto',
-                      maxHeight: '200px',
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(2, 1fr)',
-                      gap: '5px',
-                    }}
-                  >
+                  <div className="overflow-y-auto max-h-52 grid grid-cols-2 gap-2">
                     {infoPanelContent?.media && infoPanelContent.media.length > 0
                       ? infoPanelContent.media.map((mediaItem, index) => (
-                          <div key={index}>
+                          <div key={index} className="cursor-pointer hover:opacity-80 transition-opacity rounded overflow-hidden">
                             {mediaItem.type === 'img' && (
                               <img
                                 src={mediaItem.source}
                                 alt={mediaItem.caption}
-                                style={{ width: '100%' }}
+                                className="w-full h-full object-cover"
                                 onClick={() =>
                                   setSelectedImage({
                                     source: mediaItem.source,
@@ -1525,7 +1366,7 @@ const Home: NextPage = () => {
                                   mediaItem.source.split('/')[3].split('?')[0]
                                 }/default.jpg`}
                                 alt={mediaItem.caption}
-                                style={{ width: '100%' }}
+                                className="w-full h-full object-cover"
                                 onClick={() =>
                                   setSelectedVideo({
                                     source: `https://www.youtube.com/embed/${
@@ -1542,103 +1383,55 @@ const Home: NextPage = () => {
                       : null}
                   </div>
                 </div>
-                <div
-                  style={{
-                    flex: 1,
-                    border: '1px solid #ccc',
-                    marginTop: '10px',
-                    padding: '10px',
-                    borderRadius: '5px',
-                    height: '320px',
-                  }}
-                >
-                  <div
-                    style={{
-                      borderBottom: '2px solid #ccc',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <h3 style={{ textAlign: 'center', fontWeight: 'bold', marginBottom: '10px' }}>
-                      Authority
-                    </h3>
-                    <div>
+                <div className="flex-1 card h-80 overflow-hidden">
+                  <div className="border-b border-[var(--border)] flex items-center justify-between mb-4 pb-3">
+                    <h3 className="text-base font-semibold m-0 text-[var(--text-primary)]">Linked Data</h3>
+                    <div className="flex gap-1.5">
                       <button
                         onClick={handleWikidataOpenDialog}
-                        style={{
-                          padding: '5px 10px',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '5px',
-                          cursor: 'pointer',
-                          fontSize: '10px',
-                          marginBottom: '10px',
-                        }}
+                        className="btn-icon btn-icon-sm btn-secondary"
+                        title="Add linked data"
                       >
-                        <img
-                          src="/images/queue.png"
-                          alt="Upload"
-                          style={{ width: '16px', height: '16px', verticalAlign: 'middle' }} // アイコンのサイズを調整
-                        />
+                        <img src="/images/queue.png" alt="Add" className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={handleAuthorityUpload}
-                        style={{
-                          padding: '5px 10px',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '5px',
-                          cursor: 'pointer',
-                          fontSize: '10px',
-                          marginBottom: '10px',
-                          alignItems: 'center', // ボタン内のコンテンツを中央揃え
-                        }}
+                        className="btn-icon btn-icon-sm btn-secondary"
+                        title="Upload CSV"
                       >
-                        <img
-                          src="/images/upload.png"
-                          alt="Upload"
-                          style={{ width: '16px', height: '16px', verticalAlign: 'middle' }} // アイコンのサイズを調整
-                        />
+                        <img src="/images/upload.png" alt="Upload" className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
-                  <div style={{ marginTop: '10px' }}>
+                  <div className="overflow-y-auto max-h-60">
                     {infoPanelContent?.wikidata && infoPanelContent.wikidata.length > 0
                       ? infoPanelContent.wikidata.map((wikiItem, index) => (
-                          <div key={index}>
+                          <div key={index} className="mb-3 flex items-center gap-2 flex-wrap">
                             {wikiItem.type === 'wikidata' && (
-                              <button
-                                style={{
-                                  padding: '5px 10px',
-                                  backgroundColor: '#333',
-                                  color: 'white',
-                                  border: 'none',
-                                  borderRadius: '5px',
-                                  cursor: 'pointer',
-                                  fontSize: '12px',
-                                  marginBottom: '5px',
-                                  marginTop: '10px',
-                                }}
-                              >
-                                <span>{wikiItem.label}</span>
-                              </button>
+                              <span className="btn-primary btn-sm inline-flex items-center">
+                                {wikiItem.label}
+                              </span>
                             )}
-                            {wikiItem.type === 'geonames' && <span>{wikiItem.label}</span>}
+                            {wikiItem.type === 'geonames' && (
+                              <span className="text-sm font-medium">{wikiItem.label}</span>
+                            )}
 
-                            {/*<div>*/}
-                            <a href={wikiItem.uri} target="_blank" rel="noopener noreferrer">
-                              <PiShareNetwork style={{ marginLeft: '5px', display: 'inline' }} />
+                            <a
+                              href={wikiItem.uri}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-800 transition-colors inline-flex items-center"
+                            >
+                              <PiShareNetwork className="w-5 h-5" />
                             </a>
                             {wikiItem.wikipedia && (
                               <a
                                 href={wikiItem.wikipedia}
                                 target="_blank"
                                 rel="noopener noreferrer"
+                                className="text-blue-600 hover:text-blue-800 transition-colors inline-flex items-center"
                               >
-                                <IoDocumentTextOutline
-                                  style={{ marginLeft: '5px', display: 'inline' }}
-                                />
+                                <IoDocumentTextOutline className="w-5 h-5" />
                               </a>
                             )}
                             {wikiItem.type === 'geonames' && wikiItem.lat && (
@@ -1648,137 +1441,84 @@ const Home: NextPage = () => {
                                     ShowMap(wikiItem.lat, wikiItem.lng);
                                   }
                                 }}
+                                className="text-green-600 hover:text-green-800 transition-colors inline-flex items-center"
                               >
-                                <LiaMapMarkedSolid
-                                  style={{ marginLeft: '5px', display: 'inline' }}
-                                />
+                                <LiaMapMarkedSolid className="w-5 h-5" />
                               </button>
                             )}
                             <button
                               onClick={() =>
                                 infoPanelContent?.id && deleteWiki(infoPanelContent.id, index)
                               }
-                              style={{
-                                padding: '5px 10px',
-                                backgroundColor: '#8b0000',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '5px',
-                                cursor: 'pointer',
-                                fontSize: '10px',
-                                marginBottom: '5px',
-                                marginLeft: '5px',
-                              }}
+                              className="btn-danger btn-icon"
                             >
                               <FaTrashAlt />
                             </button>
-                            {/*</div>*/}
                           </div>
                         ))
                       : null}
                   </div>
                 </div>
-                <div
-                  style={{
-                    flex: 1,
-                    border: '1px solid #ccc',
-                    marginTop: '10px',
-                    padding: '10px',
-                    borderRadius: '5px',
-                    height: '320px',
-                  }}
-                >
-                  <div
-                    style={{
-                      borderBottom: '2px solid #ccc',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <h3 style={{ textAlign: 'center', fontWeight: 'bold', marginBottom: '10px' }}>
-                      Literature
-                    </h3>
-                    <div>
+                <div className="flex-1 card h-80 overflow-hidden">
+                  <div className="border-b border-[var(--border)] flex items-center justify-between mb-4 pb-3">
+                    <h3 className="text-base font-semibold m-0 text-[var(--text-primary)]">References</h3>
+                    <div className="flex gap-1.5">
                       <button
                         onClick={handleBibOpenDialog}
-                        style={{
-                          padding: '5px 10px',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '5px',
-                          cursor: 'pointer',
-                          fontSize: '10px',
-                          marginBottom: '10px',
-                        }}
+                        className="btn-icon btn-icon-sm btn-secondary"
+                        title="Add reference"
                       >
-                        <img
-                          src="/images/queue.png"
-                          alt="Upload"
-                          style={{ width: '16px', height: '16px', verticalAlign: 'middle' }} // アイコンのサイズを調整
-                        />
+                        <img src="/images/queue.png" alt="Add" className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={handleBibUpload}
-                        style={{
-                          padding: '5px 10px',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '5px',
-                          cursor: 'pointer',
-                          fontSize: '10px',
-                          marginBottom: '10px',
-                          alignItems: 'center', // ボタン内のコンテンツを中央揃え
-                        }}
+                        className="btn-icon btn-icon-sm btn-secondary"
+                        title="Upload CSV"
                       >
-                        <img
-                          src="/images/upload.png"
-                          alt="Upload"
-                          style={{ width: '16px', height: '16px', verticalAlign: 'middle' }} // アイコンのサイズを調整
-                        />
+                        <img src="/images/upload.png" alt="Upload" className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
-                  <div style={{ marginTop: '10px' }}>
+                  <div className="overflow-y-auto max-h-60">
                     {infoPanelContent?.bibliography && infoPanelContent.bibliography.length > 0
                       ? infoPanelContent.bibliography.map((bibItem, index) => (
-                          <div key={index}>
-                            <div>
-                              <FaBook style={{ marginRight: '5px', display: 'inline' }} />
-                              <span style={{ fontSize: '12px' }}>
-                                {bibItem.author} ({bibItem.year}): {bibItem.title}
-                              </span>
-                              <div>
-                                {bibItem.page && (
-                                  <a href={bibItem.page} target="_blank" rel="noopener noreferrer">
-                                    <FaLink style={{ marginLeft: '5px', display: 'inline' }} />
-                                  </a>
-                                )}
-                                {bibItem.pdf && (
-                                  <a href={bibItem.pdf} target="_blank" rel="noopener noreferrer">
-                                    <FaRegFilePdf
-                                      style={{ marginLeft: '5px', display: 'inline' }}
-                                    />
-                                  </a>
-                                )}
-                                <button
-                                  onClick={() =>
-                                    infoPanelContent?.id && deleteBib(infoPanelContent.id, index)
-                                  }
-                                  style={{
-                                    padding: '5px 10px',
-                                    backgroundColor: '#8b0000',
-                                    color: 'white',
-                                    border: 'none',
-                                    borderRadius: '5px',
-                                    cursor: 'pointer',
-                                    fontSize: '10px',
-                                    marginBottom: '5px',
-                                    marginLeft: '5px',
-                                  }}
-                                >
-                                  <FaTrashAlt />
-                                </button>
+                          <div key={index} className="mb-4 pb-3 border-b border-gray-200 last:border-0">
+                            <div className="flex items-start gap-2">
+                              <FaBook className="text-gray-600 mt-1 flex-shrink-0" />
+                              <div className="flex-1">
+                                <p className="text-sm text-gray-800 mb-2">
+                                  {bibItem.author} ({bibItem.year}): {bibItem.title}
+                                </p>
+                                <div className="flex items-center gap-2">
+                                  {bibItem.page && (
+                                    <a
+                                      href={bibItem.page}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-blue-600 hover:text-blue-800 transition-colors inline-flex items-center"
+                                    >
+                                      <FaLink className="w-4 h-4" />
+                                    </a>
+                                  )}
+                                  {bibItem.pdf && (
+                                    <a
+                                      href={bibItem.pdf}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-red-600 hover:text-red-800 transition-colors inline-flex items-center"
+                                    >
+                                      <FaRegFilePdf className="w-4 h-4" />
+                                    </a>
+                                  )}
+                                  <button
+                                    onClick={() =>
+                                      infoPanelContent?.id && deleteBib(infoPanelContent.id, index)
+                                    }
+                                    className="btn-danger btn-icon"
+                                  >
+                                    <FaTrashAlt />
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -1787,875 +1527,336 @@ const Home: NextPage = () => {
                   </div>
                 </div>
               </div>
-              <button
-                onClick={() => infoPanelContent?.id && deleteAnnotation(infoPanelContent.id)}
-                style={{
-                  marginTop: '40px',
-                  padding: '10px 20px',
-                  backgroundColor: '#8b0000',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '5px',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                }}
-              >
-                Delete Annotation
-              </button>
-              <button
-                onClick={() => infoPanelContent?.id && downloadAnnotation(infoPanelContent.id)}
-                style={{
-                  marginTop: '40px',
-                  marginLeft: '20px',
-                  padding: '10px 20px',
-                  backgroundColor: '#006400',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '5px',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                }}
-              >
-                JSON Download
-              </button>
+              <div className="flex gap-3 mt-8 pt-6 border-t border-[var(--border)]">
+                <button
+                  onClick={() => infoPanelContent?.id && downloadAnnotation(infoPanelContent.id)}
+                  className="btn-primary"
+                >
+                  Download JSON
+                </button>
+                <button
+                  onClick={() => infoPanelContent?.id && deleteAnnotation(infoPanelContent.id)}
+                  className="btn-danger"
+                >
+                  Delete Annotation
+                </button>
+              </div>
             </div>
           </div>
         </div>
-        <footer
-          style={{
-            backgroundColor: '#333',
-            color: 'white',
-            padding: '10px 20px',
-            textAlign: 'center',
-          }}
-        >
-          &copy; 2025 Semantic 3D Annotatino Editor. All rights reserved.
+        <footer className="bg-white border-t border-[var(--border)] py-3 px-6 text-center">
+          <p className="text-sm text-[var(--text-secondary)] m-0">
+            &copy; 2025 IIIF 3D Viewer. All rights reserved.
+          </p>
         </footer>
       </div>
 
       {isRDFDialogOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            width: '500px',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            backgroundColor: 'white',
-            padding: '20px',
-            border: '1px solid #ccc',
-            borderRadius: '5px',
-            zIndex: 1000,
-          }}
-        >
-          <form style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
-              IRI:
-              <input
-                name="IRI"
-                value={IRI}
-                required
-                onChange={(e) => setIRI(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  marginTop: '5px',
-                  border: '1px solid #ccc',
-                  borderRadius: '5px',
-                  fontSize: '16px',
-                }}
-              />
-            </label>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
-              <button
-                type="button"
-                onClick={() => downloadRDF(manifestUrl)}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: '#000080',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '5px',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                  marginRight: '10px',
-                }}
-              >
-                Download
-              </button>
-              <button
-                type="button"
-                onClick={handleRDFCloseDialog}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: '#333',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '5px',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                }}
-              >
-                Close
-              </button>
-            </div>
-          </form>
+        <div className="dialog-overlay" onClick={handleRDFCloseDialog}>
+          <div className="dialog w-[500px]" onClick={(e) => e.stopPropagation()}>
+            <form className="flex flex-col gap-4">
+              <label className="font-bold text-lg">
+                IRI:
+                <input
+                  name="IRI"
+                  value={IRI}
+                  required
+                  onChange={(e) => setIRI(e.target.value)}
+                  className="input-field"
+                />
+              </label>
+              <div className="flex justify-end gap-3">
+                <button type="button" onClick={() => downloadRDF(manifestUrl)} className="btn-info">
+                  Download
+                </button>
+                <button type="button" onClick={handleRDFCloseDialog} className="btn-primary">
+                  Close
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
       {isMediaUploadDialogOpen && (
-        //csvファイルのアップロードダイアログ
-        <div
-          style={{
-            position: 'fixed',
-            width: '500px',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            backgroundColor: 'white',
-            padding: '20px',
-            border: '1px solid #ccc',
-            borderRadius: '5px',
-            zIndex: 1000,
-          }}
-        >
-          <form style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
-              Upload CSV File:
-              <input
-                type="file"
-                accept=".csv"
-                onChange={uploadMediaCSV}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  marginTop: '5px',
-                  border: '1px solid #ccc',
-                  borderRadius: '5px',
-                  fontSize: '16px',
-                }}
-              />
-            </label>
-            <p>【注意】既存のデータは上書きされます。</p>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
-              <button
-                type="button"
-                onClick={saveMediaUpload}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: '#000080',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '5px',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                  marginRight: '10px',
-                }}
-              >
-                Upload
-              </button>
-              <button
-                type="button"
-                onClick={handleMediaUploadCloseDialog}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: '#333',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '5px',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                }}
-              >
-                Close
-              </button>
-            </div>
-          </form>
+        <div className="dialog-overlay" onClick={handleMediaUploadCloseDialog}>
+          <div className="dialog w-[500px]" onClick={(e) => e.stopPropagation()}>
+            <form className="flex flex-col gap-4">
+              <label className="font-bold text-lg">
+                Upload CSV File:
+                <input type="file" accept=".csv" onChange={uploadMediaCSV} className="input-field" />
+              </label>
+              <p className="text-red-600 font-medium">【注意】既存のデータは上書きされます。</p>
+              <div className="flex justify-end gap-3">
+                <button type="button" onClick={saveMediaUpload} className="btn-info">
+                  Upload
+                </button>
+                <button type="button" onClick={handleMediaUploadCloseDialog} className="btn-primary">
+                  Close
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
       {isMediaDialogOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            width: '500px',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            backgroundColor: 'white',
-            padding: '20px',
-            border: '1px solid #ccc',
-            borderRadius: '5px',
-            zIndex: 1000,
-          }}
-        >
-          <form style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
-              Source URI:
-              <input
-                name="source"
-                value={source}
-                required
-                onChange={(e) => setSource(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  marginTop: '5px',
-                  border: '1px solid #ccc',
-                  borderRadius: '5px',
-                  fontSize: '16px',
-                }}
-              />
-            </label>
-            <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
-              Type:
-              <select
-                name="type"
-                value={type}
-                onChange={(e) => setType(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  marginTop: '5px',
-                  border: '1px solid #ccc',
-                  borderRadius: '5px',
-                  fontSize: '16px',
-                }}
-              >
-                <option value="img">Image</option>
-                <option value="video">Youtube</option>
-              </select>
-            </label>
-            <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
-              Caption:
-              <textarea
-                name="caption"
-                value={caption}
-                required
-                onChange={(e) => setCaption(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  marginTop: '5px',
-                  border: '1px solid #ccc',
-                  borderRadius: '5px',
-                  fontSize: '16px',
-                  resize: 'vertical',
-                }}
-              />
-            </label>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
-              <button
-                type="button"
-                onClick={saveMedias}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: '#000080',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '5px',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                  marginRight: '10px',
-                }}
-              >
-                Save
-              </button>
-              <button
-                type="button"
-                onClick={handleMediaCloseDialog}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: '#333',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '5px',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                }}
-              >
-                Close
-              </button>
-            </div>
-          </form>
+        <div className="dialog-overlay" onClick={handleMediaCloseDialog}>
+          <div className="dialog w-[500px]" onClick={(e) => e.stopPropagation()}>
+            <form className="flex flex-col gap-4">
+              <label className="font-bold text-lg">
+                Source URI:
+                <input
+                  name="source"
+                  value={source}
+                  required
+                  onChange={(e) => setSource(e.target.value)}
+                  className="input-field"
+                />
+              </label>
+              <label className="font-bold text-lg">
+                Type:
+                <select name="type" value={type} onChange={(e) => setType(e.target.value)} className="input-field">
+                  <option value="img">Image</option>
+                  <option value="video">Youtube</option>
+                </select>
+              </label>
+              <label className="font-bold text-lg">
+                Caption:
+                <textarea
+                  name="caption"
+                  value={caption}
+                  required
+                  onChange={(e) => setCaption(e.target.value)}
+                  className="input-field resize-y min-h-24"
+                />
+              </label>
+              <div className="flex justify-end gap-3">
+                <button type="button" onClick={saveMedias} className="btn-info">
+                  Save
+                </button>
+                <button type="button" onClick={handleMediaCloseDialog} className="btn-primary">
+                  Close
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
       {isAuthorityUploadDialogOpen && (
-        //csvファイルのアップロードダイアログ
-        <div
-          style={{
-            position: 'fixed',
-            width: '500px',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            backgroundColor: 'white',
-            padding: '20px',
-            border: '1px solid #ccc',
-            borderRadius: '5px',
-            zIndex: 1000,
-          }}
-        >
-          <form style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
-              Upload CSV File:
-              <input
-                type="file"
-                accept=".csv"
-                onChange={uploadAuthorityCSV}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  marginTop: '5px',
-                  border: '1px solid #ccc',
-                  borderRadius: '5px',
-                  fontSize: '16px',
-                }}
-              />
-            </label>
-            <p>【注意】既存のデータは上書きされます。</p>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
-              <button
-                type="button"
-                onClick={saveAuthorityUpload}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: '#000080',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '5px',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                  marginRight: '10px',
-                }}
-              >
-                Upload
-              </button>
-              <button
-                type="button"
-                onClick={handleAuthorityUploadCloseDialog}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: '#333',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '5px',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                }}
-              >
-                Close
-              </button>
-            </div>
-          </form>
+        <div className="dialog-overlay" onClick={handleAuthorityUploadCloseDialog}>
+          <div className="dialog w-[500px]" onClick={(e) => e.stopPropagation()}>
+            <form className="flex flex-col gap-4">
+              <label className="font-bold text-lg">
+                Upload CSV File:
+                <input type="file" accept=".csv" onChange={uploadAuthorityCSV} className="input-field" />
+              </label>
+              <p className="text-red-600 font-medium">【注意】既存のデータは上書きされます。</p>
+              <div className="flex justify-end gap-3">
+                <button type="button" onClick={saveAuthorityUpload} className="btn-info">
+                  Upload
+                </button>
+                <button type="button" onClick={handleAuthorityUploadCloseDialog} className="btn-primary">
+                  Close
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
       {isWikidataDialogOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            width: '500px',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            backgroundColor: 'white',
-            padding: '20px',
-            border: '1px solid #ccc',
-            borderRadius: '5px',
-            zIndex: 1000,
-          }}
-        >
-          <form style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
-              Type:
-              <select
-                name="type"
-                value={wikiType}
-                onChange={(e) => setWikiType(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  marginTop: '5px',
-                  border: '1px solid #ccc',
-                  borderRadius: '5px',
-                  fontSize: '16px',
-                }}
-              >
-                <option value="wikidata">Wikidata</option>
-                <option value="geonames">GeoNames</option>
-              </select>
-            </label>
-            <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
-              URI:
-              <input
-                name="wikidata"
-                value={wikidata}
-                required
-                onChange={(e) => setWikidata(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  marginTop: '5px',
-                  border: '1px solid #ccc',
-                  borderRadius: '5px',
-                  fontSize: '16px',
-                }}
-              />
-            </label>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
-              <button
-                type="button"
-                onClick={saveWikidata}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: '#000080',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '5px',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                  marginRight: '10px',
-                }}
-              >
-                Save
-              </button>
-              <button
-                type="button"
-                onClick={handleWikidataCloseDialog}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: '#333',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '5px',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                }}
-              >
-                Close
-              </button>
-            </div>
-          </form>
+        <div className="dialog-overlay" onClick={handleWikidataCloseDialog}>
+          <div className="dialog w-[500px]" onClick={(e) => e.stopPropagation()}>
+            <form className="flex flex-col gap-4">
+              <label className="font-bold text-lg">
+                Type:
+                <select
+                  name="type"
+                  value={wikiType}
+                  onChange={(e) => setWikiType(e.target.value)}
+                  className="input-field"
+                >
+                  <option value="wikidata">Wikidata</option>
+                  <option value="geonames">GeoNames</option>
+                </select>
+              </label>
+              <label className="font-bold text-lg">
+                URI:
+                <input
+                  name="wikidata"
+                  value={wikidata}
+                  required
+                  onChange={(e) => setWikidata(e.target.value)}
+                  className="input-field"
+                />
+              </label>
+              <div className="flex justify-end gap-3">
+                <button type="button" onClick={saveWikidata} className="btn-info">
+                  Save
+                </button>
+                <button type="button" onClick={handleWikidataCloseDialog} className="btn-primary">
+                  Close
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
       {isBibUploadDialogOpen && (
-        //csvファイルのアップロードダイアログ
-        <div
-          style={{
-            position: 'fixed',
-            width: '500px',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            backgroundColor: 'white',
-            padding: '20px',
-            border: '1px solid #ccc',
-            borderRadius: '5px',
-            zIndex: 1000,
-          }}
-        >
-          <form style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
-              Upload CSV File:
-              <input
-                type="file"
-                accept=".csv"
-                onChange={uploadBibCSV}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  marginTop: '5px',
-                  border: '1px solid #ccc',
-                  borderRadius: '5px',
-                  fontSize: '16px',
-                }}
-              />
-            </label>
-            <p>【注意】既存のデータは上書きされます。</p>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
-              <button
-                type="button"
-                onClick={saveBibUpload}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: '#000080',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '5px',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                  marginRight: '10px',
-                }}
-              >
-                Upload
-              </button>
-              <button
-                type="button"
-                onClick={handleBibUploadCloseDialog}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: '#333',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '5px',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                }}
-              >
-                Close
-              </button>
-            </div>
-          </form>
+        <div className="dialog-overlay" onClick={handleBibUploadCloseDialog}>
+          <div className="dialog w-[500px]" onClick={(e) => e.stopPropagation()}>
+            <form className="flex flex-col gap-4">
+              <label className="font-bold text-lg">
+                Upload CSV File:
+                <input type="file" accept=".csv" onChange={uploadBibCSV} className="input-field" />
+              </label>
+              <p className="text-red-600 font-medium">【注意】既存のデータは上書きされます。</p>
+              <div className="flex justify-end gap-3">
+                <button type="button" onClick={saveBibUpload} className="btn-info">
+                  Upload
+                </button>
+                <button type="button" onClick={handleBibUploadCloseDialog} className="btn-primary">
+                  Close
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
       {isBibDialogOpen && (
-        <div
-          style={{
-            width: '500px',
-            position: 'fixed',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            backgroundColor: 'white',
-            padding: '20px',
-            border: '1px solid #ccc',
-            borderRadius: '5px',
-            zIndex: 1000,
-          }}
-        >
-          <form style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
-              Author:
-              <input
-                name="bibAuthor"
-                value={bibAuthor}
-                required
-                onChange={(e) => setBibAuthor(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  marginTop: '5px',
-                  border: '1px solid #ccc',
-                  borderRadius: '5px',
-                  fontSize: '16px',
-                  resize: 'vertical',
-                }}
-              />
-            </label>
-            <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
-              Title:
-              <textarea
-                name="bibTitle"
-                value={bibTitle}
-                required
-                onChange={(e) => setBibTitle(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  marginTop: '5px',
-                  border: '1px solid #ccc',
-                  borderRadius: '5px',
-                  fontSize: '16px',
-                  resize: 'vertical',
-                }}
-              />
-            </label>
-            <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
-              Year:
-              <input
-                name="bibYear"
-                value={bibYear}
-                required
-                onChange={(e) => setBibYear(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  marginTop: '5px',
-                  border: '1px solid #ccc',
-                  borderRadius: '5px',
-                  fontSize: '16px',
-                  resize: 'vertical',
-                }}
-              />
-            </label>
-            <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
-              Page URL:
-              <input
-                name="bibPage"
-                value={bibPage}
-                required
-                onChange={(e) => setBibPage(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  marginTop: '5px',
-                  border: '1px solid #ccc',
-                  borderRadius: '5px',
-                  fontSize: '16px',
-                  resize: 'vertical',
-                }}
-              />
-            </label>
-            <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
-              PDF:
-              <input
-                name="bibPDF"
-                value={bibPDF}
-                required
-                onChange={(e) => setBibPDF(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  marginTop: '5px',
-                  border: '1px solid #ccc',
-                  borderRadius: '5px',
-                  fontSize: '16px',
-                  resize: 'vertical',
-                }}
-              />
-            </label>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
-              <button
-                type="button"
-                onClick={saveBib}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: '#000080',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '5px',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                  marginRight: '10px',
-                }}
-              >
-                Save
-              </button>
-              <button
-                type="button"
-                onClick={handleBibCloseDialog}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: '#333',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '5px',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                }}
-              >
-                Close
-              </button>
-            </div>
-          </form>
+        <div className="dialog-overlay" onClick={handleBibCloseDialog}>
+          <div className="dialog w-[500px]" onClick={(e) => e.stopPropagation()}>
+            <form className="flex flex-col gap-4">
+              <label className="font-bold text-lg">
+                Author:
+                <input
+                  name="bibAuthor"
+                  value={bibAuthor}
+                  required
+                  onChange={(e) => setBibAuthor(e.target.value)}
+                  className="input-field"
+                />
+              </label>
+              <label className="font-bold text-lg">
+                Title:
+                <textarea
+                  name="bibTitle"
+                  value={bibTitle}
+                  required
+                  onChange={(e) => setBibTitle(e.target.value)}
+                  className="input-field resize-y min-h-20"
+                />
+              </label>
+              <label className="font-bold text-lg">
+                Year:
+                <input
+                  name="bibYear"
+                  value={bibYear}
+                  required
+                  onChange={(e) => setBibYear(e.target.value)}
+                  className="input-field"
+                />
+              </label>
+              <label className="font-bold text-lg">
+                Page URL:
+                <input
+                  name="bibPage"
+                  value={bibPage}
+                  required
+                  onChange={(e) => setBibPage(e.target.value)}
+                  className="input-field"
+                />
+              </label>
+              <label className="font-bold text-lg">
+                PDF:
+                <input
+                  name="bibPDF"
+                  value={bibPDF}
+                  required
+                  onChange={(e) => setBibPDF(e.target.value)}
+                  className="input-field"
+                />
+              </label>
+              <div className="flex justify-end gap-3">
+                <button type="button" onClick={saveBib} className="btn-info">
+                  Save
+                </button>
+                <button type="button" onClick={handleBibCloseDialog} className="btn-primary">
+                  Close
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
       {isDescDialogOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            height: '500px',
-            width: '900px',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            backgroundColor: 'white',
-            padding: '20px',
-            border: '1px solid #ccc',
-            borderRadius: '5px',
-            zIndex: 1000,
-          }}
-        >
-          <form
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '15px',
-            }}
-          >
-            <div
-              id="editorJS"
-              style={{
-                height: '350px', // 高さを自動調整
-                minHeight: '350px', // 必要に応じて最小高さを設定
-                marginBottom: '20px', // ボタンとの間に余白を追加
-                overflowY: 'auto', // 縦方向のスクロールを有効化
-                border: '1px solid #ccc', // 視覚的な区切りを追加（オプション）
-                padding: '10px', // 内側の余白を追加（オプション）
-              }}
-            />
-            {/*
-            <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
-              Description:
-              <textarea
-                name="description"
-                value={desc}
-                required
-                onChange={(e) => setDesc(e.target.value)}
-                style={{
-                  height: '150px',
-                  width: '100%',
-                  padding: '10px',
-                  marginTop: '5px',
-                  border: '1px solid #ccc',
-                  borderRadius: '5px',
-                  fontSize: '16px',
-                  resize: 'vertical',
-                }}
+        <div className="dialog-overlay" onClick={handleDescCloseDialog}>
+          <div className="dialog w-[900px] h-[500px]" onClick={(e) => e.stopPropagation()}>
+            <form className="flex flex-col gap-4 h-full">
+              <div
+                id="editorJS"
+                className="h-[350px] min-h-[350px] mb-5 overflow-y-auto border border-[var(--border)] rounded-md p-3"
               />
-            </label>
-            */}
-            {/*
-            <label style={{ fontWeight: 'bold', fontSize: '18px' }}>
-              Description:
-              <Editor data={editorData} onChange={handleEditorChange} />
-            </label>
-            */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
-              <button
-                type="button"
-                //onClick={saveDesc}
-                onClick={btnSaves}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: '#000080',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '5px',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                  marginRight: '10px',
-                  marginTop: '10px',
-                }}
-              >
-                Save
-              </button>
-              <button
-                type="button"
-                onClick={handleDescCloseDialog}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: '#333',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '5px',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                  marginTop: '10px',
-                }}
-              >
-                Close
-              </button>
-            </div>
-          </form>
+              <div className="flex justify-end gap-3 mt-auto">
+                <button type="button" onClick={btnSaves} className="btn-info">
+                  Save
+                </button>
+                <button type="button" onClick={handleDescCloseDialog} className="btn-primary">
+                  Close
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
       {selectedImage && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            backgroundColor: 'rgba(0, 0, 0, 0.8)',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            alignItems: 'center',
-            zIndex: 1000,
-          }}
-          onClick={() => setSelectedImage(null)}
-        >
-          <img
-            src={selectedImage.source}
-            alt={selectedImage.caption}
-            style={{ maxWidth: '90%', maxHeight: '90%' }}
-          />
-          <br />
-          <p style={{ color: 'white', marginTop: '5px', fontSize: '24px' }}>
-            {selectedImage.caption}
-          </p>
-          <button
-            onClick={() =>
-              infoPanelContent?.id && deleteMedia(infoPanelContent.id, selectedImage.index)
-            }
-            style={{
-              position: 'absolute',
-              top: '10px',
-              right: '10px',
-              padding: '5px 10px',
-              backgroundColor: '#8b0000',
-              color: 'white',
-              border: 'none',
-              borderRadius: '5px',
-              cursor: 'pointer',
-              fontSize: '16px',
-              marginBottom: '5px',
-              marginTop: '10px',
-              marginRight: '10px',
-            }}
-          >
-            <FaTrashAlt />
-          </button>
+        <div className="dialog-overlay" onClick={() => setSelectedImage(null)}>
+          <div className="flex flex-col items-center justify-center max-w-[90%] max-h-[90%]">
+            <img
+              src={selectedImage.source}
+              alt={selectedImage.caption}
+              className="max-w-full max-h-[80vh] rounded-lg shadow-2xl"
+            />
+            <p className="text-white mt-4 text-2xl font-medium">{selectedImage.caption}</p>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                infoPanelContent?.id && deleteMedia(infoPanelContent.id, selectedImage.index);
+              }}
+              className="btn-danger fixed top-4 right-4"
+            >
+              <FaTrashAlt />
+            </button>
+          </div>
         </div>
       )}
 
       {selectedVideo && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            backgroundColor: 'rgba(0, 0, 0, 0.8)',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            alignItems: 'center',
-            zIndex: 1000,
-          }}
-          onClick={() => setSelectedVideo(null)}
-        >
-          <iframe
-            style={{ width: '100%', height: '70%' }}
-            src={selectedVideo.source}
-            title="YouTube video player"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          />
-          <br />
-          <p style={{ color: 'white', marginTop: '5px', fontSize: '24px' }}>
-            {selectedVideo.caption}
-          </p>
-          <button
-            onClick={() =>
-              infoPanelContent?.id && deleteMedia(infoPanelContent.id, selectedVideo.index)
-            }
-            style={{
-              position: 'absolute',
-              top: '10px',
-              right: '10px',
-              padding: '5px 10px',
-              backgroundColor: '#8b0000',
-              color: 'white',
-              border: 'none',
-              borderRadius: '5px',
-              cursor: 'pointer',
-              fontSize: '16px',
-              marginBottom: '5px',
-              marginTop: '10px',
-              marginRight: '10px',
-            }}
-          >
-            <FaTrashAlt />
-          </button>
+        <div className="dialog-overlay" onClick={() => setSelectedVideo(null)}>
+          <div className="flex flex-col items-center justify-center w-full h-full px-8">
+            <iframe
+              className="w-full h-[70%] rounded-lg shadow-2xl"
+              src={selectedVideo.source}
+              title="YouTube video player"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            />
+            <p className="text-white mt-4 text-2xl font-medium">{selectedVideo.caption}</p>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                infoPanelContent?.id && deleteMedia(infoPanelContent.id, selectedVideo.index);
+              }}
+              className="btn-danger fixed top-4 right-4"
+            >
+              <FaTrashAlt />
+            </button>
+          </div>
         </div>
       )}
     </>

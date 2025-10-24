@@ -63,8 +63,19 @@ const getAnnotations = async () => {
   //const q = query(collection(db, 'annotations'));
   const q = query(collection(db, 'test'));
   const querySnapshot = await getDocs(q);
+
+  console.log('=== ThreeCanvas: Loading Annotations ===');
+  console.log(`Total annotations in Firebase: ${querySnapshot.size}`);
+
   querySnapshot.forEach((doc) => {
     const data = doc.data() as Annotation;
+
+    console.log(`Annotation ${doc.id}:`, {
+      target_manifest: data.target_manifest,
+      title: data.data?.body?.label,
+      position: data.position,
+    });
+
     const annotationWithId = {
       ...data,
       id: doc.id,
@@ -75,6 +86,8 @@ const getAnnotations = async () => {
     };
     annotations.push(annotationWithId);
   });
+
+  console.log(`Loaded ${annotations.length} annotations for display`);
   return annotations;
 };
 
@@ -90,6 +103,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   // イベントリスナーの存在を追跡するフラグ
   const clickListenerAdded = useRef(false);
   const dblClickListenerAdded = useRef(false);
+  const contextMenuListenerAdded = useRef(false);
   const [user] = useAuthState(auth);
   const setInfoPanel = useSetAtom(infoPanelAtom);
   const selectedSpriteRef = useRef<THREE.Sprite | null>(null);
@@ -98,6 +112,9 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   const spritesRef = useRef<THREE.Sprite[]>([]);
   const polygonsRef = useRef<THREE.Mesh[]>([]);
   const sceneRef = useRef<THREE.Scene | null>(null);
+  const modelRef = useRef<THREE.Group | null>(null); // 3Dモデルへの参照
+  const frameCountRef = useRef(0); // フレームカウンタ
+  const raycasterRef = useRef(new THREE.Raycaster()); // Raycasterのインスタンスを再利用
   const [annotationInputVisible, setAnnotationInputVisible] = useState(false);
   const [annotationPosition, setAnnotationPosition] = useState<THREE.Vector3 | null>(null);
   const camPos = useRef<THREE.Vector3 | null>(null);
@@ -107,6 +124,8 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   const [title, setTitle] = useState('');
   const [, /*description*/ setDescription] = useState('');
   const polygonVertices = useRef<THREE.Vector3[]>([]);
+  const tempPointsRef = useRef<THREE.Mesh[]>([]); // 一時的な点の表示
+  const tempLinesRef = useRef<THREE.Line[]>([]); // 一時的な線の表示
   const annotationModeRef = useRef<boolean>(annotationMode);
 
   const [isProgressVisible, setIsProgressVisible] = useState(true);
@@ -212,8 +231,13 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
 
       const importedModel = manifest.items[0].items[0].items[0].body.id;
       //const importedModelType = manifest.items[0].items[0].items[0].body.type;
-      targetManifest.current = manifest.id;
+      // Use the input manifestUrl instead of manifest.id to ensure consistency
+      targetManifest.current = manifestUrl;
       tagetCanvas.current = manifest.items[0].id;
+
+      console.log('=== Manifest Loaded ===');
+      console.log('Target manifest URL set to:', targetManifest.current);
+      console.log('Target canvas ID:', tagetCanvas.current);
 
       // GLTFLoader
       const loader = new GLTFLoader();
@@ -227,6 +251,9 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
         (gltf) => {
           const model = gltf.scene;
           scene.add(model);
+
+          // Store model reference for occlusion detection
+          modelRef.current = model;
 
           // モデルのロードが完了したらprogress barを非表示にする
           setIsProgressVisible(false);
@@ -278,7 +305,8 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
               //const annotation = data.items[0].items[1].items[i];
               const annotation = data[i];
 
-              if (annotation.target_manifest == manifest.id) {
+              // Compare with manifestUrl instead of manifest.id
+              if (annotation.target_manifest === manifestUrl) {
                 const description = annotation.data.body.value ? annotation.data.body.value : '';
 
                 // 3DSelectorの場合の処理
@@ -359,7 +387,14 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
                     verticesArray[i * 3 + 2] = vertices[i].z;
                   }
                   geometry.setAttribute('position', new THREE.BufferAttribute(verticesArray, 3));
-                  geometry.setIndex([0, 1, 2, 2, 3, 0]);
+
+                  // 三角形分割: 任意の点数に対応
+                  const indices: number[] = [];
+                  const n = vertices.length;
+                  for (let i = 1; i < n - 1; i++) {
+                    indices.push(0, i, i + 1);
+                  }
+                  geometry.setIndex(indices);
 
                   const material = new THREE.MeshBasicMaterial({
                     color: 'yellow',
@@ -539,6 +574,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
             };
 
             const onMouseDblClick = (event: MouseEvent) => {
+              console.log('Double click detected. Annotation mode:', annotationModeRef.current);
               // マウスの位置を正規化
               const rect = renderer.domElement.getBoundingClientRect();
               mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -547,12 +583,20 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
               // レイキャストを設定
               raycaster.setFromCamera(mouse, camera);
 
+              // ポリゴンモードの場合は3Dモデルのみをレイキャスト、それ以外はシーン全体
+              const targetObjects = annotationModeRef.current && modelRef.current
+                ? [modelRef.current]
+                : scene.children;
+
               // クリック位置の3次元空間内の位置情報を取得
-              const intersects = raycaster.intersectObjects(scene.children, true);
+              const intersects = raycaster.intersectObjects(targetObjects, true);
+              console.log('Intersects found:', intersects.length, 'Target:', annotationModeRef.current ? 'model only' : 'all scene');
               if (intersects.length > 0) {
                 const intersectedPoint = intersects[0].point;
+                console.log('Intersected point:', intersectedPoint, 'Object:', intersects[0].object.type);
 
                 if (annotationModeRef.current == false) {
+                  console.log('Creating point annotation');
                   const cameraDirection = new THREE.Vector3();
                   camera.getWorldDirection(cameraDirection);
                   const offset = cameraDirection.multiplyScalar(-0.01); // オフセットの距離を調整
@@ -588,6 +632,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
 
                   setAnnotationInputVisible(true);
                 } else {
+                  console.log('Creating polygon vertex');
                   // 頂点を追加
                   const cameraDirection = new THREE.Vector3();
                   camera.getWorldDirection(cameraDirection);
@@ -595,53 +640,112 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
                   const newPoint = intersectedPoint.clone().add(offset);
 
                   polygonVertices.current.push(newPoint);
+                  console.log('Polygon vertex added:', polygonVertices.current.length, 'points', newPoint);
 
-                  if (polygonVertices.current.length >= 4) {
-                    // ポリゴンを描画
-                    const geometry = new THREE.BufferGeometry();
-                    const vertices = new Float32Array(polygonVertices.current.length * 3);
-                    for (let i = 0; i < polygonVertices.current.length; i++) {
-                      vertices[i * 3] = polygonVertices.current[i].x;
-                      vertices[i * 3 + 1] = polygonVertices.current[i].y;
-                      vertices[i * 3 + 2] = polygonVertices.current[i].z;
-                    }
-                    geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
-                    geometry.setIndex([0, 1, 2, 2, 3, 0]); // インデックスを設定してポリゴンを描画
+                  // 頂点の視覚的フィードバックを追加（小さな球体）
+                  const pointGeometry = new THREE.SphereGeometry(0.02, 16, 16);
+                  const pointMaterial = new THREE.MeshBasicMaterial({
+                    color: 0x00ff00,
+                    depthTest: false,  // 常に手前に表示
+                    transparent: true,
+                    opacity: 0.8
+                  });
+                  const pointMesh = new THREE.Mesh(pointGeometry, pointMaterial);
+                  pointMesh.position.copy(newPoint);
+                  pointMesh.renderOrder = 999; // 最後にレンダリング
+                  scene.add(pointMesh);
+                  tempPointsRef.current.push(pointMesh);
+                  console.log('Green sphere added to scene. Total spheres:', tempPointsRef.current.length);
 
-                    const material = new THREE.MeshBasicMaterial({
-                      color: 0xff0000,
-                      side: THREE.DoubleSide,
+                  // 線の視覚的フィードバックを追加
+                  if (polygonVertices.current.length > 1) {
+                    const lineGeometry = new THREE.BufferGeometry().setFromPoints([
+                      polygonVertices.current[polygonVertices.current.length - 2],
+                      polygonVertices.current[polygonVertices.current.length - 1],
+                    ]);
+                    const lineMaterial = new THREE.LineBasicMaterial({
+                      color: 0x00ff00,
+                      linewidth: 3,
+                      depthTest: false,  // 常に手前に表示
                       transparent: true,
-                      opacity: 0.2,
+                      opacity: 0.8
                     });
-                    const polygon = new THREE.Mesh(geometry, material);
-                    scene.add(polygon);
-                    polygonRef.current = polygon;
-                    polygonArea.current = polygon.geometry.attributes.position
-                      .array as Float32Array; // 型を明示的に指定
-                    polygonsRef.current.push(polygon);
-
-                    const screenPosition = new THREE.Vector3(
-                      intersectedPoint.x,
-                      intersectedPoint.y,
-                      intersectedPoint.z
-                    ).project(camera);
-                    const x = (screenPosition.x * 0.5 + 0.5) * sizes.width;
-                    const y = (screenPosition.y * -0.5 + 0.5) * sizes.height;
-
-                    setAnnotationPosition(new THREE.Vector3(x, y, 0));
-
-                    //　カメラの位置を取得
-                    const cameraPosition = camera.position;
-                    camPos.current = cameraPosition;
-
-                    setAnnotationInputVisible(true);
-                    //alert("Polygon created!")
-
-                    // 頂点リストをリセット
-                    polygonVertices.current = [];
+                    const line = new THREE.Line(lineGeometry, lineMaterial);
+                    line.renderOrder = 999; // 最後にレンダリング
+                    scene.add(line);
+                    tempLinesRef.current.push(line);
+                    console.log('Green line added to scene. Total lines:', tempLinesRef.current.length);
                   }
                 }
+              }
+            };
+
+            // 右クリックでポリゴンを確定
+            const onContextMenu = (event: MouseEvent) => {
+              event.preventDefault(); // デフォルトのコンテキストメニューを無効化
+              console.log('Right click detected. Annotation mode:', annotationModeRef.current, 'Vertices:', polygonVertices.current.length);
+
+              if (annotationModeRef.current && polygonVertices.current.length >= 3) {
+                console.log('Creating polygon with', polygonVertices.current.length, 'vertices');
+                // 最低3点以上でポリゴンを作成
+                const geometry = new THREE.BufferGeometry();
+                const vertices = new Float32Array(polygonVertices.current.length * 3);
+                for (let i = 0; i < polygonVertices.current.length; i++) {
+                  vertices[i * 3] = polygonVertices.current[i].x;
+                  vertices[i * 3 + 1] = polygonVertices.current[i].y;
+                  vertices[i * 3 + 2] = polygonVertices.current[i].z;
+                }
+                geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+
+                // 三角形分割: Ear clipping algorithm (簡易版)
+                const indices: number[] = [];
+                const n = polygonVertices.current.length;
+
+                // 凸ポリゴンの場合の簡易三角形分割
+                for (let i = 1; i < n - 1; i++) {
+                  indices.push(0, i, i + 1);
+                }
+                geometry.setIndex(indices);
+
+                const material = new THREE.MeshBasicMaterial({
+                  color: 0xff0000,
+                  side: THREE.DoubleSide,
+                  transparent: true,
+                  opacity: 0.2,
+                });
+                const polygon = new THREE.Mesh(geometry, material);
+                scene.add(polygon);
+                polygonRef.current = polygon;
+                polygonArea.current = polygon.geometry.attributes.position
+                  .array as Float32Array;
+                polygonsRef.current.push(polygon);
+
+                // 最後の頂点の位置でアノテーション入力を表示
+                const lastPoint = polygonVertices.current[polygonVertices.current.length - 1];
+                const screenPosition = new THREE.Vector3(
+                  lastPoint.x,
+                  lastPoint.y,
+                  lastPoint.z
+                ).project(camera);
+                const x = (screenPosition.x * 0.5 + 0.5) * sizes.width;
+                const y = (screenPosition.y * -0.5 + 0.5) * sizes.height;
+
+                setAnnotationPosition(new THREE.Vector3(x, y, 0));
+
+                // カメラの位置を取得
+                const cameraPosition = camera.position;
+                camPos.current = cameraPosition;
+
+                setAnnotationInputVisible(true);
+
+                // 一時的な視覚的フィードバックをクリーンアップ
+                tempPointsRef.current.forEach((point) => scene.remove(point));
+                tempLinesRef.current.forEach((line) => scene.remove(line));
+                tempPointsRef.current = [];
+                tempLinesRef.current = [];
+
+                // 頂点リストをリセット
+                polygonVertices.current = [];
               }
             };
 
@@ -656,6 +760,14 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
               dblClickListenerAdded.current = true;
             }
 
+            if (!contextMenuListenerAdded.current) {
+              window.addEventListener('contextmenu', onContextMenu);
+              contextMenuListenerAdded.current = true;
+              console.log('Context menu listener added');
+            } else {
+              console.log('Context menu listener already added');
+            }
+
             return () => {
               if (clickListenerAdded.current) {
                 window.removeEventListener('click', onMouseClick);
@@ -664,6 +776,10 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
               if (dblClickListenerAdded.current) {
                 window.removeEventListener('dblclick', onMouseDblClick);
                 dblClickListenerAdded.current = false;
+              }
+              if (contextMenuListenerAdded.current) {
+                window.removeEventListener('contextmenu', onContextMenu);
+                contextMenuListenerAdded.current = false;
               }
             };
           })
@@ -712,6 +828,29 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
           const scale = distance * 0.05; // 距離に反比例してスケールを調整
           sprite.scale.set(scale, scale, scale);
         });
+
+        // Check occlusion every 10 frames to minimize performance impact
+        frameCountRef.current++;
+        if (frameCountRef.current % 10 === 0) {
+          spritesRef.current.forEach((sprite) => {
+            if (modelRef.current) {
+              // Raycast from camera to sprite
+              const direction = new THREE.Vector3();
+              direction.subVectors(sprite.position, camera.position).normalize();
+              raycasterRef.current.set(camera.position, direction);
+
+              const intersects = raycasterRef.current.intersectObject(modelRef.current, true);
+              const distance = camera.position.distanceTo(sprite.position);
+
+              // If something is between camera and sprite, make it more transparent
+              if (intersects.length > 0 && intersects[0].distance < distance - 0.01) {
+                sprite.material.opacity = 0.15;
+              } else {
+                sprite.material.opacity = 0.7;
+              }
+            }
+          });
+        }
 
         // 情報パネルの位置を更新
         // 選択されたスプライトがある場合には、情報パネルの位置をスプライトの位置に設定, 選択されたポリゴンがある場合には、情報パネルの位置をポリゴンの位置に設定
