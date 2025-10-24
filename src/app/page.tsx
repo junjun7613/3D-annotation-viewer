@@ -7,7 +7,7 @@ import type { NextPage } from 'next';
 import SignIn from './components/SignIn';
 import ThreeCanvas from './components/ThreeCanvasManifest';
 import SwitchButton from './components/SwitchButton';
-import TEIViewer from './components/TEIViewer';
+import DisplayTEI from './components/DisplayTEI';
 import { FaPencilAlt, FaBook, FaRegFilePdf, FaTrashAlt } from 'react-icons/fa';
 import { FaLink } from 'react-icons/fa6';
 import { PiShareNetwork } from 'react-icons/pi';
@@ -52,6 +52,7 @@ const Home: NextPage = () => {
   // infoPanelContentという連想配列を作成
 
   const [, /*editorData*/ setEditorData] = useState<OutputData | undefined>();
+  const [infoTab, setInfoTab] = useState<'resources' | 'linkedData' | 'references'>('resources');
 
   interface MediaItem {
     id: string;
@@ -1256,7 +1257,7 @@ const Home: NextPage = () => {
             <a href="#home" className="text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors text-sm font-medium">
               Home
             </a>
-            <a href="#about" className="text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors text-sm font-medium">
+            <a href="/about" className="text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors text-sm font-medium">
               About
             </a>
             <SignIn />
@@ -1287,19 +1288,28 @@ const Home: NextPage = () => {
                 value={manifestUrl}
                 onChange={handleManifestUrlChange}
                 placeholder="Enter IIIF Manifest URL"
-                className="input-field flex-1 mb-0"
+                className="input-field mb-0"
+                style={{ width: '600px' }}
               />
-              <button onClick={() => handleRDFOpenDialog()} className="btn-primary whitespace-nowrap">
-                Export RDF
+              <button
+                onClick={() => handleRDFOpenDialog()}
+                className="ml-10 p-0 bg-transparent border-0 cursor-pointer hover:opacity-70 transition-opacity"
+                title="Export RDF"
+              >
+                <img src="/images/rdf.png" alt="RDF" className="w-8 h-8" />
               </button>
-              <button onClick={() => downloadIIIFManifest(manifestUrl)} className="btn-primary whitespace-nowrap">
-                View Manifest
+              <button
+                onClick={() => downloadIIIFManifest(manifestUrl)}
+                className="ml-4 p-0 bg-transparent border-0 cursor-pointer hover:opacity-70 transition-opacity"
+                title="View IIIF Manifest"
+              >
+                <img src="/images/iiif.png" alt="IIIF" className="w-10 h-10" />
               </button>
             </div>
             <div className="flex-[0.8] flex gap-5 border-b border-[var(--border)] pb-6 mb-6">
               <div className="flex-1 card">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold m-0 text-[var(--text-primary)]">
+                  <h3 className="text-lg m-0 text-[var(--text-primary)]">
                     {infoPanelContent?.title || 'Annotation Details'}
                   </h3>
                   <button
@@ -1316,15 +1326,49 @@ const Home: NextPage = () => {
                 ></div>
               </div>
               <div className="flex-1 card">
-                <TEIViewer />
+                <DisplayTEI manifestUrl={manifestUrl} />
               </div>
             </div>
             <div className="flex-[1.2] pt-4">
-              <div className="flex justify-between gap-5">
-                <div className="flex-1 card h-80 overflow-hidden">
-                  <div className="border-b border-[var(--border)] flex items-center justify-between mb-4 pb-3">
-                    <h3 className="text-base font-semibold m-0 text-[var(--text-primary)]">Resources</h3>
-                    <div className="flex gap-1.5">
+              <div className="card h-80 overflow-hidden">
+                {/* Tab Navigation */}
+                <div className="flex gap-2 mb-4 border-b border-[var(--border)]">
+                  <button
+                    className={`px-4 py-2 text-sm font-medium transition-colors ${
+                      infoTab === 'resources'
+                        ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                    }`}
+                    onClick={() => setInfoTab('resources')}
+                  >
+                    Resources
+                  </button>
+                  <button
+                    className={`px-4 py-2 text-sm font-medium transition-colors ${
+                      infoTab === 'linkedData'
+                        ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                    }`}
+                    onClick={() => setInfoTab('linkedData')}
+                  >
+                    Linked Data
+                  </button>
+                  <button
+                    className={`px-4 py-2 text-sm font-medium transition-colors ${
+                      infoTab === 'references'
+                        ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                    }`}
+                    onClick={() => setInfoTab('references')}
+                  >
+                    References
+                  </button>
+                </div>
+
+                {/* Resources Tab */}
+                {infoTab === 'resources' && (
+                  <>
+                    <div className="flex justify-end gap-1.5 mb-4">
                       <button
                         onClick={handleMediaOpenDialog}
                         className="btn-icon btn-icon-sm btn-secondary"
@@ -1340,8 +1384,7 @@ const Home: NextPage = () => {
                         <img src="/images/upload.png" alt="Upload" className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                  </div>
-                  <div className="overflow-y-auto max-h-52 grid grid-cols-2 gap-2">
+                    <div className="overflow-y-auto max-h-56 grid grid-cols-4 gap-2">
                     {infoPanelContent?.media && infoPanelContent.media.length > 0
                       ? infoPanelContent.media.map((mediaItem, index) => (
                           <div key={index} className="cursor-pointer hover:opacity-80 transition-opacity rounded overflow-hidden">
@@ -1381,12 +1424,14 @@ const Home: NextPage = () => {
                           </div>
                         ))
                       : null}
-                  </div>
-                </div>
-                <div className="flex-1 card h-80 overflow-hidden">
-                  <div className="border-b border-[var(--border)] flex items-center justify-between mb-4 pb-3">
-                    <h3 className="text-base font-semibold m-0 text-[var(--text-primary)]">Linked Data</h3>
-                    <div className="flex gap-1.5">
+                    </div>
+                  </>
+                )}
+
+                {/* Linked Data Tab */}
+                {infoTab === 'linkedData' && (
+                  <>
+                    <div className="flex justify-end gap-1.5 mb-4">
                       <button
                         onClick={handleWikidataOpenDialog}
                         className="btn-icon btn-icon-sm btn-secondary"
@@ -1402,8 +1447,7 @@ const Home: NextPage = () => {
                         <img src="/images/upload.png" alt="Upload" className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                  </div>
-                  <div className="overflow-y-auto max-h-60">
+                    <div className="overflow-y-auto max-h-60">
                     {infoPanelContent?.wikidata && infoPanelContent.wikidata.length > 0
                       ? infoPanelContent.wikidata.map((wikiItem, index) => (
                           <div key={index} className="mb-3 flex items-center gap-2 flex-wrap">
@@ -1457,12 +1501,14 @@ const Home: NextPage = () => {
                           </div>
                         ))
                       : null}
-                  </div>
-                </div>
-                <div className="flex-1 card h-80 overflow-hidden">
-                  <div className="border-b border-[var(--border)] flex items-center justify-between mb-4 pb-3">
-                    <h3 className="text-base font-semibold m-0 text-[var(--text-primary)]">References</h3>
-                    <div className="flex gap-1.5">
+                    </div>
+                  </>
+                )}
+
+                {/* References Tab */}
+                {infoTab === 'references' && (
+                  <>
+                    <div className="flex justify-end gap-1.5 mb-4">
                       <button
                         onClick={handleBibOpenDialog}
                         className="btn-icon btn-icon-sm btn-secondary"
@@ -1478,8 +1524,7 @@ const Home: NextPage = () => {
                         <img src="/images/upload.png" alt="Upload" className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                  </div>
-                  <div className="overflow-y-auto max-h-60">
+                    <div className="overflow-y-auto max-h-60">
                     {infoPanelContent?.bibliography && infoPanelContent.bibliography.length > 0
                       ? infoPanelContent.bibliography.map((bibItem, index) => (
                           <div key={index} className="mb-4 pb-3 border-b border-gray-200 last:border-0">
@@ -1524,8 +1569,9 @@ const Home: NextPage = () => {
                           </div>
                         ))
                       : null}
-                  </div>
-                </div>
+                    </div>
+                  </>
+                )}
               </div>
               <div className="flex gap-3 mt-8 pt-6 border-t border-[var(--border)]">
                 <button

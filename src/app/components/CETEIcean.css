@@ -922,3 +922,25 @@ html {
   background-color: white;
   color: #292929;
 }
+
+/* Custom styles for Diplomatic and Transcription views */
+.tei-diplomatic {
+  text-transform: uppercase;
+}
+
+.tei-diplomatic tei-ex {
+  display: none;
+}
+
+.tei-transcription tei-ex {
+  font-style: italic;
+  color: #999;
+}
+
+.tei-transcription tei-ex:before {
+  content: '(';
+}
+
+.tei-transcription tei-ex:after {
+  content: ')';
+}
