@@ -853,12 +853,12 @@ const Home: NextPage = () => {
   };
   */
 
-  const handleSwitchChange = (checked: boolean) => {
-    setAnnotationsVisible(checked);
+  const handleSwitchChange = (checked?: boolean) => {
+    setAnnotationsVisible(checked !== undefined ? checked : !annotationsVisible);
   };
 
-  const handleAnnotationModeChange = (mode: boolean) => {
-    setAnnotationMode(mode);
+  const handleAnnotationModeChange = (mode?: boolean) => {
+    setAnnotationMode(mode !== undefined ? mode : !annotationMode);
   };
 
   const handleManifestUrlChange = (event: React.ChangeEvent<HTMLInputElement>) => {

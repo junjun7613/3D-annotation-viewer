@@ -844,7 +844,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
 
               // If something is between camera and sprite, make it more transparent
               if (intersects.length > 0 && intersects[0].distance < distance - 0.01) {
-                sprite.material.opacity = 0.15;
+                sprite.material.opacity = 0.0;
               } else {
                 sprite.material.opacity = 0.7;
               }
