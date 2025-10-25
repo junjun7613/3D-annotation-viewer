@@ -1281,8 +1281,8 @@ const Home: NextPage = () => {
               </div>
             </div>
           </div>
-          <div className="flex-1 flex flex-col p-6 bg-[var(--secondary-bg)]">
-            <div className="flex-[0.2] flex items-center gap-3 border-b border-[var(--border)] pb-4 mb-5">
+          <div className="flex-1 flex flex-col p-4 bg-[var(--secondary-bg)] overflow-hidden">
+            <div className="flex items-center gap-3 border-b border-[var(--border)] pb-3 mb-3 flex-shrink-0">
               <input
                 type="text"
                 value={manifestUrl}
@@ -1306,7 +1306,7 @@ const Home: NextPage = () => {
                 <img src="/images/iiif.png" alt="IIIF" className="w-10 h-10" />
               </button>
             </div>
-            <div className="flex-[0.8] flex gap-5 border-b border-[var(--border)] pb-6 mb-6">
+            <div className="flex gap-4 border-b border-[var(--border)] pb-4 mb-4 flex-shrink-0" style={{ minHeight: '320px', maxHeight: '320px' }}>
               <div className="flex-1 card">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg m-0 text-[var(--text-primary)]">
@@ -1329,10 +1329,10 @@ const Home: NextPage = () => {
                 <DisplayTEI manifestUrl={manifestUrl} />
               </div>
             </div>
-            <div className="flex-[1.2] pt-4">
-              <div className="card h-80 overflow-hidden">
+            <div className="flex-1 overflow-hidden flex flex-col">
+              <div className="card flex-1 overflow-hidden flex flex-col">
                 {/* Tab Navigation */}
-                <div className="flex gap-2 mb-4 border-b border-[var(--border)]">
+                <div className="flex gap-2 mb-3 border-b border-[var(--border)] flex-shrink-0">
                   <button
                     className={`px-4 py-2 text-sm font-medium transition-colors ${
                       infoTab === 'resources'
@@ -1368,7 +1368,7 @@ const Home: NextPage = () => {
                 {/* Resources Tab */}
                 {infoTab === 'resources' && (
                   <>
-                    <div className="flex justify-end gap-1.5 mb-4">
+                    <div className="flex justify-end gap-1.5 mb-3 flex-shrink-0">
                       <button
                         onClick={handleMediaOpenDialog}
                         className="btn-icon btn-icon-sm btn-secondary"
@@ -1384,10 +1384,10 @@ const Home: NextPage = () => {
                         <img src="/images/upload.png" alt="Upload" className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                    <div className="overflow-y-auto max-h-56 grid grid-cols-4 gap-2">
+                    <div className="overflow-y-auto flex-1 grid grid-cols-5 gap-2">
                     {infoPanelContent?.media && infoPanelContent.media.length > 0
                       ? infoPanelContent.media.map((mediaItem, index) => (
-                          <div key={index} className="cursor-pointer hover:opacity-80 transition-opacity rounded overflow-hidden">
+                          <div key={index} className="cursor-pointer hover:opacity-80 transition-opacity rounded overflow-hidden aspect-square">
                             {mediaItem.type === 'img' && (
                               <img
                                 src={mediaItem.source}
@@ -1431,7 +1431,7 @@ const Home: NextPage = () => {
                 {/* Linked Data Tab */}
                 {infoTab === 'linkedData' && (
                   <>
-                    <div className="flex justify-end gap-1.5 mb-4">
+                    <div className="flex justify-end gap-1.5 mb-3 flex-shrink-0">
                       <button
                         onClick={handleWikidataOpenDialog}
                         className="btn-icon btn-icon-sm btn-secondary"
@@ -1447,57 +1447,81 @@ const Home: NextPage = () => {
                         <img src="/images/upload.png" alt="Upload" className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                    <div className="overflow-y-auto max-h-60">
+                    <div className="overflow-y-auto flex-1 grid grid-cols-2 gap-3">
                     {infoPanelContent?.wikidata && infoPanelContent.wikidata.length > 0
                       ? infoPanelContent.wikidata.map((wikiItem, index) => (
-                          <div key={index} className="mb-3 flex items-center gap-2 flex-wrap">
-                            {wikiItem.type === 'wikidata' && (
-                              <span className="btn-primary btn-sm inline-flex items-center">
-                                {wikiItem.label}
-                              </span>
-                            )}
-                            {wikiItem.type === 'geonames' && (
-                              <span className="text-sm font-medium">{wikiItem.label}</span>
-                            )}
-
-                            <a
-                              href={wikiItem.uri}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-600 hover:text-blue-800 transition-colors inline-flex items-center"
-                            >
-                              <PiShareNetwork className="w-5 h-5" />
-                            </a>
-                            {wikiItem.wikipedia && (
-                              <a
-                                href={wikiItem.wikipedia}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:text-blue-800 transition-colors inline-flex items-center"
-                              >
-                                <IoDocumentTextOutline className="w-5 h-5" />
-                              </a>
-                            )}
-                            {wikiItem.type === 'geonames' && wikiItem.lat && (
+                          <div key={index} className="bg-white border border-[var(--border)] rounded-lg p-3 hover:shadow-md transition-shadow">
+                            {/* Header with Label and Type Badge */}
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex-1">
+                                <h4 className="text-base font-semibold text-[var(--text-primary)] mb-1">
+                                  {wikiItem.label}
+                                </h4>
+                                <span className={`inline-block px-2 py-1 text-xs font-medium rounded ${
+                                  wikiItem.type === 'wikidata'
+                                    ? 'bg-blue-100 text-blue-700'
+                                    : 'bg-green-100 text-green-700'
+                                }`}>
+                                  {wikiItem.type === 'wikidata' ? 'Wikidata' : 'GeoNames'}
+                                </span>
+                                {wikiItem.type === 'geonames' && wikiItem.lat && wikiItem.lng && (
+                                  <span className="ml-2 text-xs text-[var(--text-secondary)]">
+                                    {parseFloat(wikiItem.lat).toFixed(2)}°N, {parseFloat(wikiItem.lng).toFixed(2)}°E
+                                  </span>
+                                )}
+                              </div>
                               <button
                                 onClick={() => {
-                                  if (wikiItem.lat !== undefined && wikiItem.lng !== undefined) {
-                                    ShowMap(wikiItem.lat, wikiItem.lng);
+                                  if (infoPanelContent?.id) {
+                                    deleteWiki(infoPanelContent.id, index);
                                   }
                                 }}
-                                className="text-green-600 hover:text-green-800 transition-colors inline-flex items-center"
+                                className="text-red-500 hover:text-red-700 transition-colors p-1"
+                                title="Delete"
                               >
-                                <LiaMapMarkedSolid className="w-5 h-5" />
+                                <FaTrashAlt className="w-4 h-4" />
                               </button>
-                            )}
-                            <button
-                              onClick={() =>
-                                infoPanelContent?.id && deleteWiki(infoPanelContent.id, index)
-                              }
-                              className="btn-danger btn-icon"
-                            >
-                              <FaTrashAlt />
-                            </button>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex gap-2 pt-2 border-t border-gray-100">
+                              <a
+                                href={wikiItem.uri}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                                title="View on external site"
+                              >
+                                <PiShareNetwork className="w-4 h-4" />
+                                View
+                              </a>
+                              {wikiItem.wikipedia && (
+                                <a
+                                  href={wikiItem.wikipedia}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                                  title="View on Wikipedia"
+                                >
+                                  <IoDocumentTextOutline className="w-4 h-4" />
+                                  Wikipedia
+                                </a>
+                              )}
+                              {wikiItem.type === 'geonames' && wikiItem.lat && wikiItem.lng && (
+                                <button
+                                  onClick={() => {
+                                    if (wikiItem.lat !== undefined && wikiItem.lng !== undefined) {
+                                      ShowMap(wikiItem.lat, wikiItem.lng);
+                                    }
+                                  }}
+                                  className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-green-600 hover:text-green-800 hover:bg-green-50 rounded transition-colors"
+                                  title="Show on map"
+                                >
+                                  <LiaMapMarkedSolid className="w-4 h-4" />
+                                  Map
+                                </button>
+                              )}
+                            </div>
                           </div>
                         ))
                       : null}
@@ -1508,7 +1532,7 @@ const Home: NextPage = () => {
                 {/* References Tab */}
                 {infoTab === 'references' && (
                   <>
-                    <div className="flex justify-end gap-1.5 mb-4">
+                    <div className="flex justify-end gap-1.5 mb-3 flex-shrink-0">
                       <button
                         onClick={handleBibOpenDialog}
                         className="btn-icon btn-icon-sm btn-secondary"
@@ -1524,48 +1548,65 @@ const Home: NextPage = () => {
                         <img src="/images/upload.png" alt="Upload" className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                    <div className="overflow-y-auto max-h-60">
+                    <div className="overflow-y-auto flex-1 space-y-3">
                     {infoPanelContent?.bibliography && infoPanelContent.bibliography.length > 0
                       ? infoPanelContent.bibliography.map((bibItem, index) => (
-                          <div key={index} className="mb-4 pb-3 border-b border-gray-200 last:border-0">
-                            <div className="flex items-start gap-2">
-                              <FaBook className="text-gray-600 mt-1 flex-shrink-0" />
-                              <div className="flex-1">
-                                <p className="text-sm text-gray-800 mb-2">
-                                  {bibItem.author} ({bibItem.year}): {bibItem.title}
-                                </p>
-                                <div className="flex items-center gap-2">
-                                  {bibItem.page && (
-                                    <a
-                                      href={bibItem.page}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-blue-600 hover:text-blue-800 transition-colors inline-flex items-center"
-                                    >
-                                      <FaLink className="w-4 h-4" />
-                                    </a>
-                                  )}
-                                  {bibItem.pdf && (
-                                    <a
-                                      href={bibItem.pdf}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-red-600 hover:text-red-800 transition-colors inline-flex items-center"
-                                    >
-                                      <FaRegFilePdf className="w-4 h-4" />
-                                    </a>
-                                  )}
-                                  <button
-                                    onClick={() =>
-                                      infoPanelContent?.id && deleteBib(infoPanelContent.id, index)
-                                    }
-                                    className="btn-danger btn-icon"
-                                  >
-                                    <FaTrashAlt />
-                                  </button>
+                          <div key={index} className="bg-white border border-[var(--border)] rounded-lg p-3 hover:shadow-md transition-shadow">
+                            {/* Header with Author and Year */}
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex items-start gap-2 flex-1">
+                                <FaBook className="text-gray-600 mt-0.5 flex-shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="text-sm font-semibold text-[var(--text-primary)] mb-1">
+                                    {bibItem.author} ({bibItem.year})
+                                  </h4>
+                                  <p className="text-sm text-[var(--text-secondary)] line-clamp-2">
+                                    {bibItem.title}
+                                  </p>
                                 </div>
                               </div>
+                              <button
+                                onClick={() => {
+                                  if (infoPanelContent?.id) {
+                                    deleteBib(infoPanelContent.id, index);
+                                  }
+                                }}
+                                className="text-red-500 hover:text-red-700 transition-colors p-1 ml-2"
+                                title="Delete"
+                              >
+                                <FaTrashAlt className="w-4 h-4" />
+                              </button>
                             </div>
+
+                            {/* Actions */}
+                            {(bibItem.page || bibItem.pdf) && (
+                              <div className="flex gap-2 pt-2 border-t border-gray-100">
+                                {bibItem.page && (
+                                  <a
+                                    href={bibItem.page}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                                    title="View page"
+                                  >
+                                    <FaLink className="w-3 h-3" />
+                                    Page
+                                  </a>
+                                )}
+                                {bibItem.pdf && (
+                                  <a
+                                    href={bibItem.pdf}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                                    title="View PDF"
+                                  >
+                                    <FaRegFilePdf className="w-3 h-3" />
+                                    PDF
+                                  </a>
+                                )}
+                              </div>
+                            )}
                           </div>
                         ))
                       : null}
@@ -1573,7 +1614,7 @@ const Home: NextPage = () => {
                   </>
                 )}
               </div>
-              <div className="flex gap-3 mt-8 pt-6 border-t border-[var(--border)]">
+              <div className="flex gap-3 mt-3 flex-shrink-0">
                 <button
                   onClick={() => infoPanelContent?.id && downloadAnnotation(infoPanelContent.id)}
                   className="btn-primary"

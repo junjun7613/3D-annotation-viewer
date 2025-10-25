@@ -81,8 +81,11 @@ const DisplayTEI: React.FC<DisplayTEIProps> = ({ onTextLoad, manifestUrl }) => {
 
               e.insertBefore(lineMark, e.firstChild);
             }
-            const br = document.createElement('br');
-            e.insertBefore(br, e.firstChild);
+            // Add line break before line marker (except for first line)
+            if (n && n !== '1') {
+              const br = document.createElement('br');
+              e.insertBefore(br, e.firstChild);
+            }
           },
           // Diplomatic: show only abbr, hide ex
           ex: function (e: HTMLElement) {
@@ -154,8 +157,11 @@ const DisplayTEI: React.FC<DisplayTEIProps> = ({ onTextLoad, manifestUrl }) => {
 
               e.insertBefore(lineMark, e.firstChild);
             }
-            const br = document.createElement('br');
-            e.insertBefore(br, e.firstChild);
+            // Add line break before line marker (except for first line)
+            if (n && n !== '1') {
+              const br = document.createElement('br');
+              e.insertBefore(br, e.firstChild);
+            }
           },
           // Don't add ex behavior - let it render naturally
         },
@@ -227,8 +233,8 @@ const DisplayTEI: React.FC<DisplayTEIProps> = ({ onTextLoad, manifestUrl }) => {
   };
 
   return (
-    <>
-      <div className="flex items-center justify-between mb-4">
+    <div className="flex flex-col h-full overflow-hidden">
+      <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <h3 className="text-lg m-0 text-[var(--text-primary)]">
           Text Viewer
         </h3>
@@ -247,39 +253,41 @@ const DisplayTEI: React.FC<DisplayTEIProps> = ({ onTextLoad, manifestUrl }) => {
         </label>
       </div>
 
-      {fileName && (
+      {/* {fileName && (
         <div className="text-xs text-[var(--text-secondary)] mb-2">
           File: {fileName}
         </div>
-      )}
+      )} */}
 
-      {/* Tabs */}
-      {(teiHTMLDiplomatic || teiHTMLTranscription) && (
-        <div className="flex gap-2 mb-3 border-b border-[var(--border)]">
-          <button
-            className={`px-3 py-2 text-sm font-medium transition-colors ${
-              activeTab === 'diplomatic'
-                ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]'
-                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-            }`}
-            onClick={() => setActiveTab('diplomatic')}
-          >
-            Diplomatic
-          </button>
-          <button
-            className={`px-3 py-2 text-sm font-medium transition-colors ${
-              activeTab === 'transcription'
-                ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]'
-                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-            }`}
-            onClick={() => setActiveTab('transcription')}
-          >
-            Transcription
-          </button>
-        </div>
-      )}
+      {/* Tabs - Always visible */}
+      <div className="flex gap-2 mb-3 border-b border-[var(--border)] min-h-[44px] flex-shrink-0">
+        {(teiHTMLDiplomatic || teiHTMLTranscription) && (
+          <>
+            <button
+              className={`px-3 py-2 text-sm font-medium transition-colors ${
+                activeTab === 'diplomatic'
+                  ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              }`}
+              onClick={() => setActiveTab('diplomatic')}
+            >
+              Diplomatic
+            </button>
+            <button
+              className={`px-3 py-2 text-sm font-medium transition-colors ${
+                activeTab === 'transcription'
+                  ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              }`}
+              onClick={() => setActiveTab('transcription')}
+            >
+              Transcription
+            </button>
+          </>
+        )}
+      </div>
 
-      <div className="overflow-y-auto max-h-56 text-sm leading-relaxed text-[var(--text-secondary)]">
+      <div className="overflow-y-auto flex-1 text-sm leading-relaxed text-[var(--text-secondary)]">
         {isLoading ? (
           <div className="text-center py-8">Loading...</div>
         ) : error ? (
@@ -289,12 +297,12 @@ const DisplayTEI: React.FC<DisplayTEIProps> = ({ onTextLoad, manifestUrl }) => {
         ) : activeTab === 'transcription' && teiHTMLTranscription ? (
           <div dangerouslySetInnerHTML={{ __html: teiHTMLTranscription }} />
         ) : !fileName ? (
-          <div className="text-center py-8 text-[var(--text-muted)]">
+          <div className="text-center py-4 text-[var(--text-muted)]">
             Upload a TEI/XML file to view the text
           </div>
         ) : null}
       </div>
-    </>
+    </div>
   );
 };
 
