@@ -872,15 +872,8 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
       };
       animate();
 
-      // ズーム機能
-      const handleWheel = (event: WheelEvent) => {
-        camera.position.z += event.deltaY * 0.01;
-      };
-      window.addEventListener('wheel', handleWheel);
-
       // クリーンアップ
       return () => {
-        window.removeEventListener('wheel', handleWheel);
         unsubscribe();
       };
 
