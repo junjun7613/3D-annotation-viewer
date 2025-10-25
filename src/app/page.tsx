@@ -52,6 +52,7 @@ const Home: NextPage = () => {
   // infoPanelContentという連想配列を作成
 
   const [, /*editorData*/ setEditorData] = useState<OutputData | undefined>();
+  const [metaTab, setMetaTab] = useState<'object' | 'annotation'>('annotation');
   const [infoTab, setInfoTab] = useState<'resources' | 'linkedData' | 'references'>('resources');
 
   interface MediaItem {
@@ -1331,43 +1332,77 @@ const Home: NextPage = () => {
             </div>
             <div className="flex-1 overflow-hidden flex flex-col">
               <div className="card flex-1 overflow-hidden flex flex-col">
-                {/* Tab Navigation */}
-                <div className="flex gap-2 mb-3 border-b border-[var(--border)] flex-shrink-0">
+                {/* Meta-level Tab Navigation: Object/Annotation */}
+                <div className="flex gap-2 mb-3 border-b-2 border-[var(--border)] flex-shrink-0">
                   <button
-                    className={`px-4 py-2 text-sm font-medium transition-colors ${
-                      infoTab === 'resources'
-                        ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]'
+                    className={`px-4 py-2 text-sm font-bold transition-colors ${
+                      metaTab === 'object'
+                        ? 'text-[var(--primary)] border-b-2 border-[var(--primary)] -mb-[2px]'
                         : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                     }`}
-                    onClick={() => setInfoTab('resources')}
+                    onClick={() => setMetaTab('object')}
                   >
-                    Resources
+                    Object
                   </button>
                   <button
-                    className={`px-4 py-2 text-sm font-medium transition-colors ${
-                      infoTab === 'linkedData'
-                        ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]'
+                    className={`px-4 py-2 text-sm font-bold transition-colors ${
+                      metaTab === 'annotation'
+                        ? 'text-[var(--primary)] border-b-2 border-[var(--primary)] -mb-[2px]'
                         : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                     }`}
-                    onClick={() => setInfoTab('linkedData')}
+                    onClick={() => setMetaTab('annotation')}
                   >
-                    Linked Data
-                  </button>
-                  <button
-                    className={`px-4 py-2 text-sm font-medium transition-colors ${
-                      infoTab === 'references'
-                        ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]'
-                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                    }`}
-                    onClick={() => setInfoTab('references')}
-                  >
-                    References
+                    Annotation
                   </button>
                 </div>
 
+                {/* Object Tab Content */}
+                {metaTab === 'object' && (
+                  <div className="flex-1 flex items-center justify-center text-[var(--text-secondary)]">
+                    <p className="text-sm">Object metadata coming soon...</p>
+                  </div>
+                )}
+
+                {/* Annotation Tab Content */}
+                {metaTab === 'annotation' && (
+                  <div className="flex-1 overflow-hidden flex flex-col">
+                    {/* Sub-level Tab Navigation: Resources/Linked Data/References */}
+                    <div className="flex gap-2 mb-3 border-b border-[var(--border)] flex-shrink-0">
+                      <button
+                        className={`px-4 py-2 text-sm font-medium transition-colors ${
+                          infoTab === 'resources'
+                            ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]'
+                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                        }`}
+                        onClick={() => setInfoTab('resources')}
+                      >
+                        Resources
+                      </button>
+                      <button
+                        className={`px-4 py-2 text-sm font-medium transition-colors ${
+                          infoTab === 'linkedData'
+                            ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]'
+                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                        }`}
+                        onClick={() => setInfoTab('linkedData')}
+                      >
+                        Linked Data
+                      </button>
+                      <button
+                        className={`px-4 py-2 text-sm font-medium transition-colors ${
+                          infoTab === 'references'
+                            ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]'
+                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                        }`}
+                        onClick={() => setInfoTab('references')}
+                      >
+                        References
+                      </button>
+                    </div>
+
                 {/* Resources Tab */}
                 {infoTab === 'resources' && (
-                  <>
+                  <div className="flex-1 overflow-hidden flex flex-col min-h-0">
                     <div className="flex justify-end gap-1.5 mb-3 flex-shrink-0">
                       <button
                         onClick={handleMediaOpenDialog}
@@ -1384,7 +1419,7 @@ const Home: NextPage = () => {
                         <img src="/images/upload.png" alt="Upload" className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                    <div className="overflow-y-auto flex-1 grid grid-cols-5 gap-2">
+                    <div className="overflow-y-auto grid grid-cols-5 gap-2" style={{ height: '220px' }}>
                     {infoPanelContent?.media && infoPanelContent.media.length > 0
                       ? infoPanelContent.media.map((mediaItem, index) => (
                           <div key={index} className="cursor-pointer hover:opacity-80 transition-opacity rounded overflow-hidden aspect-square">
@@ -1425,12 +1460,12 @@ const Home: NextPage = () => {
                         ))
                       : null}
                     </div>
-                  </>
+                  </div>
                 )}
 
                 {/* Linked Data Tab */}
                 {infoTab === 'linkedData' && (
-                  <>
+                  <div className="flex-1 overflow-hidden flex flex-col min-h-0">
                     <div className="flex justify-end gap-1.5 mb-3 flex-shrink-0">
                       <button
                         onClick={handleWikidataOpenDialog}
@@ -1447,10 +1482,11 @@ const Home: NextPage = () => {
                         <img src="/images/upload.png" alt="Upload" className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                    <div className="overflow-y-auto flex-1 grid grid-cols-2 gap-3">
+                    <div className="overflow-y-auto" style={{ height: '220px' }}>
+                      <div className="flex flex-wrap gap-3">
                     {infoPanelContent?.wikidata && infoPanelContent.wikidata.length > 0
                       ? infoPanelContent.wikidata.map((wikiItem, index) => (
-                          <div key={index} className="bg-white border border-[var(--border)] rounded-lg p-3 hover:shadow-md transition-shadow">
+                          <div key={index} className="bg-white border border-[var(--border)] rounded-lg p-3 hover:shadow-md transition-shadow" style={{ width: 'calc(50% - 6px)' }}>
                             {/* Header with Label and Type Badge */}
                             <div className="flex items-start justify-between mb-2">
                               <div className="flex-1">
@@ -1525,13 +1561,14 @@ const Home: NextPage = () => {
                           </div>
                         ))
                       : null}
+                      </div>
                     </div>
-                  </>
+                  </div>
                 )}
 
                 {/* References Tab */}
                 {infoTab === 'references' && (
-                  <>
+                  <div className="flex-1 overflow-hidden flex flex-col min-h-0">
                     <div className="flex justify-end gap-1.5 mb-3 flex-shrink-0">
                       <button
                         onClick={handleBibOpenDialog}
@@ -1548,7 +1585,7 @@ const Home: NextPage = () => {
                         <img src="/images/upload.png" alt="Upload" className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                    <div className="overflow-y-auto flex-1 space-y-3">
+                    <div className="overflow-y-auto space-y-3" style={{ height: '220px' }}>
                     {infoPanelContent?.bibliography && infoPanelContent.bibliography.length > 0
                       ? infoPanelContent.bibliography.map((bibItem, index) => (
                           <div key={index} className="bg-white border border-[var(--border)] rounded-lg p-3 hover:shadow-md transition-shadow">
@@ -1611,7 +1648,9 @@ const Home: NextPage = () => {
                         ))
                       : null}
                     </div>
-                  </>
+                  </div>
+                )}
+                  </div>
                 )}
               </div>
               <div className="flex gap-3 mt-3 flex-shrink-0">
