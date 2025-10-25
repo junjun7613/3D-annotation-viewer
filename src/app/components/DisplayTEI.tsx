@@ -3,11 +3,16 @@
 import { useState, useEffect } from 'react';
 import CETEI from 'CETEIcean';
 import './CETEIcean.css';
-import { FaUpload, FaLink } from 'react-icons/fa';
+import { FaUpload } from 'react-icons/fa';
 
 interface DisplayTEIProps {
   onTextLoad?: (text: string) => void;
   manifestUrl?: string;
+}
+
+interface CETEIInstance {
+  addBehaviors: (behaviors: Record<string, unknown>) => void;
+  makeHTML5: (xmlText: string, callback: (data: HTMLElement) => void) => void;
 }
 
 const DisplayTEI: React.FC<DisplayTEIProps> = ({ onTextLoad, manifestUrl }) => {
@@ -29,7 +34,7 @@ const DisplayTEI: React.FC<DisplayTEIProps> = ({ onTextLoad, manifestUrl }) => {
   const processTEIFile = (xmlText: string) => {
     try {
       // Process Diplomatic version (abbr only)
-      const ctDiplomatic = new CETEI() as any;
+      const ctDiplomatic = new CETEI() as unknown as CETEIInstance;
       const diplomaticBehaviors = {
         tei: {
           facsimile: function (e: HTMLElement) {
@@ -102,7 +107,7 @@ const DisplayTEI: React.FC<DisplayTEIProps> = ({ onTextLoad, manifestUrl }) => {
       });
 
       // Process Transcription version (full expansion)
-      const ctTranscription = new CETEI() as any;
+      const ctTranscription = new CETEI() as unknown as CETEIInstance;
       const transcriptionBehaviors = {
         tei: {
           facsimile: function (e: HTMLElement) {

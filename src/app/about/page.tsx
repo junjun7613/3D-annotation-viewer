@@ -50,8 +50,8 @@ export default function About() {
             <h3 className="text-xl font-semibold mb-3 text-[var(--text-primary)]">3. TEI/XML Text Viewer</h3>
             <ul className="list-disc pl-6 text-[var(--text-secondary)] space-y-2">
               <li>Upload TEI/XML files to display textual content alongside 3D models</li>
-              <li><strong>Diplomatic View:</strong> Shows abbreviated text in uppercase (e.g., "D M")</li>
-              <li><strong>Transcription View:</strong> Shows full expansions with parentheses (e.g., "D(is) M(anibus)")</li>
+              <li><strong>Diplomatic View:</strong> Shows abbreviated text in uppercase (e.g., &quot;D M&quot;)</li>
+              <li><strong>Transcription View:</strong> Shows full expansions with parentheses (e.g., &quot;D(is) M(anibus)&quot;)</li>
               <li>Clickable line markers (🔗) for linking text lines to 3D annotations</li>
               <li>Only displays content from edition sections</li>
             </ul>
@@ -130,7 +130,7 @@ export default function About() {
             <h3 className="text-xl font-semibold mb-3 text-[var(--text-primary)]">Managing Resources and Data</h3>
             <ol className="list-decimal pl-6 text-[var(--text-secondary)] space-y-3">
               <li>Use the tabs (Resources, Linked Data, References) to switch between different data types</li>
-              <li>Click the "+" button to add new entries manually</li>
+              <li>Click the &quot;+&quot; button to add new entries manually</li>
               <li>Click the upload button to import data via CSV files</li>
               <li>Click the delete button (🗑️) to remove entries</li>
             </ol>

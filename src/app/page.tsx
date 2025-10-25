@@ -1873,7 +1873,9 @@ const Home: NextPage = () => {
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                infoPanelContent?.id && deleteMedia(infoPanelContent.id, selectedImage.index);
+                if (infoPanelContent?.id) {
+                  deleteMedia(infoPanelContent.id, selectedImage.index);
+                }
               }}
               className="btn-danger fixed top-4 right-4"
             >
@@ -1896,7 +1898,9 @@ const Home: NextPage = () => {
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                infoPanelContent?.id && deleteMedia(infoPanelContent.id, selectedVideo.index);
+                if (infoPanelContent?.id) {
+                  deleteMedia(infoPanelContent.id, selectedVideo.index);
+                }
               }}
               className="btn-danger fixed top-4 right-4"
             >
