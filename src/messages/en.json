@@ -1,19 +1,19 @@
 {
   "Header": {
-    "title": "3D Viewer",
+    "title": "IIIF 3D Editor",
     "download": "Download",
     "downloadShort": "DL",
     "english": "English",
     "japanese": "日本語"
   },
   "Footer": {
-    "title": "3D Viewer",
+    "title": "IIIF 3D Editor",
     "help": "Help",
     "privacy": "Privacy Policy",
     "terms": "Terms of Service"
   },
   "Input": {
-    "title": "3D Model Viewer",
+    "title": "3D Model Editor",
     "description": "Enter the URL of the IIIF Manifest",
     "submit": "View",
     "sampleManifest": "Sample Manifest",

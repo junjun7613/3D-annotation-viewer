@@ -1492,7 +1492,7 @@ const Home: NextPage = () => {
       `}</style>
       <div className="flex flex-col h-full w-full bg-[var(--background)]">
         <header className="bg-[var(--card-bg)] border-b border-[var(--border)] py-4 px-6 flex justify-between items-center shadow-sm">
-          <h1 className="m-0 text-xl font-bold text-[var(--text-primary)]">IIIF 3D Viewer</h1>
+          <h1 className="m-0 text-xl font-bold text-[var(--text-primary)]">IIIF 3D Editor</h1>
           <nav className="flex items-center gap-6">
             <a href="#home" className="text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors text-sm font-medium">
               Home
@@ -2013,7 +2013,7 @@ const Home: NextPage = () => {
         </div>
         <footer className="bg-[var(--card-bg)] border-t border-[var(--border)] py-3 px-6 text-center">
           <p className="text-sm text-[var(--text-secondary)] m-0">
-            &copy; 2025 IIIF 3D Viewer. All rights reserved.
+            &copy; 2025 IIIF 3D Editor. All rights reserved.
           </p>
         </footer>
       </div>

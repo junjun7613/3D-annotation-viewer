@@ -1,13 +1,13 @@
 {
   "Header": {
-    "title": "3D ビューワ",
+    "title": "IIIF 3D エディタ",
     "download": "ダウンロード",
     "downloadShort": "DL",
     "english": "English",
     "japanese": "日本語"
   },
   "Footer": {
-    "title": "3D ビューワ",
+    "title": "IIIF 3D エディタ",
     "help": "ヘルプ",
     "privacy": "プライバシーポリシー",
     "terms": "利用規約"

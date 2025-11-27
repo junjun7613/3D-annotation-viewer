@@ -16,8 +16,8 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: '3D Annotation Viewer',
-  description: '3D Annotation Viewer',
+  title: 'IIIF 3D Editor',
+  description: 'IIIF 3D Editor',
 };
 
 export default function RootLayout({

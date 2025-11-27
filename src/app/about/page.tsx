@@ -10,14 +10,14 @@ export default function About() {
         <Link href="/" className="mr-4 text-[var(--primary)] hover:text-[var(--primary-hover)] transition-colors">
           <FaArrowLeft className="w-5 h-5" />
         </Link>
-        <h1 className="m-0 text-xl font-bold text-[var(--text-primary)]">About IIIF 3D Viewer</h1>
+        <h1 className="m-0 text-xl font-bold text-[var(--text-primary)]">About IIIF 3D Editor</h1>
       </header>
 
       <main className="max-w-4xl mx-auto p-8">
         <section className="mb-8">
           <h2 className="text-2xl font-bold mb-4 text-[var(--text-primary)]">Overview</h2>
           <p className="text-[var(--text-secondary)] leading-relaxed mb-4">
-            IIIF 3D Viewer is a web-based application for viewing and annotating 3D models using the IIIF (International Image Interoperability Framework) standard.
+            IIIF 3D Editor is a web-based application for viewing and annotating 3D models using the IIIF (International Image Interoperability Framework) standard.
             This tool allows you to load 3D models, create annotations, link textual data, and manage resources in an integrated environment.
           </p>
         </section>
@@ -47,7 +47,7 @@ export default function About() {
           </div>
 
           <div className="mb-6">
-            <h3 className="text-xl font-semibold mb-3 text-[var(--text-primary)]">3. TEI/XML Text Viewer</h3>
+            <h3 className="text-xl font-semibold mb-3 text-[var(--text-primary)]">3. TEI/XML Text Editor</h3>
             <ul className="list-disc pl-6 text-[var(--text-secondary)] space-y-2">
               <li>Upload TEI/XML files to display textual content alongside 3D models</li>
               <li><strong>Diplomatic View:</strong> Shows abbreviated text in uppercase (e.g., &quot;D M&quot;)</li>
