@@ -460,7 +460,7 @@ const Home: NextPage = () => {
       // wikidataのsparqlエンドポイントにアクセスして該当するデータのラベルを取得
       console.log(wikidata);
 
-      const query = `SELECT ?item ?itemLabel ?wikipediaUrl WHERE {
+      const query = `SELECT ?item ?itemLabel ?wikipediaUrl ?lat ?lng WHERE {
         VALUES ?item {wd:${wikidata.split('/').pop()}}
         SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],en". }
         OPTIONAL{
@@ -468,6 +468,11 @@ const Home: NextPage = () => {
         schema:inLanguage "en" ;
         schema:isPartOf <https://en.wikipedia.org/> .
     }
+        OPTIONAL {
+          ?item wdt:P625 ?coord .
+          BIND(geof:latitude(?coord) AS ?lat)
+          BIND(geof:longitude(?coord) AS ?lng)
+        }
       }
       `; //wikidataのsparqlクエリ
       const url = `https://query.wikidata.org/sparql?query=${encodeURIComponent(
@@ -482,6 +487,15 @@ const Home: NextPage = () => {
       if (result['results']['bindings'][0]['wikipediaUrl']) {
         wikipedia = result['results']['bindings'][0]['wikipediaUrl']['value'];
       }
+      // 緯度経度が取得できる場合は取得
+      let lat = '';
+      let lng = '';
+      if (result['results']['bindings'][0]['lat']) {
+        lat = result['results']['bindings'][0]['lat']['value'];
+      }
+      if (result['results']['bindings'][0]['lng']) {
+        lng = result['results']['bindings'][0]['lng']['value'];
+      }
 
       data = {
         type: wikiType,
@@ -489,6 +503,8 @@ const Home: NextPage = () => {
         label: label,
         //もしwikipediaがあれば、dataに追加
         wikipedia: wikipedia,
+        lat: lat,
+        lng: lng,
       };
     } else if (wikiType === 'geonames') {
       console.log(wikidata);
@@ -579,12 +595,19 @@ const Home: NextPage = () => {
         // wikidataのsparqlエンドポイントにアクセスして該当するデータのラベルを取得
         console.log(authority_uri);
 
-        const query = `SELECT ?item ?itemLabel ?wikipediaUrl WHERE {
+        const query = `SELECT ?item ?itemLabel ?wikipediaUrl ?lat ?lng WHERE {
           VALUES ?item {wd:${authority_uri.split('/').pop()}}
           SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],en". }
-          ?wikipediaUrl schema:about ?item ;
-          schema:inLanguage "en" ;
-          schema:isPartOf <https://en.wikipedia.org/> .
+          OPTIONAL {
+            ?wikipediaUrl schema:about ?item ;
+            schema:inLanguage "en" ;
+            schema:isPartOf <https://en.wikipedia.org/> .
+          }
+          OPTIONAL {
+            ?item wdt:P625 ?coord .
+            BIND(geof:latitude(?coord) AS ?lat)
+            BIND(geof:longitude(?coord) AS ?lng)
+          }
         }
         `; //wikidataのsparqlクエリ
         const url = `https://query.wikidata.org/sparql?query=${encodeURIComponent(
@@ -592,19 +615,26 @@ const Home: NextPage = () => {
         )}&format=json`;
         const result = await fetch(url).then((res) => res.json());
         const label = result['results']['bindings'][0]['itemLabel']['value'];
-        const wikipedia = result['results']['bindings'][0]['wikipediaUrl']['value'];
-        /*
-        const data = {
-          uri: wikidata,
-          label: label,
-          wikipedia: wikipedia,
-        };
-        */
+        let wikipedia = '';
+        if (result['results']['bindings'][0]['wikipediaUrl']) {
+          wikipedia = result['results']['bindings'][0]['wikipediaUrl']['value'];
+        }
+        // 緯度経度が取得できる場合は取得
+        let lat = '';
+        let lng = '';
+        if (result['results']['bindings'][0]['lat']) {
+          lat = result['results']['bindings'][0]['lat']['value'];
+        }
+        if (result['results']['bindings'][0]['lng']) {
+          lng = result['results']['bindings'][0]['lng']['value'];
+        }
         data = {
           type: authority_type,
           uri: authority_uri,
           label: label,
           wikipedia: wikipedia,
+          lat: lat,
+          lng: lng,
         };
         infoPanelContent?.wikidata.push(data);
         authority.push(data);
@@ -1233,7 +1263,7 @@ const Home: NextPage = () => {
     }
   };
   const ShowMap = (lat: string, lng: string) => {
-    console.log(lat, lng);
+    window.open(`https://www.google.com/maps?q=${lat},${lng}`, '_blank');
   };
 
   return (
@@ -1500,7 +1530,7 @@ const Home: NextPage = () => {
                                 }`}>
                                   {wikiItem.type === 'wikidata' ? 'Wikidata' : 'GeoNames'}
                                 </span>
-                                {wikiItem.type === 'geonames' && wikiItem.lat && wikiItem.lng && (
+                                {wikiItem.lat && wikiItem.lng && (
                                   <span className="ml-2 text-xs text-[var(--text-secondary)]">
                                     {parseFloat(wikiItem.lat).toFixed(2)}°N, {parseFloat(wikiItem.lng).toFixed(2)}°E
                                   </span>
@@ -1543,7 +1573,7 @@ const Home: NextPage = () => {
                                   Wikipedia
                                 </a>
                               )}
-                              {wikiItem.type === 'geonames' && wikiItem.lat && wikiItem.lng && (
+                              {wikiItem.lat && wikiItem.lng && (
                                 <button
                                   onClick={() => {
                                     if (wikiItem.lat !== undefined && wikiItem.lng !== undefined) {
