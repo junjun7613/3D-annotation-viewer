@@ -8,6 +8,7 @@ interface GeoFeature {
   type: 'Feature';
   metadata: {
     label: string;
+    description?: string;
     id: string;
   };
   geometry: {
@@ -57,12 +58,30 @@ export const downloadIIIFManifest = async (
   firebaseDocuments.forEach((doc) => {
     const html = parser.parse(doc.data.body.value);
 
+    // Wikidataの地名を説明文に追加
+    let descriptionHtml: string;
+    const baseHtml = Array.isArray(html) ? html.join('') : String(html);
+
+    if (doc.wikidata && doc.wikidata.length > 0) {
+      const wikidataLabels = doc.wikidata
+        .map((wikiItem: WikidataItem) => wikiItem.label)
+        .filter((label: string) => label)
+        .join(', ');
+      if (wikidataLabels) {
+        descriptionHtml = `<p>${wikidataLabels}</p>${baseHtml}`;
+      } else {
+        descriptionHtml = baseHtml;
+      }
+    } else {
+      descriptionHtml = baseHtml;
+    }
+
     const annotation: IIIFAnnotation = {
       id: `${newUrl}/annotation/${doc.id}`,
       type: 'Annotation',
       motivation: 'commenting',
       body: {
-        value: html,
+        value: descriptionHtml,
         label: doc.data.body.label,
         type: doc.data.body.type,
       }, // doc.data.body,
@@ -100,7 +119,8 @@ export const downloadIIIFManifest = async (
           const geoFeature: GeoFeature = {
             type: 'Feature',
             metadata: {
-              label: wikiItem.label,
+              label: doc.data.body.label,
+              description: wikiItem.label,
               id: `${doc.id}-${wikiItem.uri.split('/').pop()}`,
             },
             geometry: {

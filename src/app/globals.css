@@ -1,5 +1,7 @@
 @import 'tailwindcss';
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   /* Background colors - Clean white base */
   --background: #ffffff;
@@ -167,7 +169,7 @@ body {
 }
 
 .btn-secondary {
-  background-color: white;
+  background-color: var(--card-bg);
   color: var(--text-secondary);
   border: 1px solid var(--border);
   padding: 0.5rem 1.25rem;
@@ -304,4 +306,97 @@ body {
 .description-content a:hover {
   color: var(--link-hover);
   border-bottom: 2px solid var(--link-hover);
+}
+
+/* EditorJS dark mode support */
+#editorJS {
+  background-color: var(--card-bg);
+  color: var(--text-primary);
+}
+
+#editorJS .ce-block__content,
+#editorJS .ce-toolbar__content {
+  max-width: none;
+}
+
+#editorJS .cdx-block {
+  color: var(--text-primary);
+}
+
+#editorJS .ce-paragraph {
+  color: var(--text-primary);
+}
+
+#editorJS .ce-header {
+  color: var(--text-primary);
+}
+
+#editorJS .ce-toolbar__plus,
+#editorJS .ce-toolbar__settings-btn {
+  color: var(--text-secondary);
+  background-color: var(--card-bg);
+}
+
+#editorJS .ce-toolbar__plus:hover,
+#editorJS .ce-toolbar__settings-btn:hover {
+  background-color: var(--secondary-bg);
+}
+
+#editorJS .ce-inline-toolbar {
+  background-color: var(--card-bg);
+  border-color: var(--border);
+}
+
+#editorJS .ce-inline-tool {
+  color: var(--text-primary);
+}
+
+#editorJS .ce-inline-tool:hover {
+  background-color: var(--secondary-bg);
+}
+
+#editorJS .ce-conversion-toolbar {
+  background-color: var(--card-bg);
+  border-color: var(--border);
+}
+
+#editorJS .ce-conversion-tool {
+  color: var(--text-primary);
+}
+
+#editorJS .ce-conversion-tool:hover {
+  background-color: var(--secondary-bg);
+}
+
+#editorJS .ce-settings {
+  background-color: var(--card-bg);
+  border-color: var(--border);
+}
+
+#editorJS .ce-settings__button {
+  color: var(--text-primary);
+}
+
+#editorJS .ce-settings__button:hover {
+  background-color: var(--secondary-bg);
+}
+
+/* Dialog labels and text */
+.dialog label {
+  color: var(--text-primary);
+}
+
+.dialog select {
+  background-color: var(--card-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.625rem 0.75rem;
+  font-size: 0.875rem;
+}
+
+.dialog select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }

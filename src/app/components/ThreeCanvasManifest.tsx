@@ -55,6 +55,8 @@ interface ThreeCanvasProps {
   annotationMode: boolean;
   manifestUrl: string;
   editable?: boolean;
+  compactMarkers?: boolean;
+  focusAnnotationId?: string | null;
 }
 
 //firebaseからデータを取得する関数
@@ -87,6 +89,8 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   annotationMode,
   manifestUrl,
   editable = true,
+  compactMarkers = false,
+  focusAnnotationId = null,
 }) => {
   //const canvasRef = useRef<HTMLDivElement>(null);
   //const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -103,6 +107,8 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   const polygonsRef = useRef<THREE.Mesh[]>([]);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const modelRef = useRef<THREE.Group | null>(null); // 3Dモデルへの参照
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null); // カメラへの参照
+  const controlsRef = useRef<OrbitControls | null>(null); // コントロールへの参照
   const frameCountRef = useRef(0); // フレームカウンタ
   const raycasterRef = useRef(new THREE.Raycaster()); // Raycasterのインスタンスを再利用
   const [annotationInputVisible, setAnnotationInputVisible] = useState(false);
@@ -117,6 +123,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   const tempPointsRef = useRef<THREE.Mesh[]>([]); // 一時的な点の表示
   const tempLinesRef = useRef<THREE.Line[]>([]); // 一時的な線の表示
   const annotationModeRef = useRef<boolean>(annotationMode);
+  const compactMarkersRef = useRef<boolean>(compactMarkers);
 
   const [isProgressVisible, setIsProgressVisible] = useState(true);
 
@@ -156,11 +163,108 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
     [setInfoPanel]
   );
 
+  // focusAnnotationIdが変わったときにカメラを移動
+  const focusAnnotationIdRef = useRef<string | null>(null);
+  const cameraAnimationRef = useRef<gsap.core.Tween | null>(null);
+
+  useEffect(() => {
+    // nullの場合はRefをリセットして終了
+    if (!focusAnnotationId) {
+      focusAnnotationIdRef.current = null;
+      return;
+    }
+    if (!cameraRef.current) return;
+
+    // 同じIDの場合はスキップ（重複実行防止）
+    if (focusAnnotationIdRef.current === focusAnnotationId) return;
+    focusAnnotationIdRef.current = focusAnnotationId;
+
+    // spritesRefからfocusAnnotationIdに一致するスプライトを探す
+    const targetSprite = spritesRef.current.find(
+      (sprite) => sprite.userData.id === focusAnnotationId
+    );
+
+    if (targetSprite && targetSprite.userData.camPos) {
+      const targetCamPos = targetSprite.userData.camPos;
+
+      // 既存のアニメーションがあれば停止
+      if (cameraAnimationRef.current) {
+        cameraAnimationRef.current.kill();
+      }
+
+      // GSAPでスムーズにカメラを移動
+      cameraAnimationRef.current = gsap.to(cameraRef.current.position, {
+        x: targetCamPos[0],
+        y: targetCamPos[1],
+        z: targetCamPos[2],
+        duration: 0.8,
+        ease: 'power2.out',
+        onComplete: () => {
+          cameraAnimationRef.current = null;
+        },
+      });
+
+      // InfoPanelも更新
+      handleAnnotationClick(
+        targetSprite.userData.id,
+        targetSprite.userData.creator,
+        targetSprite.userData.title,
+        targetSprite.userData.description,
+        targetSprite.userData.media,
+        targetSprite.userData.wikidata,
+        targetSprite.userData.bibliography
+      );
+    }
+  }, [focusAnnotationId, handleAnnotationClick]);
+
+  // ユーザーがマウス操作を開始したらアニメーションを停止
+  useEffect(() => {
+    const stopAnimation = () => {
+      // GSAPアニメーションを停止
+      if (cameraAnimationRef.current) {
+        cameraAnimationRef.current.kill();
+        cameraAnimationRef.current = null;
+      }
+      // OrbitControlsのダンピングを即座にリセット
+      if (controlsRef.current) {
+        // 一時的にダンピングを無効にして即座に停止
+        controlsRef.current.enableDamping = false;
+        controlsRef.current.update();
+        // 次のフレームでダンピングを再有効化
+        requestAnimationFrame(() => {
+          if (controlsRef.current) {
+            controlsRef.current.enableDamping = true;
+          }
+        });
+      }
+    };
+
+    const canvas = document.getElementById('canvas');
+    if (canvas) {
+      canvas.addEventListener('mousedown', stopAnimation);
+      canvas.addEventListener('wheel', stopAnimation);
+      canvas.addEventListener('touchstart', stopAnimation);
+    }
+
+    return () => {
+      if (canvas) {
+        canvas.removeEventListener('mousedown', stopAnimation);
+        canvas.removeEventListener('wheel', stopAnimation);
+        canvas.removeEventListener('touchstart', stopAnimation);
+      }
+    };
+  }, []);
+
   //もしannotationModeが変更されたら、annotationModeRefを更新
   //menifestUrlが変更されたら、manifestUrlを出力
   useEffect(() => {
     annotationModeRef.current = annotationMode;
   }, [annotationMode]);
+
+  // compactMarkersが変更されたら、compactMarkersRefを更新
+  useEffect(() => {
+    compactMarkersRef.current = compactMarkers;
+  }, [compactMarkers]);
 
   useEffect(() => {
     //const q = query(collection(db, 'annotations'));
@@ -190,6 +294,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
     // カメラ
     const camera = new THREE.PerspectiveCamera(75, sizes.width / sizes.height, 0.1, 1000);
     camera.position.z = 2;
+    cameraRef.current = camera; // カメラをRefに保存
 
     // レンダラー
     const renderer = new THREE.WebGLRenderer({
@@ -298,16 +403,39 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
                 // 3DSelectorの場合の処理
                 if (annotation.data.target.selector.type == '3DSelector') {
                   // spriteの作成
-                  const texture = new THREE.TextureLoader().load('/images/button.png');
-                  texture.colorSpace = THREE.SRGBColorSpace;
+                  let material: THREE.SpriteMaterial;
 
-                  // マテリアルを作成する
-                  const material = new THREE.SpriteMaterial({
-                    map: texture,
-                    depthTest: false, // スプライトを常に前面に表示
-                    transparent: true, // スプライトを半透明にする
-                    opacity: 0.7,
-                  });
+                  if (compactMarkersRef.current) {
+                    // 小さな赤い枠線のみの円（中は透明）
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 64;
+                    canvas.height = 64;
+                    const ctx = canvas.getContext('2d');
+                    if (ctx) {
+                      ctx.beginPath();
+                      ctx.arc(32, 32, 28, 0, Math.PI * 2);
+                      ctx.strokeStyle = '#ef4444';
+                      ctx.lineWidth = 4;
+                      ctx.stroke();
+                    }
+                    const texture = new THREE.CanvasTexture(canvas);
+                    material = new THREE.SpriteMaterial({
+                      map: texture,
+                      depthTest: false,
+                      transparent: true,
+                      opacity: 1.0,
+                    });
+                  } else {
+                    // 通常のボタン画像
+                    const texture = new THREE.TextureLoader().load('/images/button.png');
+                    texture.colorSpace = THREE.SRGBColorSpace;
+                    material = new THREE.SpriteMaterial({
+                      map: texture,
+                      depthTest: false,
+                      transparent: true,
+                      opacity: 0.7,
+                    });
+                  }
 
                   const sprite = new THREE.Sprite(material);
                   sprite.renderOrder = 999; // スプライトのレンダー順序を設定
@@ -322,7 +450,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
                   );
 
                   // スプライトのサイズを調整する
-                  sprite.scale.set(0.1, 0.1, 0.2); // ここでサイズを調整します。必要に応じて値を変更してください。
+                  sprite.scale.set(compactMarkersRef.current ? 0.05 : 0.1, compactMarkersRef.current ? 0.05 : 0.1, 0.2);
                   sprite.userData = {
                     id: annotation.id,
                     creator: annotation.creator,
@@ -763,9 +891,11 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
       // コントロール
       const controls = new OrbitControls(camera, renderer.domElement);
       controls.enableDamping = true; // 慣性を有効にする
+      controls.dampingFactor = 0.1; // ダンピングの強さ（大きいほど早く止まる）
       controls.minDistance = 0.8; // ズームインの最小距離
       controls.maxDistance = 10; // ズームアウトの最大距離
       controls.domElement = renderer.domElement;
+      controlsRef.current = controls; // コントロールへの参照を保存
 
       /*
     // ボックスジオメトリー
@@ -864,6 +994,49 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
     });
   }, [manifestUrl, editable, handleAnnotationClick]);
 
+  // compactMarkersの変更時にスプライトのマテリアルとサイズを更新
+  useEffect(() => {
+    spritesRef.current.forEach((sprite) => {
+      let material: THREE.SpriteMaterial;
+
+      if (compactMarkers) {
+        // 小さな赤い枠線のみの円（中は透明）
+        const canvas = document.createElement('canvas');
+        canvas.width = 64;
+        canvas.height = 64;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.beginPath();
+          ctx.arc(32, 32, 28, 0, Math.PI * 2);
+          ctx.strokeStyle = '#ef4444';
+          ctx.lineWidth = 4;
+          ctx.stroke();
+        }
+        const texture = new THREE.CanvasTexture(canvas);
+        material = new THREE.SpriteMaterial({
+          map: texture,
+          depthTest: false,
+          transparent: true,
+          opacity: 1.0,
+        });
+      } else {
+        // 通常のボタン画像
+        const texture = new THREE.TextureLoader().load('/images/button.png');
+        texture.colorSpace = THREE.SRGBColorSpace;
+        material = new THREE.SpriteMaterial({
+          map: texture,
+          depthTest: false,
+          transparent: true,
+          opacity: 0.7,
+        });
+      }
+
+      // 古いマテリアルを破棄
+      sprite.material.dispose();
+      sprite.material = material;
+    });
+  }, [compactMarkers]);
+
   const handleAnnotationSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     // アノテーションの保存処理をここに追加
@@ -884,6 +1057,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
         target_manifest: targetManifest.current,
         target_canvas: tagetCanvas.current,
         creator: user?.uid,
+        createdAt: Date.now(),
         media: [],
         wikidata: [],
         bibliography: [],
@@ -928,6 +1102,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
         target_manifest: targetManifest.current,
         target_canvas: tagetCanvas.current,
         creator: user?.uid,
+        createdAt: Date.now(),
         media: [],
         wikidata: [],
         bibliography: [],
@@ -1018,18 +1193,14 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
       <canvas id="canvas" style={{ width: '100%', height: '100%', display: 'block' }} />
       {annotationInputVisible && annotationPosition && (
         <div
+          className="absolute bg-[var(--card-bg)] p-3 border border-[var(--border)] rounded-lg shadow-lg z-[100]"
           style={{
-            position: 'absolute',
             top: `${annotationPosition.y}px`,
             left: `${annotationPosition.x}px`,
-            backgroundColor: 'white',
-            padding: '10px',
-            border: '1px solid black',
-            zIndex: 100,
           }}
         >
           <form onSubmit={handleAnnotationSubmit}>
-            <label>
+            <label className="text-[var(--text-primary)] font-medium text-sm">
               Title:
               <br />
               <input
@@ -1038,70 +1209,27 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 required
-                style={{
-                  padding: '10px',
-                  border: '1px solid #ccc',
-                  borderRadius: '5px',
-                  fontSize: '16px',
-                }}
+                className="mt-1 w-full px-3 py-2 bg-[var(--background)] text-[var(--text-primary)] border border-[var(--border)] rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent"
               />
             </label>
             <br />
-            {/*
-            <label>
-              Description:
-              <br />
-              <textarea
-                name="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                required
-                style={{
-                  padding: '10px',
-                  border: '1px solid #ccc',
-                  borderRadius: '5px',
-                  fontSize: '16px',
-                  resize: 'vertical',
-                }}
-              />
-            </label>
-            */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+            <div className="flex justify-between gap-2 mt-3">
               <button
                 type="button"
                 onClick={() => saveAnnotation()}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: '#000080',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '5px',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                  marginTop: '10px',
-                }}
+                className="btn-primary"
               >
                 Save
               </button>
               <button
                 type="button"
-                // setAnnotationInputVisibleをfalseにし、polygonRefをsceneから削除
                 onClick={() => {
                   setAnnotationInputVisible(false);
                   if (polygonRef.current) {
                     sceneRef.current?.remove(polygonRef.current);
                   }
                 }}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: '#ccc',
-                  color: 'black',
-                  border: 'none',
-                  borderRadius: '5px',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                  marginTop: '10px',
-                }}
+                className="btn-secondary"
               >
                 Cancel
               </button>

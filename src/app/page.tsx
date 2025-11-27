@@ -8,7 +8,7 @@ import SignIn from './components/SignIn';
 import ThreeCanvas from './components/ThreeCanvasManifest';
 import SwitchButton from './components/SwitchButton';
 import DisplayTEI from './components/DisplayTEI';
-import { FaPencilAlt, FaBook, FaRegFilePdf, FaTrashAlt } from 'react-icons/fa';
+import { FaPencilAlt, FaBook, FaRegFilePdf, FaTrashAlt, FaList, FaUpload, FaBars } from 'react-icons/fa';
 import { FaLink } from 'react-icons/fa6';
 import { PiShareNetwork } from 'react-icons/pi';
 import { IoDocumentTextOutline } from 'react-icons/io5';
@@ -48,6 +48,7 @@ const Home: NextPage = () => {
   const [annotationsVisible, setAnnotationsVisible] = useState(true);
   // sprite annotationとpolygon annotationの表示を切り替える
   const [annotationMode, setAnnotationMode] = useState(false);
+  const [compactMarkers, setCompactMarkers] = useState(false);
   const [manifestUrl, setManifestUrl] = useState<string>('');
   // infoPanelContentという連想配列を作成
 
@@ -103,10 +104,26 @@ const Home: NextPage = () => {
   const [isBibDialogOpen, setIsBibDialogOpen] = useState(false);
   const [isDescDialogOpen, setIsDescDialogOpen] = useState(false);
   const [isWikidataDialogOpen, setIsWikidataDialogOpen] = useState(false);
+  const [isTitleDialogOpen, setIsTitleDialogOpen] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [isAnnotationListOpen, setIsAnnotationListOpen] = useState(false);
+  const [annotationList, setAnnotationList] = useState<{ id: string; title: string; createdAt: number }[]>([]);
+  const [focusAnnotationId, setFocusAnnotationId] = useState<string | null>(null);
 
   const [isMediaUploadDialogOpen, setIsMediaUploadDialogOpen] = useState(false);
   const [isAuthorityUploadDialogOpen, setIsAuthorityUploadDialogOpen] = useState(false);
   const [isBibUploadDialogOpen, setIsBibUploadDialogOpen] = useState(false);
+  const [isBulkWikidataDialogOpen, setIsBulkWikidataDialogOpen] = useState(false);
+  const [bulkWikidataFile, setBulkWikidataFile] = useState<string>('');
+  const [bulkWikidataResult, setBulkWikidataResult] = useState<{
+    matched: { label: string; annotationTitle: string; wikidata: string }[];
+    skipped: { label: string; reason: string }[];
+    notFound: { label: string }[];
+  } | null>(null);
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0, currentLabel: '' });
+  const [bulkWikidataLang, setBulkWikidataLang] = useState('ja');
+  const [isViewerMenuOpen, setIsViewerMenuOpen] = useState(false);
 
   const [IRI, setIRI] = useState('');
   //mediaの情報をstateで管理
@@ -898,7 +915,17 @@ const Home: NextPage = () => {
   };
 
   const handleManifestUrlChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setManifestUrl(event.target.value);
+    const newUrl = event.target.value;
+    setManifestUrl(newUrl);
+
+    // URLのgetパラメータに反映
+    const url = new URL(window.location.href);
+    if (newUrl) {
+      url.searchParams.set('manifest', newUrl);
+    } else {
+      url.searchParams.delete('manifest');
+    }
+    window.history.replaceState({}, '', url.toString());
   };
 
   const deleteAnnotation = (id: string) => {
@@ -1209,6 +1236,58 @@ const Home: NextPage = () => {
     setIsDescDialogOpen(false);
   };
 
+  const handleAnnotationListOpen = async () => {
+    if (!manifestUrl) {
+      alert('Please enter a manifest URL first.');
+      return;
+    }
+    const querySnapshot = await getDocs(collection(db, 'test'));
+    const list: { id: string; title: string; createdAt: number }[] = [];
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      if (data.target_manifest === manifestUrl) {
+        list.push({
+          id: doc.id,
+          title: data.data?.body?.label || 'Untitled',
+          createdAt: data.createdAt || 0,
+        });
+      }
+    });
+    // 作成時間の昇順（古い順）にソート
+    list.sort((a, b) => a.createdAt - b.createdAt);
+    setAnnotationList(list);
+    setIsAnnotationListOpen(true);
+  };
+
+  const handleTitleOpenDialog = () => {
+    if (infoPanelContent?.creator == user?.uid) {
+      setEditTitle(infoPanelContent?.title || '');
+      setIsTitleDialogOpen(true);
+    } else {
+      alert('You are not the creator of this annotation.');
+    }
+  };
+  const handleTitleCloseDialog = () => {
+    setIsTitleDialogOpen(false);
+  };
+  const saveTitle = async () => {
+    const docRef = doc(db, 'test', infoPanelContent?.id || '');
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      await updateDoc(docRef, {
+        'data.body.label': editTitle,
+      });
+      // infoPanelContentのtitleを更新
+      if (infoPanelContent) {
+        infoPanelContent.title = editTitle;
+      }
+    } else {
+      console.warn('No such document!');
+    }
+    setIsTitleDialogOpen(false);
+  };
+
   const handleWikidataOpenDialog = () => {
     if (infoPanelContent?.creator == user?.uid) {
       setWikidata(infoPanelContent?.wikidata.join(',') || '');
@@ -1235,6 +1314,167 @@ const Home: NextPage = () => {
     window.open(`https://www.google.com/maps?q=${lat},${lng}`, '_blank');
   };
 
+  // 一括Wikidata登録用のCSVアップロード
+  const handleBulkWikidataFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (e.target?.result) {
+          setBulkWikidataFile(e.target.result.toString());
+        }
+      };
+      reader.readAsText(file);
+    }
+  };
+
+  const processBulkWikidata = async () => {
+    if (!bulkWikidataFile || !manifestUrl) {
+      alert('Please select a CSV file and enter manifest URL first.');
+      return;
+    }
+
+    setIsBulkProcessing(true);
+    setBulkWikidataResult(null);
+    setBulkProgress({ current: 0, total: 0, currentLabel: '' });
+
+    try {
+      // CSVをパース（ヘッダー行をスキップ）
+      const lines = bulkWikidataFile.split('\n').filter(line => line.trim());
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+
+      // ヘッダーのインデックスを取得
+      const labelIdx = headers.findIndex(h => h === 'label');
+      const wikidataIdx = headers.findIndex(h => h === 'wikidata');
+
+      if (labelIdx === -1 || wikidataIdx === -1) {
+        alert('CSV must have "label" and "wikidata" columns.');
+        setIsBulkProcessing(false);
+        return;
+      }
+
+      // CSVデータをパース
+      const csvData: { label: string; wikidata: string | null }[] = [];
+      for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(',').map(v => v.trim());
+        const label = values[labelIdx];
+        const wikidata = values[wikidataIdx] || null;
+
+        if (label) {
+          csvData.push({ label, wikidata });
+        }
+      }
+
+      // 進捗の総数を設定
+      setBulkProgress({ current: 0, total: csvData.length, currentLabel: '' });
+
+      // Firebaseからアノテーションを取得
+      const querySnapshot = await getDocs(collection(db, 'test'));
+      const annotations: { id: string; title: string; docRef: ReturnType<typeof doc> }[] = [];
+      querySnapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (data.target_manifest === manifestUrl) {
+          annotations.push({
+            id: docSnap.id,
+            title: data.data?.body?.label || '',
+            docRef: doc(db, 'test', docSnap.id),
+          });
+        }
+      });
+
+      const matched: { label: string; annotationTitle: string; wikidata: string }[] = [];
+      const skipped: { label: string; reason: string }[] = [];
+      const notFound: { label: string }[] = [];
+
+      // 各CSVエントリに対してマッチング
+      for (let i = 0; i < csvData.length; i++) {
+        const csvEntry = csvData[i];
+
+        // 進捗を更新
+        setBulkProgress({ current: i + 1, total: csvData.length, currentLabel: csvEntry.label });
+
+        // アノテーションのタイトルとCSVのlabelをマッチング
+        const matchedAnnotation = annotations.find(a => a.title === csvEntry.label);
+
+        if (!matchedAnnotation) {
+          notFound.push({ label: csvEntry.label });
+          continue;
+        }
+
+        // wikidataがnullまたは空の場合は空配列で上書き
+        if (!csvEntry.wikidata) {
+          await updateDoc(matchedAnnotation.docRef, {
+            wikidata: [],
+          });
+          matched.push({
+            label: csvEntry.label,
+            annotationTitle: matchedAnnotation.title,
+            wikidata: '(cleared)',
+          });
+          continue;
+        }
+
+        // Wikidataからラベルと座標を取得
+        const wikidataId = csvEntry.wikidata.split('/').pop();
+        const query = `SELECT ?item ?itemLabel ?lat ?lng WHERE {
+          VALUES ?item {wd:${wikidataId}}
+          OPTIONAL {
+            ?item wdt:P625 ?coord .
+            BIND(geof:latitude(?coord) AS ?lat)
+            BIND(geof:longitude(?coord) AS ?lng)
+          }
+          SERVICE wikibase:label { bd:serviceParam wikibase:language "${bulkWikidataLang},en". }
+        }`;
+        const url = `https://query.wikidata.org/sparql?query=${encodeURIComponent(query)}&format=json`;
+
+        let wikidataLabel = '';
+        let lat = '';
+        let lng = '';
+        try {
+          const result = await fetch(url).then(res => res.json());
+          const binding = result['results']['bindings'][0];
+          wikidataLabel = binding?.['itemLabel']?.['value'] || '';
+          lat = binding?.['lat']?.['value'] || '';
+          lng = binding?.['lng']?.['value'] || '';
+        } catch {
+          wikidataLabel = csvEntry.label;
+        }
+
+        // Firebaseを更新（wikidataを完全に上書き）
+        const newWikidataEntry: WikidataItem = {
+          type: 'wikidata',
+          uri: csvEntry.wikidata,
+          label: wikidataLabel,
+          lat: lat,
+          lng: lng,
+        };
+
+        // 既存のwikidataを完全に上書き（新しいエントリのみ）
+        await updateDoc(matchedAnnotation.docRef, {
+          wikidata: [newWikidataEntry],
+        });
+        matched.push({
+          label: csvEntry.label,
+          annotationTitle: matchedAnnotation.title,
+          wikidata: csvEntry.wikidata,
+        });
+      }
+
+      setBulkWikidataResult({ matched, skipped, notFound });
+    } catch (error) {
+      console.error('Error processing bulk wikidata:', error);
+      alert('Error processing CSV file.');
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
+
+  const handleBulkWikidataClose = () => {
+    setIsBulkWikidataDialogOpen(false);
+    setBulkWikidataFile('');
+    setBulkWikidataResult(null);
+  };
+
   return (
     <>
       <style jsx global>{`
@@ -1251,7 +1491,7 @@ const Home: NextPage = () => {
         }
       `}</style>
       <div className="flex flex-col h-full w-full bg-[var(--background)]">
-        <header className="bg-white border-b border-[var(--border)] py-4 px-6 flex justify-between items-center shadow-sm">
+        <header className="bg-[var(--card-bg)] border-b border-[var(--border)] py-4 px-6 flex justify-between items-center shadow-sm">
           <h1 className="m-0 text-xl font-bold text-[var(--text-primary)]">IIIF 3D Viewer</h1>
           <nav className="flex items-center gap-6">
             <a href="#home" className="text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors text-sm font-medium">
@@ -1269,16 +1509,42 @@ const Home: NextPage = () => {
               annotationsVisible={annotationsVisible}
               annotationMode={annotationMode}
               manifestUrl={manifestUrl}
+              compactMarkers={compactMarkers}
+              focusAnnotationId={focusAnnotationId}
             />
-            <div className="absolute top-4 left-4 z-[100] bg-white/95 p-4 rounded-lg shadow-lg backdrop-blur-sm border border-[var(--border)]">
-              <div className="mb-4">
-                <p className="text-sm font-medium mb-2 text-[var(--text-primary)]">Display annotations</p>
-                <SwitchButton checked={annotationsVisible} onChange={handleSwitchChange} />
-              </div>
-              <div>
-                <p className="text-sm font-medium mb-2 text-[var(--text-primary)]">Polygon annotation mode</p>
-                <SwitchButton checked={annotationMode} onChange={handleAnnotationModeChange} />
-              </div>
+            <div className="absolute top-4 left-4 z-[100]">
+              <button
+                onClick={() => setIsViewerMenuOpen(!isViewerMenuOpen)}
+                className="p-3 bg-[var(--card-bg)]/95 rounded-lg shadow-lg backdrop-blur-sm border border-[var(--border)] hover:bg-[var(--secondary-bg)] transition-colors"
+                title="Menu"
+              >
+                <FaBars className="w-5 h-5 text-[var(--text-primary)]" />
+              </button>
+              {isViewerMenuOpen && (
+                <div className="mt-2 bg-[var(--card-bg)]/95 p-4 rounded-lg shadow-lg backdrop-blur-sm border border-[var(--border)]">
+                  <div className="mb-4">
+                    <p className="text-sm font-medium mb-2 text-[var(--text-primary)]">Display annotations</p>
+                    <SwitchButton checked={annotationsVisible} onChange={handleSwitchChange} />
+                  </div>
+                  <div className="mb-4">
+                    <p className="text-sm font-medium mb-2 text-[var(--text-primary)]">Polygon annotation mode</p>
+                    <SwitchButton checked={annotationMode} onChange={handleAnnotationModeChange} />
+                  </div>
+                  <div className="mb-4">
+                    <p className="text-sm font-medium mb-2 text-[var(--text-primary)]">Compact markers</p>
+                    <SwitchButton checked={compactMarkers} onChange={() => setCompactMarkers(!compactMarkers)} />
+                  </div>
+                  <div>
+                    <button
+                      onClick={handleAnnotationListOpen}
+                      className="flex items-center gap-2 w-full px-3 py-2 text-sm font-medium text-[var(--text-primary)] bg-[var(--background)] hover:bg-[var(--secondary-bg)] border border-[var(--border)] rounded-md transition-colors"
+                    >
+                      <FaList className="w-4 h-4" />
+                      Annotation List
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           <div className="flex-1 flex flex-col p-4 bg-[var(--secondary-bg)] overflow-hidden">
@@ -1305,13 +1571,30 @@ const Home: NextPage = () => {
               >
                 <img src="/images/iiif.png" alt="IIIF" className="w-10 h-10" />
               </button>
+              <button
+                onClick={() => setIsBulkWikidataDialogOpen(true)}
+                className="ml-4 flex items-center gap-2 px-3 py-2 text-sm font-medium text-[var(--text-primary)] bg-[var(--background)] hover:bg-[var(--secondary-bg)] border border-[var(--border)] rounded-md transition-colors"
+                title="Bulk Wikidata Registration"
+              >
+                <FaUpload className="w-4 h-4" />
+                Bulk Wikidata
+              </button>
             </div>
             <div className="flex gap-4 border-b border-[var(--border)] pb-4 mb-4 flex-shrink-0" style={{ minHeight: '320px', maxHeight: '320px' }}>
               <div className="flex-1 card">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg m-0 text-[var(--text-primary)]">
-                    {infoPanelContent?.title || 'Annotation Details'}
-                  </h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg m-0 text-[var(--text-primary)]">
+                      {infoPanelContent?.title || 'Annotation Details'}
+                    </h3>
+                    <button
+                      onClick={handleTitleOpenDialog}
+                      className="text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors"
+                      title="Edit title"
+                    >
+                      <FaPencilAlt className="w-3 h-3" />
+                    </button>
+                  </div>
                   <button
                     onClick={handleDescOpenDialog}
                     className="btn-icon btn-icon-sm btn-secondary"
@@ -1495,7 +1778,7 @@ const Home: NextPage = () => {
                       <div className="flex flex-wrap gap-3">
                     {infoPanelContent?.wikidata && infoPanelContent.wikidata.length > 0
                       ? infoPanelContent.wikidata.map((wikiItem, index) => (
-                          <div key={index} className="bg-white border border-[var(--border)] rounded-lg p-3 hover:shadow-md transition-shadow" style={{ width: 'calc(50% - 6px)' }}>
+                          <div key={index} className="bg-[var(--card-bg)] border border-[var(--border)] rounded-lg p-3 hover:shadow-md transition-shadow" style={{ width: 'calc(50% - 6px)' }}>
                             {/* Header with Label and Type Badge */}
                             <div className="flex items-start justify-between mb-2">
                               <div className="flex-1">
@@ -1511,7 +1794,7 @@ const Home: NextPage = () => {
                                 </span>
                                 {wikiItem.lat && wikiItem.lng && (
                                   <span className="ml-2 text-xs text-[var(--text-secondary)]">
-                                    {parseFloat(wikiItem.lat).toFixed(2)}°N, {parseFloat(wikiItem.lng).toFixed(2)}°E
+                                    {Math.abs(parseFloat(wikiItem.lat)).toFixed(2)}°{parseFloat(wikiItem.lat) >= 0 ? 'N' : 'S'}, {Math.abs(parseFloat(wikiItem.lng)).toFixed(2)}°{parseFloat(wikiItem.lng) >= 0 ? 'E' : 'W'}
                                   </span>
                                 )}
                               </div>
@@ -1597,7 +1880,7 @@ const Home: NextPage = () => {
                     <div className="overflow-y-auto space-y-3" style={{ height: '220px' }}>
                     {infoPanelContent?.bibliography && infoPanelContent.bibliography.length > 0
                       ? infoPanelContent.bibliography.map((bibItem, index) => (
-                          <div key={index} className="bg-white border border-[var(--border)] rounded-lg p-3 hover:shadow-md transition-shadow">
+                          <div key={index} className="bg-[var(--card-bg)] border border-[var(--border)] rounded-lg p-3 hover:shadow-md transition-shadow">
                             {/* Header with Author and Year */}
                             <div className="flex items-start justify-between mb-2">
                               <div className="flex items-start gap-2 flex-1">
@@ -1663,7 +1946,7 @@ const Home: NextPage = () => {
                 {/* Location Tab */}
                 {infoTab === 'location' && (
                   <div className="flex-1 overflow-hidden flex flex-col min-h-0">
-                    <div className="flex flex-col gap-4 p-4 bg-white border border-[var(--border)] rounded-lg">
+                    <div className="flex flex-col gap-4 p-4 bg-[var(--card-bg)] border border-[var(--border)] rounded-lg">
                       <div className="flex flex-col gap-2">
                         <label className="text-sm font-medium text-[var(--text-primary)]">
                           Latitude
@@ -1728,7 +2011,7 @@ const Home: NextPage = () => {
             </div>
           </div>
         </div>
-        <footer className="bg-white border-t border-[var(--border)] py-3 px-6 text-center">
+        <footer className="bg-[var(--card-bg)] border-t border-[var(--border)] py-3 px-6 text-center">
           <p className="text-sm text-[var(--text-secondary)] m-0">
             &copy; 2025 IIIF 3D Viewer. All rights reserved.
           </p>
@@ -1978,6 +2261,72 @@ const Home: NextPage = () => {
         </div>
       )}
 
+      {isAnnotationListOpen && (
+        <div className="dialog-overlay" onClick={() => setIsAnnotationListOpen(false)}>
+          <div className="dialog w-[500px] max-h-[80vh]" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-[var(--text-primary)] m-0">Annotation List</h2>
+              <button
+                onClick={() => setIsAnnotationListOpen(false)}
+                className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="overflow-y-auto max-h-[60vh]">
+              {annotationList.length > 0 ? (
+                <ul className="space-y-2 m-0 p-0 list-none">
+                  {annotationList.map((annotation) => (
+                    <li
+                      key={annotation.id}
+                      className="p-3 bg-[var(--background)] border border-[var(--border)] rounded-md hover:bg-[var(--secondary-bg)] cursor-pointer transition-colors"
+                      onClick={() => {
+                        // 一度nullにしてから設定することで、同じIDでも再度フォーカス可能にする
+                        setFocusAnnotationId(null);
+                        setTimeout(() => setFocusAnnotationId(annotation.id), 0);
+                        setIsAnnotationListOpen(false);
+                      }}
+                    >
+                      <p className="m-0 text-sm font-medium text-[var(--text-primary)]">{annotation.title}</p>
+                      <p className="m-0 text-xs text-[var(--text-tertiary)] mt-1 truncate">{annotation.id}</p>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-[var(--text-secondary)] text-center py-8">No annotations found for this manifest.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isTitleDialogOpen && (
+        <div className="dialog-overlay" onClick={handleTitleCloseDialog}>
+          <div className="dialog w-[400px]" onClick={(e) => e.stopPropagation()}>
+            <form className="flex flex-col gap-4">
+              <label className="font-bold text-lg">
+                Title:
+                <input
+                  type="text"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="input-field"
+                  required
+                />
+              </label>
+              <div className="flex justify-end gap-3">
+                <button type="button" onClick={saveTitle} className="btn-info">
+                  Save
+                </button>
+                <button type="button" onClick={handleTitleCloseDialog} className="btn-primary">
+                  Close
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {isDescDialogOpen && (
         <div className="dialog-overlay" onClick={handleDescCloseDialog}>
           <div className="dialog w-[900px] h-[500px]" onClick={(e) => e.stopPropagation()}>
@@ -2044,6 +2393,145 @@ const Home: NextPage = () => {
             >
               <FaTrashAlt />
             </button>
+          </div>
+        </div>
+      )}
+
+      {isBulkWikidataDialogOpen && (
+        <div className="dialog-overlay" onClick={handleBulkWikidataClose}>
+          <div className="dialog w-[700px] max-h-[80vh]" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-[var(--text-primary)] m-0">Bulk Wikidata Registration</h2>
+              <button
+                onClick={handleBulkWikidataClose}
+                className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="mb-4">
+              <p className="text-sm text-[var(--text-secondary)] mb-2">
+                Upload a CSV file with columns: label, wikidata
+              </p>
+              <input
+                type="file"
+                accept=".csv"
+                onChange={handleBulkWikidataFileChange}
+                className="input-field"
+              />
+              <div className="mt-3 p-3 bg-[var(--secondary-bg)] border border-[var(--border)] rounded-md text-xs text-[var(--text-secondary)]">
+                <p className="font-medium text-[var(--text-primary)] mb-1">Update behavior:</p>
+                <ul className="list-disc list-inside space-y-1">
+                  <li>Wikidata will be <strong>completely replaced</strong> for matched annotations</li>
+                  <li>If wikidata column is empty, existing wikidata will be cleared</li>
+                  <li>Lat/Lng are automatically fetched from Wikidata</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <label className="text-sm font-medium text-[var(--text-primary)]">
+                Label Language:
+                <select
+                  value={bulkWikidataLang}
+                  onChange={(e) => setBulkWikidataLang(e.target.value)}
+                  className="ml-2 p-2 border border-[var(--border)] rounded-md bg-[var(--background)] text-[var(--text-primary)]"
+                >
+                  <option value="ja">Japanese (ja)</option>
+                  <option value="en">English (en)</option>
+                  <option value="de">German (de)</option>
+                  <option value="fr">French (fr)</option>
+                  <option value="es">Spanish (es)</option>
+                  <option value="zh">Chinese (zh)</option>
+                  <option value="ko">Korean (ko)</option>
+                </select>
+              </label>
+            </div>
+
+            <div className="flex gap-3 mb-4">
+              <button
+                type="button"
+                onClick={processBulkWikidata}
+                disabled={isBulkProcessing || !bulkWikidataFile}
+                className="btn-primary disabled:opacity-50"
+              >
+                {isBulkProcessing ? 'Processing...' : 'Process CSV'}
+              </button>
+            </div>
+
+            {isBulkProcessing && bulkProgress.total > 0 && (
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
+                <div className="flex justify-between text-sm text-blue-800 mb-2">
+                  <span>Processing: {bulkProgress.currentLabel}</span>
+                  <span>{bulkProgress.current} / {bulkProgress.total}</span>
+                </div>
+                <div className="w-full bg-blue-200 rounded-full h-2">
+                  <div
+                    className="bg-blue-600 h-2 rounded-full transition-all duration-200"
+                    style={{ width: `${(bulkProgress.current / bulkProgress.total) * 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {bulkWikidataResult && (
+              <div className="overflow-y-auto max-h-[50vh] space-y-4">
+                {/* Matched */}
+                <div>
+                  <h3 className="text-sm font-bold text-green-600 mb-2">
+                    Matched ({bulkWikidataResult.matched.length})
+                  </h3>
+                  {bulkWikidataResult.matched.length > 0 ? (
+                    <ul className="space-y-1 text-sm">
+                      {bulkWikidataResult.matched.map((item, idx) => (
+                        <li key={idx} className="p-2 bg-green-50 border border-green-200 rounded text-green-800">
+                          {item.label} → {item.wikidata}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-[var(--text-tertiary)]">None</p>
+                  )}
+                </div>
+
+                {/* Skipped */}
+                <div>
+                  <h3 className="text-sm font-bold text-yellow-600 mb-2">
+                    Skipped ({bulkWikidataResult.skipped.length})
+                  </h3>
+                  {bulkWikidataResult.skipped.length > 0 ? (
+                    <ul className="space-y-1 text-sm">
+                      {bulkWikidataResult.skipped.map((item, idx) => (
+                        <li key={idx} className="p-2 bg-yellow-50 border border-yellow-200 rounded text-yellow-800">
+                          {item.label} - {item.reason}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-[var(--text-tertiary)]">None</p>
+                  )}
+                </div>
+
+                {/* Not Found */}
+                <div>
+                  <h3 className="text-sm font-bold text-red-600 mb-2">
+                    Not Found ({bulkWikidataResult.notFound.length})
+                  </h3>
+                  {bulkWikidataResult.notFound.length > 0 ? (
+                    <ul className="space-y-1 text-sm">
+                      {bulkWikidataResult.notFound.map((item, idx) => (
+                        <li key={idx} className="p-2 bg-red-50 border border-red-200 rounded text-red-800">
+                          {item.label}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-[var(--text-tertiary)]">None</p>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
