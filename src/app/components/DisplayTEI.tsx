@@ -76,7 +76,7 @@ const DisplayTEI: React.FC<DisplayTEIProps> = ({ onTextLoad, manifestUrl }) => {
                 lineMark.style.opacity = '0.7';
               });
               lineMark.addEventListener('click', () => {
-                console.log('line clicked:', n);
+                // line clicked
               });
 
               e.insertBefore(lineMark, e.firstChild);
@@ -152,7 +152,7 @@ const DisplayTEI: React.FC<DisplayTEIProps> = ({ onTextLoad, manifestUrl }) => {
                 lineMark.style.opacity = '0.7';
               });
               lineMark.addEventListener('click', () => {
-                console.log('line clicked:', n);
+                // line clicked
               });
 
               e.insertBefore(lineMark, e.firstChild);
@@ -175,11 +175,9 @@ const DisplayTEI: React.FC<DisplayTEIProps> = ({ onTextLoad, manifestUrl }) => {
 
         // Add parentheses to ex elements manually
         const exElements = element.querySelectorAll('tei-ex');
-        console.log('Found tei-ex elements:', exElements.length);
-        exElements.forEach((ex, index) => {
+        exElements.forEach((ex) => {
           const htmlEx = ex as HTMLElement;
           const content = htmlEx.textContent || '';
-          console.log(`tei-ex ${index} original content:`, content);
 
           // Make sure it's visible and styled (use setProperty with !important)
           htmlEx.style.setProperty('display', 'inline', 'important');
@@ -194,8 +192,6 @@ const DisplayTEI: React.FC<DisplayTEIProps> = ({ onTextLoad, manifestUrl }) => {
           htmlEx.appendChild(openParen);
           htmlEx.appendChild(textNode);
           htmlEx.appendChild(closeParen);
-
-          console.log(`tei-ex ${index} after, innerHTML:`, htmlEx.innerHTML);
         });
 
         setTeiHTMLTranscription(element.outerHTML);
@@ -205,8 +201,7 @@ const DisplayTEI: React.FC<DisplayTEIProps> = ({ onTextLoad, manifestUrl }) => {
           onTextLoad(xmlText);
         }
       });
-    } catch (err) {
-      console.error('Error processing TEI:', err);
+    } catch {
       setError('Error processing TEI/XML file');
       setIsLoading(false);
     }
@@ -225,8 +220,7 @@ const DisplayTEI: React.FC<DisplayTEIProps> = ({ onTextLoad, manifestUrl }) => {
     try {
       const text = await file.text();
       processTEIFile(text);
-    } catch (err) {
-      console.error('Error reading file:', err);
+    } catch {
       setError('Error reading file');
       setIsLoading(false);
     }

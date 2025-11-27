@@ -35,9 +35,10 @@ export interface NewAnnotation {
   creator: string;
   title: string;
   description: string;
-  media: [];
-  wikidata: [];
-  bibliography: [];
+  media: MediaItem[];
+  wikidata: WikidataItem[];
+  bibliography: BibliographyItem[];
+  location?: LocationItem;
   position: {
     x: number;
     y: number;
@@ -69,13 +70,13 @@ export interface IIIFAnnotation {
   body: { value: string; label: string; type: string };
   target: { source: string; selector: { value: [number, number, number]; type: string } };
 }
-interface MediaItem {
+export interface MediaItem {
   type: string;
   source: string;
   caption: string;
 }
 
-interface WikidataItem {
+export interface WikidataItem {
   type: string;
   label: string;
   uri: string;
@@ -84,7 +85,7 @@ interface WikidataItem {
   lng?: string;
 }
 
-interface BibliographyItem {
+export interface BibliographyItem {
   author: string;
   title: string;
   year: string;
@@ -92,7 +93,7 @@ interface BibliographyItem {
   pdf?: string;
 }
 
-interface LocationItem {
+export interface LocationItem {
   lat: string;
   lng: string;
 }

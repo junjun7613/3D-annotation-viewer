@@ -151,12 +151,8 @@ const Home: NextPage = () => {
   // description editor関連
   useEffect(() => {
     if (infoPanelContent?.description) {
-      console.log(infoPanelContent.description);
-
       const parser = EditorJSHtml();
       const html = parser.parse(infoPanelContent.description as unknown as OutputData);
-
-      console.log(html);
 
       //setDesc(infoPanelContent.description);
       setDesc(html);
@@ -262,24 +258,19 @@ const Home: NextPage = () => {
   };
   */
 
-  console.log(infoPanelContent);
-
   const btnSaves = async () => {
     if (editorRef.current) {
       try {
         const outputData = await editorRef.current.save();
-        console.log('Article data: ', outputData);
 
         // undefinedを削除
         const cleanedData = JSON.parse(JSON.stringify(outputData));
-        console.log('OutputData after cleaning:', cleanedData);
 
         const docRef = doc(db, 'test', infoPanelContent?.id || '');
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
           const origData = docSnap.data();
-          console.log(origData.data.body.value);
           // origData.data.body.valueにoutputDataをセット
           await updateDoc(docRef, {
             data: {
@@ -297,10 +288,8 @@ const Home: NextPage = () => {
 
         handleDescCloseDialog();
       } catch (error) {
-        console.log('Saving failed: ', error);
+        // Saving failed
       }
-    } else {
-      console.warn('Editor instance is not initialized.');
     }
   };
 
@@ -377,13 +366,11 @@ const Home: NextPage = () => {
 
     // infoPanelContentのwikidataにdataを追記
     infoPanelContent?.media.push(data);
-    console.log(infoPanelContent);
 
     handleMediaCloseDialog();
   };
 
   const saveMediaUpload = async () => {
-    console.log(uploadedMediaContent);
     // Base64デコードしてCSVデータを取得
     const csvData = base64ToCsv(uploadedMediaContent);
     //console.log(csvData);
@@ -469,7 +456,6 @@ const Home: NextPage = () => {
     };
     if (wikiType === 'wikidata') {
       // wikidataのsparqlエンドポイントにアクセスして該当するデータのラベルを取得
-      console.log(wikidata);
 
       const query = `SELECT ?item ?itemLabel ?wikipediaUrl ?lat ?lng WHERE {
         VALUES ?item {wd:${wikidata.split('/').pop()}}
@@ -490,7 +476,6 @@ const Home: NextPage = () => {
         query
       )}&format=json`;
       const result = await fetch(url).then((res) => res.json());
-      console.log(result);
 
       const label = result['results']['bindings'][0]['itemLabel']['value'];
       //もしbidingsの中にwikipediaUrlがあれば、その値を取得
@@ -518,7 +503,6 @@ const Home: NextPage = () => {
         lng: lng,
       };
     } else if (wikiType === 'geonames') {
-      console.log(wikidata);
       const id = wikidata.split('/').pop();
       const url = `http://api.geonames.org/getJSON?geonameId=${id}&username=${process.env.NEXT_PUBLIC_GEONAMES_USERNAME}`;
 
@@ -541,8 +525,6 @@ const Home: NextPage = () => {
       if (wikipedia) {
         data.wikipedia = wikipedia;
       }
-
-      console.log(data);
     }
 
     // firebaseのannotationsコレクションのidを持つdocのMediaフィールド(Array)のdataをfirebaseから取得
@@ -564,14 +546,11 @@ const Home: NextPage = () => {
 
     // infoPanelContentのwikidataにdataを追記
     infoPanelContent?.wikidata.push(data);
-    console.log(infoPanelContent);
 
     handleWikidataCloseDialog();
   };
 
   const saveAuthorityUpload = async () => {
-    // const mediaData = { source, type, caption };
-    console.log(uploadedAuthorityContent);
     // Base64デコードしてCSVデータを取得
     const csvData = base64ToCsv(uploadedAuthorityContent);
     //console.log(csvData);
@@ -591,7 +570,6 @@ const Home: NextPage = () => {
     for (const item of rows) {
       const authority_type = item.split(',')[0];
       const authority_uri = item.split(',')[1].replace('\r', '');
-      console.log(authority_type, authority_uri);
 
       let data: WikidataItem = {
         type: '',
@@ -604,7 +582,6 @@ const Home: NextPage = () => {
 
       if (authority_type === 'wikidata') {
         // wikidataのsparqlエンドポイントにアクセスして該当するデータのラベルを取得
-        console.log(authority_uri);
 
         const query = `SELECT ?item ?itemLabel ?wikipediaUrl ?lat ?lng WHERE {
           VALUES ?item {wd:${authority_uri.split('/').pop()}}
@@ -650,7 +627,6 @@ const Home: NextPage = () => {
         infoPanelContent?.wikidata.push(data);
         authority.push(data);
       } else if (authority_type === 'geonames') {
-        console.log(authority_uri);
         const id = authority_uri.split('/').pop();
         const url = `http://api.geonames.org/getJSON?geonameId=${id}&username=${process.env.NEXT_PUBLIC_GEONAMES_USERNAME}`;
 
@@ -678,8 +654,6 @@ const Home: NextPage = () => {
         authority.push(data);
       }
     }
-
-    console.log(authority);
 
     // firebaseのannotationsコレクションのidを持つdocのWikidataフィールド(Array)のdataをfirebaseから取得
     //const docRef = doc(db, 'annotations', infoPanelContent?.id || '');
@@ -745,7 +719,6 @@ const Home: NextPage = () => {
 
     // infoPanelContentのwikidataにdataを追記
     infoPanelContent?.bibliography.push(data);
-    console.log(infoPanelContent);
 
     handleBibCloseDialog();
   };
@@ -773,7 +746,6 @@ const Home: NextPage = () => {
   };
 
   const saveBibUpload = async () => {
-    console.log(uploadedBibContent);
     // Base64デコードしてCSVデータを取得
     const csvData = base64ToCsv(uploadedBibContent);
     //console.log(csvData);
@@ -967,9 +939,6 @@ const Home: NextPage = () => {
   };
 
   const downloadRDF = (id: string) => {
-    console.log('RDF download');
-    console.log('Manifest URL (id):', id);
-    console.log('IRI prefix:', IRI);
     // firebaseのannotationsコレクションのすべてのDocの中から、targetmanifestの値がidと一致するものを取得
     //const querySnapshot = getDocs(collection(db, 'annotations'));
     const querySnapshot = getDocs(collection(db, 'test'));
@@ -978,23 +947,12 @@ const Home: NextPage = () => {
         '@prefix : <https://www.example.com/vocabulary/> .\n@prefix schema: <https://schema.org/> .\n@prefix dc: <http://purl.org/dc/elements/1.1/> .'; // ベースURIを定義
       turtleData += '\n';
 
-      console.log(`Total documents in 'test' collection: ${snapshot.size}`);
-      let matchedCount = 0;
-
       snapshot.forEach((doc) => {
         const data = doc.data();
-        console.log(`Document ${doc.id}:`, {
-          target_manifest: data.target_manifest,
-          matches: data.target_manifest === id,
-        });
-        //console.log(data);
         const parser = EditorJSHtml();
         const cleanedData = JSON.parse(JSON.stringify(data.data.body.value || { blocks: [] })); // デフォルト値を設定
-        console.log(cleanedData);
         const html = parser.parse(cleanedData);
         if (data.target_manifest === id) {
-          matchedCount++;
-          console.log(`✓ Matched annotation ${matchedCount}:`, data);
           // 以下でannotationごとにTutleを生成・ダウンロード
           turtleData += `\n<${IRI}${doc.id}> a :Annotation ;\n`;
           const properties = [];
@@ -1087,18 +1045,6 @@ const Home: NextPage = () => {
         }
       });
 
-      console.log(`\n=== RDF Download Summary ===`);
-      console.log(`Total annotations matched: ${matchedCount}`);
-      console.log(`RDF data length: ${turtleData.length} characters`);
-      console.log(`Preview of RDF data:\n${turtleData.substring(0, 500)}...`);
-
-      if (matchedCount === 0) {
-        console.warn('⚠ No annotations matched! Check if:');
-        console.warn('1. manifestUrl matches target_manifest in Firebase');
-        console.warn('2. Annotations exist in the "test" collection');
-        console.warn('3. IRI is set correctly');
-      }
-
       const blob = new Blob([turtleData], { type: 'text/turtle' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -1112,16 +1058,8 @@ const Home: NextPage = () => {
   };
 
   const downloadIIIFManifest = (manifestUrl: string) => {
-    console.log('=== IIIF Manifest Download ===');
-    console.log('Original manifest URL:', manifestUrl);
-
     const slug = createSlug(manifestUrl);
-    console.log('Encoded slug:', slug);
-
     const url = `/api/3/${slug}/manifest`;
-    console.log('API endpoint:', url);
-    console.log('Opening in new tab...');
-
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
@@ -1239,7 +1177,6 @@ const Home: NextPage = () => {
     setIsMediaUploadDialogOpen(false);
   };
   const handleMediaUpload = () => {
-    console.log('media uploaded');
     setIsMediaUploadDialogOpen(true);
   };
 
@@ -1257,7 +1194,6 @@ const Home: NextPage = () => {
     setIsBibUploadDialogOpen(false);
   };
   const handleBibUpload = () => {
-    console.log('bib uploaded');
     setIsBibUploadDialogOpen(true);
   };
 

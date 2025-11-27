@@ -64,17 +64,8 @@ const getAnnotations = async () => {
   const q = query(collection(db, 'test'));
   const querySnapshot = await getDocs(q);
 
-  console.log('=== ThreeCanvas: Loading Annotations ===');
-  console.log(`Total annotations in Firebase: ${querySnapshot.size}`);
-
   querySnapshot.forEach((doc) => {
     const data = doc.data() as Annotation;
-
-    console.log(`Annotation ${doc.id}:`, {
-      target_manifest: data.target_manifest,
-      title: data.data?.body?.label,
-      position: data.position,
-    });
 
     const annotationWithId = {
       ...data,
@@ -87,7 +78,6 @@ const getAnnotations = async () => {
     annotations.push(annotationWithId);
   });
 
-  console.log(`Loaded ${annotations.length} annotations for display`);
   return annotations;
 };
 
@@ -234,10 +224,6 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
       // Use the input manifestUrl instead of manifest.id to ensure consistency
       targetManifest.current = manifestUrl;
       tagetCanvas.current = manifest.items[0].id;
-
-      console.log('=== Manifest Loaded ===');
-      console.log('Target manifest URL set to:', targetManifest.current);
-      console.log('Target canvas ID:', tagetCanvas.current);
 
       // GLTFLoader
       const loader = new GLTFLoader();
@@ -574,7 +560,6 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
             };
 
             const onMouseDblClick = (event: MouseEvent) => {
-              console.log('Double click detected. Annotation mode:', annotationModeRef.current);
               // マウスの位置を正規化
               const rect = renderer.domElement.getBoundingClientRect();
               mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -590,13 +575,10 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
 
               // クリック位置の3次元空間内の位置情報を取得
               const intersects = raycaster.intersectObjects(targetObjects, true);
-              console.log('Intersects found:', intersects.length, 'Target:', annotationModeRef.current ? 'model only' : 'all scene');
               if (intersects.length > 0) {
                 const intersectedPoint = intersects[0].point;
-                console.log('Intersected point:', intersectedPoint, 'Object:', intersects[0].object.type);
 
                 if (annotationModeRef.current == false) {
-                  console.log('Creating point annotation');
                   const cameraDirection = new THREE.Vector3();
                   camera.getWorldDirection(cameraDirection);
                   const offset = cameraDirection.multiplyScalar(-0.01); // オフセットの距離を調整
@@ -632,7 +614,6 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
 
                   setAnnotationInputVisible(true);
                 } else {
-                  console.log('Creating polygon vertex');
                   // 頂点を追加
                   const cameraDirection = new THREE.Vector3();
                   camera.getWorldDirection(cameraDirection);
@@ -640,7 +621,6 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
                   const newPoint = intersectedPoint.clone().add(offset);
 
                   polygonVertices.current.push(newPoint);
-                  console.log('Polygon vertex added:', polygonVertices.current.length, 'points', newPoint);
 
                   // 頂点の視覚的フィードバックを追加（小さな球体）
                   const pointGeometry = new THREE.SphereGeometry(0.02, 16, 16);
@@ -655,7 +635,6 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
                   pointMesh.renderOrder = 999; // 最後にレンダリング
                   scene.add(pointMesh);
                   tempPointsRef.current.push(pointMesh);
-                  console.log('Green sphere added to scene. Total spheres:', tempPointsRef.current.length);
 
                   // 線の視覚的フィードバックを追加
                   if (polygonVertices.current.length > 1) {
@@ -674,7 +653,6 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
                     line.renderOrder = 999; // 最後にレンダリング
                     scene.add(line);
                     tempLinesRef.current.push(line);
-                    console.log('Green line added to scene. Total lines:', tempLinesRef.current.length);
                   }
                 }
               }
@@ -683,10 +661,8 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
             // 右クリックでポリゴンを確定
             const onContextMenu = (event: MouseEvent) => {
               event.preventDefault(); // デフォルトのコンテキストメニューを無効化
-              console.log('Right click detected. Annotation mode:', annotationModeRef.current, 'Vertices:', polygonVertices.current.length);
 
               if (annotationModeRef.current && polygonVertices.current.length >= 3) {
-                console.log('Creating polygon with', polygonVertices.current.length, 'vertices');
                 // 最低3点以上でポリゴンを作成
                 const geometry = new THREE.BufferGeometry();
                 const vertices = new Float32Array(polygonVertices.current.length * 3);
@@ -763,9 +739,6 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
             if (!contextMenuListenerAdded.current) {
               window.addEventListener('contextmenu', onContextMenu);
               contextMenuListenerAdded.current = true;
-              console.log('Context menu listener added');
-            } else {
-              console.log('Context menu listener already added');
             }
 
             return () => {
