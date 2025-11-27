@@ -60,7 +60,7 @@ export const downloadIIIFManifest = async (
     const annotation: IIIFAnnotation = {
       id: `${newUrl}/annotation/${doc.id}`,
       type: 'Annotation',
-      motivation: 'painting',
+      motivation: 'commenting',
       body: {
         value: html,
         label: doc.data.body.label,
@@ -121,9 +121,10 @@ export const downloadIIIFManifest = async (
 
   const data = await fetch(url).then((res) => res.json());
 
-  // annotations配列がなければ作成
-  if (!data.items[0].items[0].annotations) {
-    data.items[0].items[0].annotations = [];
+  // Canvas直下にannotations配列がなければ作成
+  // data.items[0] = Canvas
+  if (!data.items[0].annotations) {
+    data.items[0].annotations = [];
   }
 
   // AnnotationPage for painting annotations
@@ -132,7 +133,7 @@ export const downloadIIIFManifest = async (
     type: 'AnnotationPage',
     items: annotations,
   };
-  data.items[0].items[0].annotations.push(paintingAnnotationPage);
+  data.items[0].annotations.push(paintingAnnotationPage);
 
   // AnnotationPage for georeferencing (if there are geo features)
   if (geoFeatures.length > 0) {
@@ -153,7 +154,7 @@ export const downloadIIIFManifest = async (
       type: 'AnnotationPage',
       items: [geoAnnotation],
     };
-    data.items[0].items[0].annotations.push(geoAnnotationPage);
+    data.items[0].annotations.push(geoAnnotationPage);
   }
 
   return data;
