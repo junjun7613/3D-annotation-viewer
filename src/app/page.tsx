@@ -53,7 +53,7 @@ const Home: NextPage = () => {
 
   const [, /*editorData*/ setEditorData] = useState<OutputData | undefined>();
   const [metaTab, setMetaTab] = useState<'object' | 'annotation'>('annotation');
-  const [infoTab, setInfoTab] = useState<'resources' | 'linkedData' | 'references'>('resources');
+  const [infoTab, setInfoTab] = useState<'resources' | 'linkedData' | 'references' | 'location'>('resources');
 
   interface MediaItem {
     id: string;
@@ -124,6 +124,9 @@ const Home: NextPage = () => {
   const [desc, setDesc] = useState('');
   // wikidataの情報をstateで管理
   const [wikidata, setWikidata] = useState('');
+  // locationの情報をstateで管理
+  const [locationLat, setLocationLat] = useState('');
+  const [locationLng, setLocationLng] = useState('');
 
   const [selectedImage, setSelectedImage] = useState<{
     source: string;
@@ -173,6 +176,14 @@ const Home: NextPage = () => {
     } else {
       setDesc('');
       setEditorData(undefined);
+    }
+    // locationの初期化
+    if (infoPanelContent?.location) {
+      setLocationLat(infoPanelContent.location.lat || '');
+      setLocationLng(infoPanelContent.location.lng || '');
+    } else {
+      setLocationLat('');
+      setLocationLng('');
     }
   }, [infoPanelContent]);
 
@@ -737,6 +748,28 @@ const Home: NextPage = () => {
     console.log(infoPanelContent);
 
     handleBibCloseDialog();
+  };
+
+  const saveLocation = async () => {
+    const data = {
+      lat: locationLat,
+      lng: locationLng,
+    };
+
+    const docRef = doc(db, 'test', infoPanelContent?.id || '');
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      await updateDoc(docRef, {
+        location: data,
+      });
+      // infoPanelContentのlocationを更新
+      if (infoPanelContent) {
+        infoPanelContent.location = data;
+      }
+    } else {
+      console.warn('No such document!');
+    }
   };
 
   const saveBibUpload = async () => {
@@ -1428,6 +1461,16 @@ const Home: NextPage = () => {
                       >
                         References
                       </button>
+                      <button
+                        className={`px-4 py-2 text-sm font-medium transition-colors ${
+                          infoTab === 'location'
+                            ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]'
+                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                        }`}
+                        onClick={() => setInfoTab('location')}
+                      >
+                        Location
+                      </button>
                     </div>
 
                 {/* Resources Tab */}
@@ -1677,6 +1720,55 @@ const Home: NextPage = () => {
                           </div>
                         ))
                       : null}
+                    </div>
+                  </div>
+                )}
+
+                {/* Location Tab */}
+                {infoTab === 'location' && (
+                  <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+                    <div className="flex flex-col gap-4 p-4 bg-white border border-[var(--border)] rounded-lg">
+                      <div className="flex flex-col gap-2">
+                        <label className="text-sm font-medium text-[var(--text-primary)]">
+                          Latitude
+                        </label>
+                        <input
+                          type="text"
+                          value={locationLat}
+                          onChange={(e) => setLocationLat(e.target.value)}
+                          placeholder="e.g. 35.6762"
+                          className="px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <label className="text-sm font-medium text-[var(--text-primary)]">
+                          Longitude
+                        </label>
+                        <input
+                          type="text"
+                          value={locationLng}
+                          onChange={(e) => setLocationLng(e.target.value)}
+                          placeholder="e.g. 139.6503"
+                          className="px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={saveLocation}
+                          className="flex-1 px-4 py-2 text-sm font-medium text-white bg-[var(--primary)] hover:bg-[var(--primary-hover)] rounded-md transition-colors"
+                        >
+                          Save
+                        </button>
+                        {locationLat && locationLng && (
+                          <button
+                            onClick={() => ShowMap(locationLat, locationLng)}
+                            className="flex items-center gap-1 px-4 py-2 text-sm font-medium text-green-600 hover:text-green-800 hover:bg-green-50 border border-green-300 rounded-md transition-colors"
+                          >
+                            <LiaMapMarkedSolid className="w-4 h-4" />
+                            Open Map
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}

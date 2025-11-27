@@ -92,6 +92,11 @@ interface BibliographyItem {
   pdf?: string;
 }
 
+interface LocationItem {
+  lat: string;
+  lng: string;
+}
+
 export interface InfoPanelContent {
   id: string;
   creator: string;
@@ -100,6 +105,7 @@ export interface InfoPanelContent {
   media: MediaItem[];
   wikidata: WikidataItem[];
   bibliography: BibliographyItem[];
+  location?: LocationItem;
 }
 
 export interface Annotation3 {
