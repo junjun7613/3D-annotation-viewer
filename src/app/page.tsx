@@ -287,7 +287,7 @@ const Home: NextPage = () => {
         }
 
         handleDescCloseDialog();
-      } catch (error) {
+      } catch {
         // Saving failed
       }
     }
