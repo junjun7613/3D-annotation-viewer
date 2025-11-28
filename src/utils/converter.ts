@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import EditorJSHtml from 'editorjs-html';
 import { NewAnnotation, IIIFAnnotation, WikidataItem } from '@/types/main';
+import { toWikidataEntityUri } from '@/lib/services/wikidata';
 
 const parser = EditorJSHtml();
 
@@ -10,6 +11,9 @@ interface GeoFeature {
     label: string;
     description?: string;
     id: string;
+    thumbnail?: string;
+    uri?: string;
+    url?: string;
   };
   geometry: {
     coordinates: [number, number];
@@ -84,7 +88,7 @@ export const downloadIIIFManifest = async (
         value: descriptionHtml,
         label: doc.data.body.label,
         type: doc.data.body.type,
-      }, // doc.data.body,
+      },
       target: {
         source: doc.target_canvas,
         selector: doc.data.target.selector,
@@ -122,6 +126,9 @@ export const downloadIIIFManifest = async (
               label: doc.data.body.label,
               description: wikiItem.label,
               id: `${doc.id}-${wikiItem.uri.split('/').pop()}`,
+              thumbnail: wikiItem.thumbnail,
+              uri: toWikidataEntityUri(wikiItem.uri), // Linked Data用 /entity/ 形式
+              url: wikiItem.wikipedia,
             },
             geometry: {
               coordinates: [parseFloat(wikiItem.lng), parseFloat(wikiItem.lat)],

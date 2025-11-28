@@ -83,6 +83,7 @@ export interface WikidataItem {
   wikipedia?: string;
   lat?: string;
   lng?: string;
+  thumbnail?: string;
 }
 
 export interface BibliographyItem {

@@ -37,6 +37,7 @@ import { OutputData } from '@editorjs/editorjs'; // OutputDataをインポート
 
 import db from '@/lib/firebase/firebase';
 import { deleteDoc, doc, getDoc, getDocs, updateDoc, collection } from 'firebase/firestore';
+import { createWikidataItem } from '@/lib/services/wikidata';
 
 import type EditorJS from '@editorjs/editorjs';
 // import { link } from 'fs';
@@ -82,6 +83,7 @@ const Home: NextPage = () => {
     wikipedia?: string;
     lat?: string;
     lng?: string;
+    thumbnail?: string;
   }
 
   interface BibItem {
@@ -470,62 +472,16 @@ const Home: NextPage = () => {
       wikipedia: '',
       lat: '',
       lng: '',
+      thumbnail: '',
     };
     if (wikiType === 'wikidata') {
-      // wikidataのsparqlエンドポイントにアクセスして該当するデータのラベルを取得
-
-      const query = `SELECT ?item ?itemLabel ?wikipediaUrl ?lat ?lng WHERE {
-        VALUES ?item {wd:${wikidata.split('/').pop()}}
-        SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],en". }
-        OPTIONAL{
-        ?wikipediaUrl schema:about ?item ;
-        schema:inLanguage "en" ;
-        schema:isPartOf <https://en.wikipedia.org/> .
-    }
-        OPTIONAL {
-          ?item wdt:P625 ?coord .
-          BIND(geof:latitude(?coord) AS ?lat)
-          BIND(geof:longitude(?coord) AS ?lng)
-        }
-      }
-      `; //wikidataのsparqlクエリ
-      const url = `https://query.wikidata.org/sparql?query=${encodeURIComponent(
-        query
-      )}&format=json`;
-      const result = await fetch(url).then((res) => res.json());
-
-      const label = result['results']['bindings'][0]['itemLabel']['value'];
-      //もしbidingsの中にwikipediaUrlがあれば、その値を取得
-      let wikipedia = '';
-      if (result['results']['bindings'][0]['wikipediaUrl']) {
-        wikipedia = result['results']['bindings'][0]['wikipediaUrl']['value'];
-      }
-      // 緯度経度が取得できる場合は取得
-      let lat = '';
-      let lng = '';
-      if (result['results']['bindings'][0]['lat']) {
-        lat = result['results']['bindings'][0]['lat']['value'];
-      }
-      if (result['results']['bindings'][0]['lng']) {
-        lng = result['results']['bindings'][0]['lng']['value'];
-      }
-
-      data = {
-        type: wikiType,
-        uri: wikidata,
-        label: label,
-        //もしwikipediaがあれば、dataに追加
-        wikipedia: wikipedia,
-        lat: lat,
-        lng: lng,
-      };
+      // 共通ライブラリを使用してWikidata情報を取得
+      data = await createWikidataItem(wikidata);
     } else if (wikiType === 'geonames') {
       const id = wikidata.split('/').pop();
       const url = `http://api.geonames.org/getJSON?geonameId=${id}&username=${process.env.NEXT_PUBLIC_GEONAMES_USERNAME}`;
 
-      //console.log(url);
       const result = await fetch(url).then((res) => res.json());
-      //console.log(result);
 
       const label = result.name;
       const wikipedia = `https://${result.wikipediaURL}`;
@@ -545,7 +501,6 @@ const Home: NextPage = () => {
     }
 
     // firebaseのannotationsコレクションのidを持つdocのMediaフィールド(Array)のdataをfirebaseから取得
-    //const docRef = doc(db, 'annotations', infoPanelContent?.id || '');
     const docRef = doc(db, 'test', infoPanelContent?.id || '');
     const docSnap = await getDoc(docRef);
 
@@ -558,8 +513,6 @@ const Home: NextPage = () => {
     } else {
       console.warn('No such document!');
     }
-
-    //console.log(updatedData?.wikidata);
 
     // infoPanelContentのwikidataにdataを追記
     infoPanelContent?.wikidata.push(data);
@@ -595,52 +548,12 @@ const Home: NextPage = () => {
         wikipedia: '',
         lat: '',
         lng: '',
+        thumbnail: '',
       };
 
       if (authority_type === 'wikidata') {
-        // wikidataのsparqlエンドポイントにアクセスして該当するデータのラベルを取得
-
-        const query = `SELECT ?item ?itemLabel ?wikipediaUrl ?lat ?lng WHERE {
-          VALUES ?item {wd:${authority_uri.split('/').pop()}}
-          SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],en". }
-          OPTIONAL {
-            ?wikipediaUrl schema:about ?item ;
-            schema:inLanguage "en" ;
-            schema:isPartOf <https://en.wikipedia.org/> .
-          }
-          OPTIONAL {
-            ?item wdt:P625 ?coord .
-            BIND(geof:latitude(?coord) AS ?lat)
-            BIND(geof:longitude(?coord) AS ?lng)
-          }
-        }
-        `; //wikidataのsparqlクエリ
-        const url = `https://query.wikidata.org/sparql?query=${encodeURIComponent(
-          query
-        )}&format=json`;
-        const result = await fetch(url).then((res) => res.json());
-        const label = result['results']['bindings'][0]['itemLabel']['value'];
-        let wikipedia = '';
-        if (result['results']['bindings'][0]['wikipediaUrl']) {
-          wikipedia = result['results']['bindings'][0]['wikipediaUrl']['value'];
-        }
-        // 緯度経度が取得できる場合は取得
-        let lat = '';
-        let lng = '';
-        if (result['results']['bindings'][0]['lat']) {
-          lat = result['results']['bindings'][0]['lat']['value'];
-        }
-        if (result['results']['bindings'][0]['lng']) {
-          lng = result['results']['bindings'][0]['lng']['value'];
-        }
-        data = {
-          type: authority_type,
-          uri: authority_uri,
-          label: label,
-          wikipedia: wikipedia,
-          lat: lat,
-          lng: lng,
-        };
+        // 共通ライブラリを使用してWikidata情報を取得
+        data = await createWikidataItem(authority_uri);
         infoPanelContent?.wikidata.push(data);
         authority.push(data);
       } else if (authority_type === 'geonames') {
@@ -1414,40 +1327,20 @@ const Home: NextPage = () => {
           continue;
         }
 
-        // Wikidataからラベルと座標を取得
-        const wikidataId = csvEntry.wikidata.split('/').pop();
-        const query = `SELECT ?item ?itemLabel ?lat ?lng WHERE {
-          VALUES ?item {wd:${wikidataId}}
-          OPTIONAL {
-            ?item wdt:P625 ?coord .
-            BIND(geof:latitude(?coord) AS ?lat)
-            BIND(geof:longitude(?coord) AS ?lng)
-          }
-          SERVICE wikibase:label { bd:serviceParam wikibase:language "${bulkWikidataLang},en". }
-        }`;
-        const url = `https://query.wikidata.org/sparql?query=${encodeURIComponent(query)}&format=json`;
-
-        let wikidataLabel = '';
-        let lat = '';
-        let lng = '';
+        // 共通ライブラリを使用してWikidata情報を取得
+        let newWikidataEntry: WikidataItem;
         try {
-          const result = await fetch(url).then(res => res.json());
-          const binding = result['results']['bindings'][0];
-          wikidataLabel = binding?.['itemLabel']?.['value'] || '';
-          lat = binding?.['lat']?.['value'] || '';
-          lng = binding?.['lng']?.['value'] || '';
+          newWikidataEntry = await createWikidataItem(csvEntry.wikidata, bulkWikidataLang);
         } catch {
-          wikidataLabel = csvEntry.label;
+          newWikidataEntry = {
+            type: 'wikidata',
+            uri: csvEntry.wikidata,
+            label: csvEntry.label,
+            lat: '',
+            lng: '',
+            thumbnail: '',
+          };
         }
-
-        // Firebaseを更新（wikidataを完全に上書き）
-        const newWikidataEntry: WikidataItem = {
-          type: 'wikidata',
-          uri: csvEntry.wikidata,
-          label: wikidataLabel,
-          lat: lat,
-          lng: lng,
-        };
 
         // 既存のwikidataを完全に上書き（新しいエントリのみ）
         await updateDoc(matchedAnnotation.docRef, {
@@ -1779,6 +1672,19 @@ const Home: NextPage = () => {
                     {infoPanelContent?.wikidata && infoPanelContent.wikidata.length > 0
                       ? infoPanelContent.wikidata.map((wikiItem, index) => (
                           <div key={index} className="bg-[var(--card-bg)] border border-[var(--border)] rounded-lg p-3 hover:shadow-md transition-shadow" style={{ width: 'calc(50% - 6px)' }}>
+                            {/* Thumbnail Image */}
+                            {wikiItem.thumbnail && (
+                              <div className="mb-2 -mx-3 -mt-3">
+                                <img
+                                  src={wikiItem.thumbnail}
+                                  alt={wikiItem.label}
+                                  className="w-full h-24 object-cover rounded-t-lg"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).style.display = 'none';
+                                  }}
+                                />
+                              </div>
+                            )}
                             {/* Header with Label and Type Badge */}
                             <div className="flex items-start justify-between mb-2">
                               <div className="flex-1">
