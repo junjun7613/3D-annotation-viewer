@@ -30,7 +30,9 @@ export async function GET(
     } as NewAnnotation;
   });
 
-  const manfiestWithAnnotations = await downloadIIIFManifest(manifestId, annotations);
+  const url = new URL(request.url);
+  const baseUrl = `${url.protocol}//${url.host}`;
+  const manfiestWithAnnotations = await downloadIIIFManifest(manifestId, annotations, baseUrl);
 
   return NextResponse.json(manfiestWithAnnotations, { headers });
 }

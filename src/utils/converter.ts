@@ -6,22 +6,23 @@ import { toWikidataEntityUri } from '@/lib/services/wikidata';
 const parser = EditorJSHtml();
 
 interface GeoFeature {
+  '@id': string;
   type: 'Feature';
-  metadata: {
-    label: string;
-    description?: string;
-    id: string;
-    thumbnail?: string;
-    uri?: string;
-    url?: string;
-  };
   geometry: {
     coordinates: [number, number];
     type: 'Point';
   };
   properties: {
+    title: string;
     resourceCoords: [number, number, number];
   };
+  names: {
+    toponym: string;
+    lang?: string;
+    citations: { label: string; '@id'?: string }[];
+  }[];
+  links?: { type: string; identifier: string }[];
+  depictions?: { '@id': string; title?: string }[];
 }
 
 interface GeoAnnotation {
@@ -31,6 +32,7 @@ interface GeoAnnotation {
   target: string;
   body: {
     type: 'FeatureCollection';
+    '@context': string;
     features: GeoFeature[];
   };
 }
@@ -51,10 +53,18 @@ export function createSlug(url: string): string {
 
 export const downloadIIIFManifest = async (
   manifestUrl: string,
-  firebaseDocuments: NewAnnotation[]
+  firebaseDocuments: NewAnnotation[],
+  baseUrl: string
 ) => {
   // manifestUrlを/でsplitして最後の要素を削除
   const newUrl = manifestUrl.split('/').slice(0, -1).join('/');
+
+  // マニフェストを先に取得してラベルを取得
+  const data = await fetch(manifestUrl).then((res) => res.json());
+  const manifestLabel =
+    typeof data.label === 'string'
+      ? data.label
+      : data.label?.ja?.[0] || data.label?.en?.[0] || data.label?.none?.[0] || 'Manifest';
 
   const annotations: IIIFAnnotation[] = [];
   const geoFeatures: GeoFeature[] = [];
@@ -100,18 +110,23 @@ export const downloadIIIFManifest = async (
     // Geo features from location
     if (doc.location?.lat && doc.location?.lng) {
       const geoFeature: GeoFeature = {
+        '@id': `${baseUrl}/api/annot/${doc.id}`,
         type: 'Feature',
-        metadata: {
-          label: doc.data.body.label,
-          id: doc.id,
-        },
         geometry: {
           coordinates: [parseFloat(doc.location.lng), parseFloat(doc.location.lat)],
           type: 'Point',
         },
         properties: {
+          title: doc.data.body.label,
           resourceCoords: doc.data.target.selector.value,
         },
+        names: [
+          {
+            toponym: doc.data.body.label,
+            lang: 'ja',
+            citations: [{ label: manifestLabel, '@id': manifestUrl }],
+          },
+        ],
       };
       geoFeatures.push(geoFeature);
     }
@@ -120,33 +135,51 @@ export const downloadIIIFManifest = async (
     if (doc.wikidata && doc.wikidata.length > 0) {
       doc.wikidata.forEach((wikiItem: WikidataItem) => {
         if (wikiItem.lat && wikiItem.lng) {
+          const featureId = `${doc.id}-${wikiItem.uri.split('/').pop()}`;
           const geoFeature: GeoFeature = {
+            '@id': `${baseUrl}/api/annot/${featureId}`,
             type: 'Feature',
-            metadata: {
-              label: doc.data.body.label,
-              description: wikiItem.label,
-              id: `${doc.id}-${wikiItem.uri.split('/').pop()}`,
-              thumbnail: wikiItem.thumbnail,
-              uri: toWikidataEntityUri(wikiItem.uri), // Linked Data用 /entity/ 形式
-              url: wikiItem.wikipedia,
-            },
             geometry: {
               coordinates: [parseFloat(wikiItem.lng), parseFloat(wikiItem.lat)],
               type: 'Point',
             },
             properties: {
+              title: doc.data.body.label,
               resourceCoords: doc.data.target.selector.value,
             },
+            names: [
+              {
+                toponym: doc.data.body.label,
+                lang: 'ja',
+                citations: [{ label: manifestLabel, '@id': manifestUrl }],
+              },
+              ...(wikiItem.label
+                ? [
+                    {
+                      toponym: wikiItem.label,
+                      lang: 'ja',
+                      citations: wikiItem.wikipedia
+                        ? [{ label: 'Wikipedia', '@id': wikiItem.wikipedia }]
+                        : [{ label: 'Wikidata', '@id': wikiItem.uri }],
+                    },
+                  ]
+                : []),
+            ],
+            links: [
+              { type: 'closeMatch', identifier: toWikidataEntityUri(wikiItem.uri) },
+              ...(wikiItem.wikipedia
+                ? [{ type: 'primaryTopicOf', identifier: wikiItem.wikipedia }]
+                : []),
+            ],
+            depictions: wikiItem.thumbnail
+              ? [{ '@id': wikiItem.thumbnail }]
+              : undefined,
           };
           geoFeatures.push(geoFeature);
         }
       });
     }
   });
-
-  const url = manifestUrl;
-
-  const data = await fetch(url).then((res) => res.json());
 
   // Canvas直下にannotations配列がなければ作成
   // data.items[0] = Canvas
@@ -172,6 +205,8 @@ export const downloadIIIFManifest = async (
       target: targetCanvas,
       body: {
         type: 'FeatureCollection',
+        '@context':
+          'https://raw.githubusercontent.com/LinkedPasts/linked-places/master/linkedplaces-context-v1.1.jsonld',
         features: geoFeatures,
       },
     };
