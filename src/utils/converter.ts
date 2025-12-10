@@ -5,7 +5,8 @@ import { toWikidataEntityUri } from '@/lib/services/wikidata';
 
 const parser = EditorJSHtml();
 
-interface GeoFeature {
+export interface GeoFeature {
+  '@context': string;
   '@id': string;
   type: 'Feature';
   geometry: {
@@ -49,6 +50,100 @@ export function createSlug(url: string): string {
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
     .replace(/=/g, '');
+}
+
+// GeoFeatureを生成する共通関数
+export function createGeoFeatureFromLocation(
+  doc: NewAnnotation,
+  baseUrl: string,
+  manifestLabel: string,
+  manifestUrl: string
+): GeoFeature | null {
+  if (!doc.location?.lat || !doc.location?.lng) {
+    return null;
+  }
+  return {
+    '@context':
+      'https://raw.githubusercontent.com/LinkedPasts/linked-places/master/linkedplaces-context-v1.1.jsonld',
+    '@id': `${baseUrl}/api/annot/${doc.id}`,
+    type: 'Feature',
+    geometry: {
+      coordinates: [parseFloat(doc.location.lng), parseFloat(doc.location.lat)],
+      type: 'Point',
+    },
+    properties: {
+      title: doc.data.body.label,
+      resourceCoords: doc.data.target.selector.value,
+    },
+    names: [
+      {
+        toponym: doc.data.body.label,
+        lang: 'ja',
+        citations: [{ label: manifestLabel, '@id': manifestUrl }],
+      },
+    ],
+  };
+}
+
+export function createGeoFeatureFromWikidata(
+  doc: NewAnnotation,
+  wikiItem: WikidataItem,
+  baseUrl: string,
+  manifestLabel: string,
+  manifestUrl: string
+): GeoFeature | null {
+  if (!wikiItem.lat || !wikiItem.lng) {
+    return null;
+  }
+  return {
+    '@context':
+      'https://raw.githubusercontent.com/LinkedPasts/linked-places/master/linkedplaces-context-v1.1.jsonld',
+    '@id': `${baseUrl}/api/annot/${doc.id}`,
+    type: 'Feature',
+    geometry: {
+      coordinates: [parseFloat(wikiItem.lng), parseFloat(wikiItem.lat)],
+      type: 'Point',
+    },
+    properties: {
+      title: doc.data.body.label,
+      resourceCoords: doc.data.target.selector.value,
+    },
+    names: [
+      {
+        toponym: doc.data.body.label,
+        lang: 'ja',
+        citations: [{ label: manifestLabel, '@id': manifestUrl }],
+      },
+      ...(wikiItem.label
+        ? [
+            {
+              toponym: wikiItem.label,
+              lang: 'ja',
+              citations: wikiItem.wikipedia
+                ? [{ label: 'Wikipedia', '@id': wikiItem.wikipedia }]
+                : [{ label: 'Wikidata', '@id': wikiItem.uri }],
+            },
+          ]
+        : []),
+    ],
+    links: [
+      { type: 'closeMatch', identifier: toWikidataEntityUri(wikiItem.uri) },
+      ...(wikiItem.wikipedia
+        ? [{ type: 'primaryTopicOf', identifier: wikiItem.wikipedia }]
+        : []),
+    ],
+    depictions: wikiItem.thumbnail ? [{ '@id': wikiItem.thumbnail }] : undefined,
+  };
+}
+
+// マニフェストラベルを取得する共通関数
+export async function fetchManifestLabel(manifestUrl: string): Promise<{ label: string; data: unknown }> {
+  const data = await fetch(manifestUrl).then((res) => res.json());
+  const label =
+    typeof data.label === 'string'
+      ? data.label
+      : data.label?.ja?.[0] || data.label?.en?.[0] || data.label?.none?.[0] || 'Manifest';
+  return { label, data };
 }
 
 export const downloadIIIFManifest = async (
@@ -108,74 +203,23 @@ export const downloadIIIFManifest = async (
     annotations.push(annotation);
 
     // Geo features from location
-    if (doc.location?.lat && doc.location?.lng) {
-      const geoFeature: GeoFeature = {
-        '@id': `${baseUrl}/api/annot/${doc.id}`,
-        type: 'Feature',
-        geometry: {
-          coordinates: [parseFloat(doc.location.lng), parseFloat(doc.location.lat)],
-          type: 'Point',
-        },
-        properties: {
-          title: doc.data.body.label,
-          resourceCoords: doc.data.target.selector.value,
-        },
-        names: [
-          {
-            toponym: doc.data.body.label,
-            lang: 'ja',
-            citations: [{ label: manifestLabel, '@id': manifestUrl }],
-          },
-        ],
-      };
-      geoFeatures.push(geoFeature);
+    const locationFeature = createGeoFeatureFromLocation(doc, baseUrl, manifestLabel, manifestUrl);
+    if (locationFeature) {
+      geoFeatures.push(locationFeature);
     }
 
     // Geo features from wikidata items with lat/lng
     if (doc.wikidata && doc.wikidata.length > 0) {
       doc.wikidata.forEach((wikiItem: WikidataItem) => {
-        if (wikiItem.lat && wikiItem.lng) {
-          const featureId = `${doc.id}-${wikiItem.uri.split('/').pop()}`;
-          const geoFeature: GeoFeature = {
-            '@id': `${baseUrl}/api/annot/${featureId}`,
-            type: 'Feature',
-            geometry: {
-              coordinates: [parseFloat(wikiItem.lng), parseFloat(wikiItem.lat)],
-              type: 'Point',
-            },
-            properties: {
-              title: doc.data.body.label,
-              resourceCoords: doc.data.target.selector.value,
-            },
-            names: [
-              {
-                toponym: doc.data.body.label,
-                lang: 'ja',
-                citations: [{ label: manifestLabel, '@id': manifestUrl }],
-              },
-              ...(wikiItem.label
-                ? [
-                    {
-                      toponym: wikiItem.label,
-                      lang: 'ja',
-                      citations: wikiItem.wikipedia
-                        ? [{ label: 'Wikipedia', '@id': wikiItem.wikipedia }]
-                        : [{ label: 'Wikidata', '@id': wikiItem.uri }],
-                    },
-                  ]
-                : []),
-            ],
-            links: [
-              { type: 'closeMatch', identifier: toWikidataEntityUri(wikiItem.uri) },
-              ...(wikiItem.wikipedia
-                ? [{ type: 'primaryTopicOf', identifier: wikiItem.wikipedia }]
-                : []),
-            ],
-            depictions: wikiItem.thumbnail
-              ? [{ '@id': wikiItem.thumbnail }]
-              : undefined,
-          };
-          geoFeatures.push(geoFeature);
+        const wikidataFeature = createGeoFeatureFromWikidata(
+          doc,
+          wikiItem,
+          baseUrl,
+          manifestLabel,
+          manifestUrl
+        );
+        if (wikidataFeature) {
+          geoFeatures.push(wikidataFeature);
         }
       });
     }
