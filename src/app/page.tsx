@@ -819,6 +819,7 @@ const Home: NextPage = () => {
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const deleteObjectMedia = async (index: number) => {
     if (!manifestUrl || !user) return;
 
@@ -835,6 +836,7 @@ const Home: NextPage = () => {
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const deleteObjectBibliography = async (index: number) => {
     if (!manifestUrl || !user) return;
 
