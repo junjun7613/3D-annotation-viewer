@@ -71,6 +71,7 @@ export interface IIIFAnnotation {
   target: { source: string; selector: { value: [number, number, number]; type: string } };
 }
 export interface MediaItem {
+  id: string;
   type: string;
   source: string;
   caption: string;
@@ -87,6 +88,7 @@ export interface WikidataItem {
 }
 
 export interface BibliographyItem {
+  id: string;
   author: string;
   title: string;
   year: string;
@@ -116,4 +118,14 @@ export interface Annotation3 {
   content: string;
   cameraPosition: Vector3;
   targetPosition: Vector3;
+}
+
+export interface ObjectMetadata {
+  manifest_url: string;
+  media: MediaItem[];
+  wikidata: WikidataItem[];
+  bibliography: BibliographyItem[];
+  location?: LocationItem;
+  lastUpdatedBy?: string;
+  updatedAt?: number;
 }

@@ -149,7 +149,13 @@ export async function fetchManifestLabel(manifestUrl: string): Promise<{ label: 
 export const downloadIIIFManifest = async (
   manifestUrl: string,
   firebaseDocuments: NewAnnotation[],
-  baseUrl: string
+  baseUrl: string,
+  objectMetadata?: {
+    media: { id: string; type: string; source: string; caption: string }[];
+    wikidata: { type: string; label: string; uri: string; wikipedia?: string; lat?: string; lng?: string; thumbnail?: string }[];
+    bibliography: { id: string; author: string; title: string; year: string; page?: string; pdf?: string }[];
+    location?: { lat: string; lng: string };
+  } | null
 ) => {
   // manifestUrlを/でsplitして最後の要素を削除
   const newUrl = manifestUrl.split('/').slice(0, -1).join('/');
@@ -261,6 +267,102 @@ export const downloadIIIFManifest = async (
       items: [geoAnnotation],
     };
     data.items[0].annotations.push(geoAnnotationPage);
+  }
+
+  // Objectメタデータを追加
+  if (objectMetadata) {
+    // metadataを初期化（存在しない場合）
+    if (!data.metadata) {
+      data.metadata = [];
+    }
+
+    // Wikidataをmetadataに追加（URI付き）
+    if (objectMetadata.wikidata && objectMetadata.wikidata.length > 0) {
+      objectMetadata.wikidata.forEach((wikiItem) => {
+        // Linked Artスタイルでメタデータを追加
+        data.metadata.push({
+          label: { en: ['Related Entity'] },
+          value: {
+            '@id': wikiItem.uri,
+            type: 'Text',
+            format: 'text/html',
+            language: ['en'],
+            value: wikiItem.label,
+          },
+        });
+      });
+    }
+
+    // seeAlsoを初期化（存在しない場合）
+    if (!data.seeAlso) {
+      data.seeAlso = [];
+    }
+
+    // WikidataをseeAlsoに追加（完全な情報を保持）
+    if (objectMetadata.wikidata && objectMetadata.wikidata.length > 0) {
+      objectMetadata.wikidata.forEach((wikiItem) => {
+        const seeAlsoEntry: Record<string, unknown> = {
+          id: wikiItem.uri,
+          type: 'Dataset',
+          label: { en: [wikiItem.label] },
+          format: 'application/ld+json',
+          profile: wikiItem.type === 'wikidata' ? 'https://www.wikidata.org' : 'https://www.geonames.org',
+        };
+
+        // 地理情報を含める
+        if (wikiItem.lat && wikiItem.lng) {
+          seeAlsoEntry.latitude = parseFloat(wikiItem.lat);
+          seeAlsoEntry.longitude = parseFloat(wikiItem.lng);
+        }
+
+        // サムネイルを含める
+        if (wikiItem.thumbnail) {
+          seeAlsoEntry.thumbnail = wikiItem.thumbnail;
+        }
+
+        data.seeAlso.push(seeAlsoEntry);
+
+        // Wikipediaリンクも追加
+        if (wikiItem.wikipedia) {
+          data.seeAlso.push({
+            id: wikiItem.wikipedia,
+            type: 'Text',
+            label: { en: [`Wikipedia: ${wikiItem.label}`] },
+            format: 'text/html',
+          });
+        }
+      });
+    }
+
+    // 参考文献をseeAlsoに追加
+    if (objectMetadata.bibliography && objectMetadata.bibliography.length > 0) {
+      objectMetadata.bibliography.forEach((bibItem) => {
+        const bibEntry: Record<string, unknown> = {
+          type: 'Text',
+          label: { en: [`${bibItem.author} (${bibItem.year}). ${bibItem.title}`] },
+          format: bibItem.pdf ? 'application/pdf' : 'text/plain',
+        };
+        if (bibItem.pdf) {
+          bibEntry.id = bibItem.pdf;
+        }
+        data.seeAlso.push(bibEntry);
+      });
+    }
+
+    // Locationがある場合、navPlaceを追加（IIIF Navplace Extension準拠）
+    if (objectMetadata.location) {
+      data.navPlace = {
+        id: `${baseUrl}/place/object`,
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [parseFloat(objectMetadata.location.lng), parseFloat(objectMetadata.location.lat)],
+        },
+        properties: {
+          name: manifestLabel,
+        },
+      };
+    }
   }
 
   return data;

@@ -38,6 +38,8 @@ import { OutputData } from '@editorjs/editorjs'; // OutputDataをインポート
 import db from '@/lib/firebase/firebase';
 import { deleteDoc, doc, getDoc, getDocs, updateDoc, collection } from 'firebase/firestore';
 import { createWikidataItem } from '@/lib/services/wikidata';
+import { objectMetadataService } from '@/lib/services/objectMetadata';
+import type { ObjectMetadata } from '@/types/main';
 
 import type EditorJS from '@editorjs/editorjs';
 // import { link } from 'fs';
@@ -56,6 +58,7 @@ const Home: NextPage = () => {
   const [, /*editorData*/ setEditorData] = useState<OutputData | undefined>();
   const [metaTab, setMetaTab] = useState<'object' | 'annotation'>('annotation');
   const [infoTab, setInfoTab] = useState<'resources' | 'linkedData' | 'references' | 'location'>('resources');
+  const [objectTab, setObjectTab] = useState<'resources' | 'linkedData' | 'references' | 'location'>('resources');
 
   interface MediaItem {
     id: string;
@@ -96,6 +99,7 @@ const Home: NextPage = () => {
   }
 
   const [infoPanelContent] = useAtom(infoPanelAtom);
+  const [objectMetadata, setObjectMetadata] = useState<ObjectMetadata | null>(null);
 
   const [uploadedAuthorityContent, setUploadedAuthorityContent] = useState('');
   const [uploadedMediaContent, setUploadedMediaContent] = useState('');
@@ -116,6 +120,14 @@ const Home: NextPage = () => {
   const [isAuthorityUploadDialogOpen, setIsAuthorityUploadDialogOpen] = useState(false);
   const [isBibUploadDialogOpen, setIsBibUploadDialogOpen] = useState(false);
   const [isBulkWikidataDialogOpen, setIsBulkWikidataDialogOpen] = useState(false);
+
+  // Object専用のダイアログ状態
+  const [isObjectMediaDialogOpen, setIsObjectMediaDialogOpen] = useState(false);
+  const [isObjectWikidataDialogOpen, setIsObjectWikidataDialogOpen] = useState(false);
+  const [isObjectBibDialogOpen, setIsObjectBibDialogOpen] = useState(false);
+  const [isObjectMediaUploadDialogOpen, setIsObjectMediaUploadDialogOpen] = useState(false);
+  const [isObjectAuthorityUploadDialogOpen, setIsObjectAuthorityUploadDialogOpen] = useState(false);
+  const [isObjectBibUploadDialogOpen, setIsObjectBibUploadDialogOpen] = useState(false);
   const [bulkWikidataFile, setBulkWikidataFile] = useState<string>('');
   const [bulkWikidataResult, setBulkWikidataResult] = useState<{
     matched: { label: string; annotationTitle: string; wikidata: string }[];
@@ -143,9 +155,24 @@ const Home: NextPage = () => {
   const [desc, setDesc] = useState('');
   // wikidataの情報をstateで管理
   const [wikidata, setWikidata] = useState('');
-  // locationの情報をstateで管理
+  // locationの情報をstateで管理（annotation用）
   const [locationLat, setLocationLat] = useState('');
   const [locationLng, setLocationLng] = useState('');
+  // locationの情報をstateで管理（object用）
+  const [objectLocationLat, setObjectLocationLat] = useState('');
+  const [objectLocationLng, setObjectLocationLng] = useState('');
+
+  // Object用の入力データ状態
+  const [objectSource, setObjectSource] = useState('');
+  const [objectType, setObjectType] = useState('img');
+  const [objectCaption, setObjectCaption] = useState('');
+  const [objectWikiType, setObjectWikiType] = useState('wikidata');
+  const [objectIRI, setObjectIRI] = useState('');
+  const [objectBibAuthor, setObjectBibAuthor] = useState('');
+  const [objectBibTitle, setObjectBibTitle] = useState('');
+  const [objectBibYear, setObjectBibYear] = useState('');
+  const [objectBibPage, setObjectBibPage] = useState('');
+  const [objectBibPDF, setObjectBibPDF] = useState('');
 
   const [selectedImage, setSelectedImage] = useState<{
     source: string;
@@ -166,6 +193,25 @@ const Home: NextPage = () => {
       setManifestUrl(manifestParam);
     }
   }, []);
+
+  // manifestUrlが変更されたらobjectMetadataを取得
+  useEffect(() => {
+    const fetchObjectMetadata = async () => {
+      if (manifestUrl) {
+        const metadata = await objectMetadataService.getObjectMetadata(manifestUrl);
+        setObjectMetadata(metadata);
+        // objectMetadataのlocationをフォームに反映
+        if (metadata?.location) {
+          setObjectLocationLat(metadata.location.lat || '');
+          setObjectLocationLng(metadata.location.lng || '');
+        } else {
+          setObjectLocationLat('');
+          setObjectLocationLng('');
+        }
+      }
+    };
+    fetchObjectMetadata();
+  }, [manifestUrl]);
 
   // description editor関連
   useEffect(() => {
@@ -675,6 +721,133 @@ const Home: NextPage = () => {
     }
   };
 
+  // Object用の保存関数群
+  const saveObjectLocation = async () => {
+    if (!manifestUrl || !user) return;
+
+    const data = {
+      lat: objectLocationLat,
+      lng: objectLocationLng,
+    };
+
+    await objectMetadataService.updateLocation(manifestUrl, data, user.uid);
+
+    // objectMetadataを更新
+    setObjectMetadata(prev => prev ? { ...prev, location: data } : null);
+
+    alert('Location saved successfully!');
+  };
+
+  const saveObjectMedia = async () => {
+    if (!manifestUrl || !user) return;
+
+    const data = {
+      id: uuidv4(),
+      source: objectSource,
+      type: objectType,
+      caption: objectCaption,
+    };
+
+    await objectMetadataService.addMedia(manifestUrl, data, user.uid);
+
+    // objectMetadataを更新
+    setObjectMetadata(prev => prev ? { ...prev, media: [...(prev?.media || []), data] } : null);
+
+    // フォームをリセット
+    setObjectSource('');
+    setObjectCaption('');
+    setIsObjectMediaDialogOpen(false);
+  };
+
+  const saveObjectWikidata = async () => {
+    if (!manifestUrl || !user) return;
+
+    const data = await createWikidataItem(objectIRI);
+
+    await objectMetadataService.addWikidata(manifestUrl, data, user.uid);
+
+    // objectMetadataを更新
+    setObjectMetadata(prev => prev ? { ...prev, wikidata: [...(prev?.wikidata || []), data] } : null);
+
+    // フォームをリセット
+    setObjectIRI('');
+    setIsObjectWikidataDialogOpen(false);
+  };
+
+  const saveObjectBibliography = async () => {
+    if (!manifestUrl || !user) return;
+
+    const data = {
+      id: uuidv4(),
+      author: objectBibAuthor,
+      title: objectBibTitle,
+      year: objectBibYear,
+      page: objectBibPage,
+      pdf: objectBibPDF,
+    };
+
+    await objectMetadataService.addBibliography(manifestUrl, data, user.uid);
+
+    // objectMetadataを更新
+    setObjectMetadata(prev => prev ? { ...prev, bibliography: [...(prev?.bibliography || []), data] } : null);
+
+    // フォームをリセット
+    setObjectBibAuthor('');
+    setObjectBibTitle('');
+    setObjectBibYear('');
+    setObjectBibPage('');
+    setObjectBibPDF('');
+    setIsObjectBibDialogOpen(false);
+  };
+
+  const deleteObjectWikidata = async (index: number) => {
+    if (!manifestUrl || !user) return;
+
+    const confirmed = confirm('Are you sure you want to delete this Wikidata item?');
+    if (confirmed) {
+      await objectMetadataService.deleteWikidata(manifestUrl, index, user.uid);
+
+      // objectMetadataを更新
+      setObjectMetadata(prev => {
+        if (!prev) return null;
+        const newWikidata = prev.wikidata.filter((_, i) => i !== index);
+        return { ...prev, wikidata: newWikidata };
+      });
+    }
+  };
+
+  const deleteObjectMedia = async (index: number) => {
+    if (!manifestUrl || !user) return;
+
+    const confirmed = confirm('Are you sure you want to delete this media item?');
+    if (confirmed) {
+      await objectMetadataService.deleteMedia(manifestUrl, index, user.uid);
+
+      // objectMetadataを更新
+      setObjectMetadata(prev => {
+        if (!prev) return null;
+        const newMedia = prev.media.filter((_, i) => i !== index);
+        return { ...prev, media: newMedia };
+      });
+    }
+  };
+
+  const deleteObjectBibliography = async (index: number) => {
+    if (!manifestUrl || !user) return;
+
+    const confirmed = confirm('Are you sure you want to delete this reference?');
+    if (confirmed) {
+      await objectMetadataService.deleteBibliography(manifestUrl, index, user.uid);
+
+      // objectMetadataを更新
+      setObjectMetadata(prev => {
+        if (!prev) return null;
+        const newBibliography = prev.bibliography.filter((_, i) => i !== index);
+        return { ...prev, bibliography: newBibliography };
+      });
+    }
+  };
+
   const saveBibUpload = async () => {
     // Base64デコードしてCSVデータを取得
     const csvData = base64ToCsv(uploadedBibContent);
@@ -878,16 +1051,131 @@ const Home: NextPage = () => {
     }
   };
 
-  const downloadRDF = (id: string) => {
+  const downloadRDF = async (id: string) => {
     // firebaseのannotationsコレクションのすべてのDocの中から、targetmanifestの値がidと一致するものを取得
-    //const querySnapshot = getDocs(collection(db, 'annotations'));
-    const querySnapshot = getDocs(collection(db, 'test'));
-    querySnapshot.then((snapshot) => {
-      let turtleData =
-        '@prefix : <https://www.example.com/vocabulary/> .\n@prefix schema: <https://schema.org/> .\n@prefix dc: <http://purl.org/dc/elements/1.1/> .'; // ベースURIを定義
-      turtleData += '\n';
+    const querySnapshot = await getDocs(collection(db, 'test'));
 
-      snapshot.forEach((doc) => {
+    // Objectメタデータを取得
+    const objectMetadata = await objectMetadataService.getObjectMetadata(id);
+
+    let turtleData =
+      '@prefix : <https://www.example.com/vocabulary/> .\n@prefix schema: <https://schema.org/> .\n@prefix dc: <http://purl.org/dc/elements/1.1/> .\n@prefix geo: <http://www.w3.org/2003/01/geo/wgs84_pos#> .\n@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n@prefix foaf: <http://xmlns.com/foaf/0.1/> .';
+    turtleData += '\n';
+
+    // Manifestエンティティを追加（Object level metadata）
+    if (objectMetadata) {
+      turtleData += `\n<${id}> a :Manifest ;\n`;
+      const manifestProperties = [];
+
+      // Wikidataエンティティへのリンクを追加
+      if (objectMetadata.wikidata && objectMetadata.wikidata.length > 0) {
+        objectMetadata.wikidata.forEach((item) => {
+          manifestProperties.push(`  :relatedEntity <${item.uri}>`);
+        });
+      }
+
+      // Mediaを追加
+      if (objectMetadata.media && objectMetadata.media.length > 0) {
+        objectMetadata.media.forEach((item) => {
+          manifestProperties.push(`  :media <http://example.com/${item.id}>`);
+        });
+      }
+
+      // Bibliographyを追加
+      if (objectMetadata.bibliography && objectMetadata.bibliography.length > 0) {
+        objectMetadata.bibliography.forEach((item) => {
+          manifestProperties.push(`  :bibliography <http://example.com/${item.id}>`);
+        });
+      }
+
+      // Manifest自体の直接的な位置情報（object.location）
+      if (objectMetadata.location) {
+        manifestProperties.push(`  geo:lat "${objectMetadata.location.lat}"`);
+        manifestProperties.push(`  geo:long "${objectMetadata.location.lng}"`);
+      }
+
+      // プロパティを出力
+      if (manifestProperties.length > 0) {
+        manifestProperties.forEach((prop, index) => {
+          if (index < manifestProperties.length - 1) {
+            turtleData += prop + ' ;\n';
+          } else {
+            turtleData += prop + ' .\n';
+          }
+        });
+      } else {
+        turtleData += '.\n';
+      }
+
+      // Wikidataエンティティの詳細を独立したリソースとして追加
+      if (objectMetadata.wikidata && objectMetadata.wikidata.length > 0) {
+        objectMetadata.wikidata.forEach((item) => {
+          turtleData += `\n<${item.uri}> a :WikidataEntity ;\n`;
+          const wikiProperties = [];
+
+          wikiProperties.push(`  rdfs:label "${item.label}"`);
+          wikiProperties.push(`  :wikidataType "${item.type}"`);
+
+          // 地理情報
+          if (item.lat && item.lng) {
+            wikiProperties.push(`  geo:lat "${item.lat}"`);
+            wikiProperties.push(`  geo:long "${item.lng}"`);
+          }
+
+          // サムネイル
+          if (item.thumbnail) {
+            wikiProperties.push(`  foaf:depiction <${item.thumbnail}>`);
+          }
+
+          // Wikipedia
+          if (item.wikipedia) {
+            wikiProperties.push(`  rdfs:seeAlso <${item.wikipedia}>`);
+          }
+
+          wikiProperties.forEach((prop, index) => {
+            if (index < wikiProperties.length - 1) {
+              turtleData += prop + ' ;\n';
+            } else {
+              turtleData += prop + ' .\n';
+            }
+          });
+        });
+      }
+
+      // Object Mediaの詳細を追加
+      if (objectMetadata.media && objectMetadata.media.length > 0) {
+        objectMetadata.media.forEach((item) => {
+          turtleData += `\n<${IRI}object-media-${item.id}> a :Media ;\n`;
+          turtleData += `  schema:uri "${item.source}" ;\n`;
+          turtleData += `  schema:description "${item.caption}" ;\n`;
+          turtleData += `  schema:additionalType :${item.type} .\n`;
+        });
+      }
+
+      // Object Bibliographyの詳細を追加
+      if (objectMetadata.bibliography && objectMetadata.bibliography.length > 0) {
+        objectMetadata.bibliography.forEach((item) => {
+          turtleData += `\n<${IRI}object-bib-${item.id}> a :Bibliography ;\n`;
+          const bibProperties = [];
+
+          if (item.author) bibProperties.push(`  dc:creator "${item.author}"`);
+          if (item.title) bibProperties.push(`  dc:title "${item.title}"`);
+          if (item.year) bibProperties.push(`  dc:date "${item.year}"`);
+          if (item.pdf) bibProperties.push(`  schema:uri <${item.pdf}>`);
+
+          bibProperties.forEach((prop, index) => {
+            if (index === bibProperties.length - 1) {
+              turtleData += prop + ' .\n';
+            } else {
+              turtleData += prop + ' ;\n';
+            }
+          });
+        });
+      }
+    }
+
+    // 既存のAnnotation処理
+    querySnapshot.forEach((doc) => {
         const data = doc.data();
         const parser = EditorJSHtml();
         const cleanedData = JSON.parse(JSON.stringify(data.data.body.value || { blocks: [] })); // デフォルト値を設定
@@ -985,14 +1273,13 @@ const Home: NextPage = () => {
         }
       });
 
-      const blob = new Blob([turtleData], { type: 'text/turtle' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'graph-data.ttl';
-      a.click();
-      URL.revokeObjectURL(url);
-    });
+    const blob = new Blob([turtleData], { type: 'text/turtle' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'graph-data.ttl';
+    a.click();
+    URL.revokeObjectURL(url);
 
     handleRDFCloseDialog();
   };
@@ -1533,8 +1820,301 @@ const Home: NextPage = () => {
 
                 {/* Object Tab Content */}
                 {metaTab === 'object' && (
-                  <div className="flex-1 flex items-center justify-center text-[var(--text-secondary)]">
-                    <p className="text-sm">Object metadata coming soon...</p>
+                  <div className="flex-1 overflow-hidden flex flex-col">
+                    {/* Sub-level Tab Navigation: Resources/Linked Data/References/Location */}
+                    <div className="flex gap-2 mb-3 border-b border-[var(--border)] flex-shrink-0">
+                      <button
+                        className={`px-4 py-2 text-sm font-medium transition-colors ${
+                          objectTab === 'resources'
+                            ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]'
+                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                        }`}
+                        onClick={() => setObjectTab('resources')}
+                      >
+                        Resources
+                      </button>
+                      <button
+                        className={`px-4 py-2 text-sm font-medium transition-colors ${
+                          objectTab === 'linkedData'
+                            ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]'
+                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                        }`}
+                        onClick={() => setObjectTab('linkedData')}
+                      >
+                        Linked Data
+                      </button>
+                      <button
+                        className={`px-4 py-2 text-sm font-medium transition-colors ${
+                          objectTab === 'references'
+                            ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]'
+                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                        }`}
+                        onClick={() => setObjectTab('references')}
+                      >
+                        References
+                      </button>
+                      <button
+                        className={`px-4 py-2 text-sm font-medium transition-colors ${
+                          objectTab === 'location'
+                            ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]'
+                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                        }`}
+                        onClick={() => setObjectTab('location')}
+                      >
+                        Location
+                      </button>
+                    </div>
+
+                    {/* Resources Tab */}
+                    {objectTab === 'resources' && (
+                      <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+                        <div className="flex justify-end gap-1.5 mb-3 flex-shrink-0">
+                          <button
+                            onClick={() => setIsObjectMediaDialogOpen(true)}
+                            className="btn-icon btn-icon-sm btn-secondary"
+                            title="Add resource"
+                          >
+                            <img src="/images/queue.png" alt="Add" className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setIsObjectMediaUploadDialogOpen(true)}
+                            className="btn-icon btn-icon-sm btn-secondary"
+                            title="Upload CSV"
+                          >
+                            <FaUpload className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <div className="overflow-y-auto grid grid-cols-5 gap-2" style={{ height: '220px' }}>
+                          {objectMetadata?.media && objectMetadata.media.length > 0 ? (
+                            objectMetadata.media.map((mediaItem, index) => (
+                              <div key={index} className="cursor-pointer hover:opacity-80 transition-opacity rounded overflow-hidden aspect-square">
+                                {mediaItem.type === 'img' && (
+                                  <img
+                                    src={mediaItem.source}
+                                    alt={mediaItem.caption || 'Resource'}
+                                    className="w-full h-full object-cover"
+                                    onClick={() =>
+                                      setSelectedImage({
+                                        source: mediaItem.source,
+                                        caption: mediaItem.caption,
+                                        index: index,
+                                      })
+                                    }
+                                  />
+                                )}
+                                {mediaItem.type === 'video' && (
+                                  <img
+                                    src={`https://img.youtube.com/vi/${
+                                      mediaItem.source.split('/')[3].split('?')[0]
+                                    }/default.jpg`}
+                                    alt={mediaItem.caption || 'Resource'}
+                                    className="w-full h-full object-cover"
+                                    onClick={() =>
+                                      setSelectedVideo({
+                                        source: `https://www.youtube.com/embed/${
+                                          mediaItem.source.split('/')[3]
+                                        }`,
+                                        caption: mediaItem.caption,
+                                        index: index,
+                                      })
+                                    }
+                                  />
+                                )}
+                              </div>
+                            ))
+                          ) : (
+                            <p className="col-span-5 text-center text-sm text-[var(--text-secondary)] mt-4">No resources available</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Linked Data Tab */}
+                    {objectTab === 'linkedData' && (
+                      <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+                        <div className="flex justify-end gap-1.5 mb-3 flex-shrink-0">
+                          <button
+                            onClick={() => setIsObjectWikidataDialogOpen(true)}
+                            className="btn-icon btn-icon-sm btn-secondary"
+                            title="Add linked data"
+                          >
+                            <img src="/images/queue.png" alt="Add" className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setIsObjectAuthorityUploadDialogOpen(true)}
+                            className="btn-icon btn-icon-sm btn-secondary"
+                            title="Upload CSV"
+                          >
+                            <FaUpload className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <div className="overflow-y-auto" style={{ height: '220px' }}>
+                          <div className="flex flex-wrap gap-3">
+                            {objectMetadata?.wikidata && objectMetadata.wikidata.length > 0 ? (
+                              objectMetadata.wikidata.map((wikiItem, index) => (
+                                <div key={index} className="bg-[var(--card-bg)] border border-[var(--border)] rounded-lg p-3 hover:shadow-md transition-shadow" style={{ width: 'calc(50% - 6px)' }}>
+                                  {/* Thumbnail Image */}
+                                  {wikiItem.thumbnail && (
+                                    <div className="mb-2 -mx-3 -mt-3">
+                                      <img
+                                        src={wikiItem.thumbnail}
+                                        alt={wikiItem.label}
+                                        className="w-full h-24 object-cover rounded-t-lg"
+                                        onError={(e) => {
+                                          (e.target as HTMLImageElement).style.display = 'none';
+                                        }}
+                                      />
+                                    </div>
+                                  )}
+                                  {/* Header with Label and Type Badge */}
+                                  <div className="flex items-start justify-between mb-2">
+                                    <div className="flex-1">
+                                      <h4 className="text-base font-semibold text-[var(--text-primary)] mb-1">
+                                        {wikiItem.label}
+                                      </h4>
+                                      <span className={`inline-block px-2 py-1 text-xs font-medium rounded ${
+                                        wikiItem.type === 'wikidata'
+                                          ? 'bg-blue-100 text-blue-700'
+                                          : 'bg-green-100 text-green-700'
+                                      }`}>
+                                        {wikiItem.type === 'wikidata' ? 'Wikidata' : 'GeoNames'}
+                                      </span>
+                                      {wikiItem.lat && wikiItem.lng && (
+                                        <span className="ml-2 text-xs text-[var(--text-secondary)]">
+                                          {Math.abs(parseFloat(wikiItem.lat)).toFixed(2)}°{parseFloat(wikiItem.lat) >= 0 ? 'N' : 'S'}, {Math.abs(parseFloat(wikiItem.lng)).toFixed(2)}°{parseFloat(wikiItem.lng) >= 0 ? 'E' : 'W'}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <button
+                                      onClick={() => deleteObjectWikidata(index)}
+                                      className="text-red-500 hover:text-red-700 transition-colors p-1"
+                                      title="Delete"
+                                    >
+                                      <FaTrashAlt className="w-4 h-4" />
+                                    </button>
+                                  </div>
+
+                                  {/* Actions */}
+                                  <div className="flex gap-2 pt-2 border-t border-gray-100">
+                                    <a
+                                      href={wikiItem.uri}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                                      title="View on external site"
+                                    >
+                                      <PiShareNetwork className="w-4 h-4" />
+                                      View
+                                    </a>
+                                    {wikiItem.wikipedia && (
+                                      <a
+                                        href={wikiItem.wikipedia}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                                        title="View on Wikipedia"
+                                      >
+                                        <IoDocumentTextOutline className="w-4 h-4" />
+                                        Wikipedia
+                                      </a>
+                                    )}
+                                    {wikiItem.lat && wikiItem.lng && (
+                                      <button
+                                        onClick={() => {
+                                          if (wikiItem.lat !== undefined && wikiItem.lng !== undefined) {
+                                            ShowMap(wikiItem.lat, wikiItem.lng);
+                                          }
+                                        }}
+                                        className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-green-600 hover:text-green-800 hover:bg-green-50 rounded transition-colors"
+                                        title="Show on map"
+                                      >
+                                        <LiaMapMarkedSolid className="w-4 h-4" />
+                                        Map
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              ))
+                            ) : (
+                              <p className="col-span-2 text-center text-sm text-[var(--text-secondary)] mt-4">No linked data available</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* References Tab */}
+                    {objectTab === 'references' && (
+                      <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+                        <div className="flex justify-end gap-1.5 mb-3 flex-shrink-0">
+                          <button
+                            onClick={() => setIsObjectBibDialogOpen(true)}
+                            className="btn-icon btn-icon-sm btn-secondary"
+                            title="Add reference"
+                          >
+                            <img src="/images/queue.png" alt="Add" className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setIsObjectBibUploadDialogOpen(true)}
+                            className="btn-icon btn-icon-sm btn-secondary"
+                            title="Upload CSV"
+                          >
+                            <FaUpload className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <div className="overflow-y-auto" style={{ height: '220px' }}>
+                          {objectMetadata?.bibliography && objectMetadata.bibliography.length > 0 ? (
+                            objectMetadata.bibliography.map((bibItem, index) => (
+                              <div key={index} className="p-3 border-b border-[var(--border)] hover:bg-[var(--secondary-bg)] transition-colors">
+                                <p className="text-sm font-medium text-[var(--text-primary)]">{bibItem.title}</p>
+                                <p className="text-xs text-[var(--text-secondary)] mt-1">
+                                  {bibItem.author} ({bibItem.year})
+                                  {bibItem.page && `, p. ${bibItem.page}`}
+                                </p>
+                                {bibItem.pdf && (
+                                  <a href={bibItem.pdf} target="_blank" rel="noopener noreferrer" className="text-xs text-[var(--primary)] hover:underline mt-1 inline-block">
+                                    View PDF
+                                  </a>
+                                )}
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-center text-sm text-[var(--text-secondary)] mt-4">No references available</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Location Tab */}
+                    {objectTab === 'location' && (
+                      <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+                        <div className="mb-3 flex-shrink-0">
+                          <label className="block text-sm font-medium mb-2 text-[var(--text-primary)]">Latitude</label>
+                          <input
+                            type="text"
+                            value={objectLocationLat}
+                            onChange={(e) => setObjectLocationLat(e.target.value)}
+                            placeholder="Enter latitude"
+                            className="input-field w-full"
+                          />
+                        </div>
+                        <div className="mb-3 flex-shrink-0">
+                          <label className="block text-sm font-medium mb-2 text-[var(--text-primary)]">Longitude</label>
+                          <input
+                            type="text"
+                            value={objectLocationLng}
+                            onChange={(e) => setObjectLocationLng(e.target.value)}
+                            placeholder="Enter longitude"
+                            className="input-field w-full"
+                          />
+                        </div>
+                        <div className="flex justify-end">
+                          <button onClick={saveObjectLocation} className="btn-primary">
+                            Save Location
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -2438,6 +3018,159 @@ const Home: NextPage = () => {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Object用のダイアログ群 */}
+      {isObjectMediaDialogOpen && (
+        <div className="dialog-overlay" onClick={() => setIsObjectMediaDialogOpen(false)}>
+          <div className="dialog w-[500px]" onClick={(e) => e.stopPropagation()}>
+            <form className="flex flex-col gap-4">
+              <h2 className="text-xl font-bold text-[var(--text-primary)]">Add Object Media</h2>
+              <label className="font-bold text-lg">
+                Source URI:
+                <input
+                  name="source"
+                  value={objectSource}
+                  required
+                  onChange={(e) => setObjectSource(e.target.value)}
+                  className="input-field"
+                />
+              </label>
+              <label className="font-bold text-lg">
+                Type:
+                <select name="type" value={objectType} onChange={(e) => setObjectType(e.target.value)} className="input-field">
+                  <option value="img">Image</option>
+                  <option value="video">Youtube</option>
+                </select>
+              </label>
+              <label className="font-bold text-lg">
+                Caption:
+                <textarea
+                  name="caption"
+                  value={objectCaption}
+                  required
+                  onChange={(e) => setObjectCaption(e.target.value)}
+                  className="input-field resize-y min-h-24"
+                />
+              </label>
+              <div className="flex justify-end gap-3">
+                <button type="button" onClick={saveObjectMedia} className="btn-info">
+                  Save
+                </button>
+                <button type="button" onClick={() => setIsObjectMediaDialogOpen(false)} className="btn-primary">
+                  Close
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isObjectWikidataDialogOpen && (
+        <div className="dialog-overlay" onClick={() => setIsObjectWikidataDialogOpen(false)}>
+          <div className="dialog w-[500px]" onClick={(e) => e.stopPropagation()}>
+            <form className="flex flex-col gap-4">
+              <h2 className="text-xl font-bold text-[var(--text-primary)]">Add Object Linked Data</h2>
+              <label className="font-bold text-lg">
+                Type:
+                <select
+                  name="type"
+                  value={objectWikiType}
+                  onChange={(e) => setObjectWikiType(e.target.value)}
+                  className="input-field"
+                >
+                  <option value="wikidata">Wikidata</option>
+                  <option value="geonames">GeoNames</option>
+                </select>
+              </label>
+              <label className="font-bold text-lg">
+                IRI:
+                <input
+                  name="IRI"
+                  value={objectIRI}
+                  required
+                  onChange={(e) => setObjectIRI(e.target.value)}
+                  className="input-field"
+                  placeholder="https://www.wikidata.org/wiki/Q..."
+                />
+              </label>
+              <div className="flex justify-end gap-3">
+                <button type="button" onClick={saveObjectWikidata} className="btn-info">
+                  Save
+                </button>
+                <button type="button" onClick={() => setIsObjectWikidataDialogOpen(false)} className="btn-primary">
+                  Close
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isObjectBibDialogOpen && (
+        <div className="dialog-overlay" onClick={() => setIsObjectBibDialogOpen(false)}>
+          <div className="dialog w-[500px]" onClick={(e) => e.stopPropagation()}>
+            <form className="flex flex-col gap-4">
+              <h2 className="text-xl font-bold text-[var(--text-primary)]">Add Object Reference</h2>
+              <label className="font-bold text-lg">
+                Author:
+                <input
+                  name="author"
+                  value={objectBibAuthor}
+                  required
+                  onChange={(e) => setObjectBibAuthor(e.target.value)}
+                  className="input-field"
+                />
+              </label>
+              <label className="font-bold text-lg">
+                Title:
+                <input
+                  name="title"
+                  value={objectBibTitle}
+                  required
+                  onChange={(e) => setObjectBibTitle(e.target.value)}
+                  className="input-field"
+                />
+              </label>
+              <label className="font-bold text-lg">
+                Year:
+                <input
+                  name="year"
+                  value={objectBibYear}
+                  required
+                  onChange={(e) => setObjectBibYear(e.target.value)}
+                  className="input-field"
+                />
+              </label>
+              <label className="font-bold text-lg">
+                Page:
+                <input
+                  name="page"
+                  value={objectBibPage}
+                  onChange={(e) => setObjectBibPage(e.target.value)}
+                  className="input-field"
+                />
+              </label>
+              <label className="font-bold text-lg">
+                PDF URL:
+                <input
+                  name="pdf"
+                  value={objectBibPDF}
+                  onChange={(e) => setObjectBibPDF(e.target.value)}
+                  className="input-field"
+                />
+              </label>
+              <div className="flex justify-end gap-3">
+                <button type="button" onClick={saveObjectBibliography} className="btn-info">
+                  Save
+                </button>
+                <button type="button" onClick={() => setIsObjectBibDialogOpen(false)} className="btn-primary">
+                  Close
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
