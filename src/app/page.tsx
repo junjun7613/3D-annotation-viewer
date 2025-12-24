@@ -125,8 +125,11 @@ const Home: NextPage = () => {
   const [isObjectMediaDialogOpen, setIsObjectMediaDialogOpen] = useState(false);
   const [isObjectWikidataDialogOpen, setIsObjectWikidataDialogOpen] = useState(false);
   const [isObjectBibDialogOpen, setIsObjectBibDialogOpen] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isObjectMediaUploadDialogOpen, setIsObjectMediaUploadDialogOpen] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isObjectAuthorityUploadDialogOpen, setIsObjectAuthorityUploadDialogOpen] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isObjectBibUploadDialogOpen, setIsObjectBibUploadDialogOpen] = useState(false);
   const [bulkWikidataFile, setBulkWikidataFile] = useState<string>('');
   const [bulkWikidataResult, setBulkWikidataResult] = useState<{
