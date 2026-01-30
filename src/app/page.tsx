@@ -77,28 +77,9 @@ const Home: NextPage = () => {
     creator?: string;
     media?: MediaItem[];
     wikidata?: WikidataItem[];
-    bibliography?: BibItem[];
+    bibliography?: BibliographyItem[];
   }
   */
-
-  interface WikidataItem {
-    type: string;
-    uri: string;
-    label: string;
-    wikipedia?: string;
-    lat?: string;
-    lng?: string;
-    thumbnail?: string;
-  }
-
-  interface BibItem {
-    id: string;
-    author: string;
-    title: string;
-    year: string;
-    page: string;
-    pdf: string;
-  }
 
   const [infoPanelContent] = useAtom(infoPanelAtom);
   const [objectMetadata, setObjectMetadata] = useState<ObjectMetadata | null>(null);
@@ -1375,20 +1356,20 @@ const Home: NextPage = () => {
           turtleData += `  schema:additionalType :${item.type}`;
 
           // IIIFタイプの場合、manifest URLとcanvas IDを追加
-          if (item.type === 'iiif' && item.manifestUrl) {
+          if (item.type === 'iiif' && 'manifestUrl' in item && item.manifestUrl) {
             turtleData += ` ;\n`;
             turtleData += `  :iiifManifest <${item.manifestUrl}>`;
-            if (item.canvasId) {
+            if ('canvasId' in item && item.canvasId) {
               turtleData += ` ;\n`;
               turtleData += `  :iiifCanvas <${item.canvasId}>`;
             }
           }
 
           // SketchFabタイプの場合、model URLとmodel IDを追加
-          if (item.type === 'sketchfab' && item.manifestUrl) {
+          if (item.type === 'sketchfab' && 'manifestUrl' in item && item.manifestUrl) {
             turtleData += ` ;\n`;
             turtleData += `  :sketchfabUrl <${item.manifestUrl}>`;
-            if (item.canvasId) {
+            if ('canvasId' in item && item.canvasId) {
               turtleData += ` ;\n`;
               turtleData += `  :sketchfabModelId "${item.canvasId}"`;
             }
@@ -1444,21 +1425,21 @@ const Home: NextPage = () => {
 
           // wikidataの情報を追加
           if (data.wikidata) {
-            data.wikidata.forEach((item: WikidataItem) => {
+            (data.wikidata as WikidataItem[]).forEach((item: WikidataItem) => {
               properties.push(`  :wikidata <${item.uri}>`);
             });
           }
 
           // mediaの情報を追加
           if (data.media) {
-            data.media.forEach((item: MediaItem) => {
+            (data.media as MediaItem[]).forEach((item: MediaItem) => {
               properties.push(`  :media <${IRI}${item.id}>`);
             });
           }
 
           // bibliographyの情報を追加
           if (data.bibliography) {
-            data.bibliography.forEach((item: BibItem) => {
+            (data.bibliography as BibliographyItem[]).forEach((item: BibliographyItem) => {
               properties.push(`  :bibliography <${IRI}${item.id}>`);
             });
           }
@@ -1479,27 +1460,27 @@ const Home: NextPage = () => {
 
           // mediaの情報を追加
           if (data.media) {
-            data.media.forEach((item: MediaItem) => {
+            (data.media as MediaItem[]).forEach((item: MediaItem) => {
               turtleData += `\n<${IRI}${item.id}> a :Media ;\n`;
               turtleData += `  schema:uri "${item.source}" ;\n`;
               turtleData += `  schema:description "${item.caption}" ;\n`;
               turtleData += `  schema:additionalType :${item.type}`;
 
               // IIIFタイプの場合、manifest URLとcanvas IDを追加
-              if (item.type === 'iiif' && item.manifestUrl) {
+              if (item.type === 'iiif' && 'manifestUrl' in item && item.manifestUrl) {
                 turtleData += ` ;\n`;
                 turtleData += `  :iiifManifest <${item.manifestUrl}>`;
-                if (item.canvasId) {
+                if ('canvasId' in item && item.canvasId) {
                   turtleData += ` ;\n`;
                   turtleData += `  :iiifCanvas <${item.canvasId}>`;
                 }
               }
 
               // SketchFabタイプの場合、model URLとmodel IDを追加
-              if (item.type === 'sketchfab' && item.manifestUrl) {
+              if (item.type === 'sketchfab' && 'manifestUrl' in item && item.manifestUrl) {
                 turtleData += ` ;\n`;
                 turtleData += `  :sketchfabUrl <${item.manifestUrl}>`;
-                if (item.canvasId) {
+                if ('canvasId' in item && item.canvasId) {
                   turtleData += ` ;\n`;
                   turtleData += `  :sketchfabModelId "${item.canvasId}"`;
                 }
@@ -1511,7 +1492,7 @@ const Home: NextPage = () => {
 
           // bibiographyの情報を追加
           if (data.bibliography) {
-            data.bibliography.forEach((item: BibItem) => {
+            data.bibliography.forEach((item: BibliographyItem) => {
               turtleData += `\n<${IRI}${item.id}> a :Bibliography ;\n`;
               const properties = [];
 
