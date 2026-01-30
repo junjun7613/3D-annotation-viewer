@@ -72,11 +72,11 @@ export interface IIIFAnnotation {
 }
 export interface MediaItem {
   id: string;
-  type: string; // 'img' | 'video' | 'iiif'
+  type: string; // 'img' | 'video' | 'iiif' | 'sketchfab'
   source: string;
   caption: string;
-  manifestUrl?: string; // For IIIF type, the manifest URL
-  canvasId?: string; // For IIIF type, the canvas ID within the manifest
+  manifestUrl?: string; // For IIIF type: the manifest URL; For SketchFab type: the model URL
+  canvasId?: string; // For IIIF type: the canvas ID; For SketchFab type: the model ID
 }
 
 export interface WikidataItem {
