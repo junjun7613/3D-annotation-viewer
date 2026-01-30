@@ -40,6 +40,7 @@ import { deleteDoc, doc, getDoc, getDocs, updateDoc, collection } from 'firebase
 import { createWikidataItem } from '@/lib/services/wikidata';
 import { objectMetadataService } from '@/lib/services/objectMetadata';
 import type { ObjectMetadata } from '@/types/main';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import type { MediaItem, WikidataItem, BibliographyItem, LocationItem } from '@/types/main';
 
 import type EditorJS from '@editorjs/editorjs';
