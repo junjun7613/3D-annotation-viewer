@@ -2137,7 +2137,7 @@ const Home: NextPage = () => {
                           <div className="flex flex-wrap gap-3">
                             {objectMetadata?.media && objectMetadata.media.length > 0 ? (
                               objectMetadata.media.map((mediaItem, index) => (
-                                <div key={index} className="bg-[var(--card-bg)] border border-[var(--border)] rounded-lg overflow-hidden hover:shadow-md transition-shadow" style={{ width: 'calc(50% - 6px)' }}>
+                                <div key={index} className="bg-[var(--card-bg)] border border-[var(--border)] rounded-lg overflow-hidden hover:shadow-md transition-shadow" style={{ width: 'calc(33.333% - 8px)' }}>
                                   {/* Thumbnail */}
                                   <div className="relative w-full h-32 bg-gray-100 cursor-pointer" onClick={() => {
                                     if (mediaItem.type === 'img') {
@@ -2243,7 +2243,7 @@ const Home: NextPage = () => {
                           <div className="flex flex-wrap gap-3">
                             {objectMetadata?.wikidata && objectMetadata.wikidata.length > 0 ? (
                               objectMetadata.wikidata.map((wikiItem, index) => (
-                                <div key={index} className="bg-[var(--card-bg)] border border-[var(--border)] rounded-lg p-3 hover:shadow-md transition-shadow" style={{ width: 'calc(50% - 6px)' }}>
+                                <div key={index} className="bg-[var(--card-bg)] border border-[var(--border)] rounded-lg p-3 hover:shadow-md transition-shadow" style={{ width: 'calc(33.333% - 8px)' }}>
                                   {/* Thumbnail Image */}
                                   {wikiItem.thumbnail && (
                                     <div className="mb-2 -mx-3 -mt-3">
@@ -2479,7 +2479,7 @@ const Home: NextPage = () => {
                       <div className="flex flex-wrap gap-3">
                         {infoPanelContent?.media && infoPanelContent.media.length > 0
                           ? infoPanelContent.media.map((mediaItem, index) => (
-                              <div key={index} className="bg-[var(--card-bg)] border border-[var(--border)] rounded-lg overflow-hidden hover:shadow-md transition-shadow" style={{ width: 'calc(50% - 6px)' }}>
+                              <div key={index} className="bg-[var(--card-bg)] border border-[var(--border)] rounded-lg overflow-hidden hover:shadow-md transition-shadow" style={{ width: 'calc(33.333% - 8px)' }}>
                                 {/* Thumbnail */}
                                 <div className="relative w-full h-32 bg-gray-100 cursor-pointer" onClick={() => {
                                   if (mediaItem.type === 'img') {
@@ -2585,7 +2585,7 @@ const Home: NextPage = () => {
                       <div className="flex flex-wrap gap-3">
                     {infoPanelContent?.wikidata && infoPanelContent.wikidata.length > 0
                       ? infoPanelContent.wikidata.map((wikiItem, index) => (
-                          <div key={index} className="bg-[var(--card-bg)] border border-[var(--border)] rounded-lg p-3 hover:shadow-md transition-shadow" style={{ width: 'calc(50% - 6px)' }}>
+                          <div key={index} className="bg-[var(--card-bg)] border border-[var(--border)] rounded-lg p-3 hover:shadow-md transition-shadow" style={{ width: 'calc(33.333% - 8px)' }}>
                             {/* Thumbnail Image */}
                             {wikiItem.thumbnail && (
                               <div className="mb-2 -mx-3 -mt-3">
