@@ -72,9 +72,11 @@ export interface IIIFAnnotation {
 }
 export interface MediaItem {
   id: string;
-  type: string;
+  type: string; // 'img' | 'video' | 'iiif'
   source: string;
   caption: string;
+  manifestUrl?: string; // For IIIF type, the manifest URL
+  canvasId?: string; // For IIIF type, the canvas ID within the manifest
 }
 
 export interface WikidataItem {

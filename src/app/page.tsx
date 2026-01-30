@@ -187,6 +187,16 @@ const Home: NextPage = () => {
     caption: string;
     index: number;
   } | null>(null);
+  const [selectedIIIF, setSelectedIIIF] = useState<{
+    manifestUrl: string;
+    caption: string;
+    index: number;
+  } | null>(null);
+  const [selectedSketchFab, setSelectedSketchFab] = useState<{
+    modelId: string;
+    caption: string;
+    index: number;
+  } | null>(null);
 
   // URLからマニフェストURLを取得して設定するuseEffect
   useEffect(() => {
@@ -408,12 +418,116 @@ const Home: NextPage = () => {
 
   const saveMedias = async () => {
     // const mediaData = { source, type, caption };
-    const data = {
+    let data: {
+      id: string;
+      source: string;
+      type: string;
+      caption: string;
+      manifestUrl?: string;
+      canvasId?: string;
+    } = {
       id: uuidv4(),
       source: source,
       type: type,
       caption: caption,
     };
+
+    // If type is IIIF, fetch manifest and extract first canvas image
+    if (type === 'iiif') {
+      try {
+        const response = await fetch(source);
+        const manifest = await response.json();
+
+        // Check for IIIF Presentation API 3.0 (items)
+        if (manifest.items && manifest.items.length > 0) {
+          const canvas = manifest.items[0];
+          data.canvasId = canvas.id;
+
+          // Get thumbnail or first image from canvas
+          if (canvas.thumbnail && canvas.thumbnail.length > 0) {
+            data.source = canvas.thumbnail[0].id;
+          } else if (canvas.items && canvas.items.length > 0 &&
+                     canvas.items[0].items && canvas.items[0].items.length > 0 &&
+                     canvas.items[0].items[0].body) {
+            data.source = canvas.items[0].items[0].body.id;
+          }
+
+          data.manifestUrl = source;
+        }
+        // Check for IIIF Presentation API 2.0 (sequences)
+        else if (manifest.sequences && manifest.sequences.length > 0) {
+          const sequence = manifest.sequences[0];
+
+          // Get thumbnail from sequence or first canvas
+          if (sequence.thumbnail && sequence.thumbnail['@id']) {
+            data.source = sequence.thumbnail['@id'];
+          } else if (sequence.canvases && sequence.canvases.length > 0) {
+            const canvas = sequence.canvases[0];
+            data.canvasId = canvas['@id'];
+
+            // Try to get image from canvas
+            if (canvas.images && canvas.images.length > 0 && canvas.images[0].resource) {
+              data.source = canvas.images[0].resource['@id'];
+            } else if (canvas.thumbnail && canvas.thumbnail['@id']) {
+              data.source = canvas.thumbnail['@id'];
+            }
+          }
+
+          data.manifestUrl = source;
+        }
+      } catch (error) {
+        console.error('Failed to fetch IIIF manifest:', error);
+        alert('Failed to load IIIF manifest. Please check the URL.');
+        return;
+      }
+    }
+
+    // If type is SketchFab, extract model ID from HTML embed code
+    if (type === 'sketchfab') {
+      try {
+        let modelId = '';
+        let modelTitle = caption; // Default to caption
+
+        // Extract model ID from iframe src in embed code
+        const iframeSrcMatch = source.match(/src="https:\/\/sketchfab\.com\/models\/([a-f0-9]+)\/embed/);
+        if (iframeSrcMatch) {
+          modelId = iframeSrcMatch[1];
+        }
+
+        // Try to extract title from iframe title attribute
+        const titleMatch = source.match(/title="([^"]+)"/);
+        if (titleMatch && titleMatch[1]) {
+          modelTitle = titleMatch[1];
+          data.caption = modelTitle; // Update caption with extracted title
+        }
+
+        if (modelId) {
+          // SketchFab oEmbed API to get thumbnail
+          const oembedUrl = `https://sketchfab.com/oembed?url=https://sketchfab.com/models/${modelId}`;
+          const response = await fetch(oembedUrl);
+          const oembedData = await response.json();
+
+          if (oembedData.thumbnail_url) {
+            data.source = oembedData.thumbnail_url;
+          }
+
+          // If oEmbed returned a title and we don't have one from HTML, use it
+          if (!titleMatch && oembedData.title) {
+            data.caption = oembedData.title;
+          }
+
+          data.manifestUrl = source; // Store original embed code
+          data.canvasId = modelId; // Store model ID
+        } else {
+          alert('Could not extract model ID from SketchFab embed code. Please check the format.');
+          return;
+        }
+      } catch (error) {
+        console.error('Failed to process SketchFab embed code:', error);
+        alert('Failed to process SketchFab embed code.');
+        return;
+      }
+    }
 
     // firebaseのannotationsコレクションのidを持つdocのMediaフィールド(Array)のdataをfirebaseから取得
     //const docRef = doc(db, 'annotations', infoPanelContent?.id || '');
@@ -744,12 +858,116 @@ const Home: NextPage = () => {
   const saveObjectMedia = async () => {
     if (!manifestUrl || !user) return;
 
-    const data = {
+    let data: {
+      id: string;
+      source: string;
+      type: string;
+      caption: string;
+      manifestUrl?: string;
+      canvasId?: string;
+    } = {
       id: uuidv4(),
       source: objectSource,
       type: objectType,
       caption: objectCaption,
     };
+
+    // If type is IIIF, fetch manifest and extract first canvas image
+    if (objectType === 'iiif') {
+      try {
+        const response = await fetch(objectSource);
+        const manifest = await response.json();
+
+        // Check for IIIF Presentation API 3.0 (items)
+        if (manifest.items && manifest.items.length > 0) {
+          const canvas = manifest.items[0];
+          data.canvasId = canvas.id;
+
+          // Get thumbnail or first image from canvas
+          if (canvas.thumbnail && canvas.thumbnail.length > 0) {
+            data.source = canvas.thumbnail[0].id;
+          } else if (canvas.items && canvas.items.length > 0 &&
+                     canvas.items[0].items && canvas.items[0].items.length > 0 &&
+                     canvas.items[0].items[0].body) {
+            data.source = canvas.items[0].items[0].body.id;
+          }
+
+          data.manifestUrl = objectSource;
+        }
+        // Check for IIIF Presentation API 2.0 (sequences)
+        else if (manifest.sequences && manifest.sequences.length > 0) {
+          const sequence = manifest.sequences[0];
+
+          // Get thumbnail from sequence or first canvas
+          if (sequence.thumbnail && sequence.thumbnail['@id']) {
+            data.source = sequence.thumbnail['@id'];
+          } else if (sequence.canvases && sequence.canvases.length > 0) {
+            const canvas = sequence.canvases[0];
+            data.canvasId = canvas['@id'];
+
+            // Try to get image from canvas
+            if (canvas.images && canvas.images.length > 0 && canvas.images[0].resource) {
+              data.source = canvas.images[0].resource['@id'];
+            } else if (canvas.thumbnail && canvas.thumbnail['@id']) {
+              data.source = canvas.thumbnail['@id'];
+            }
+          }
+
+          data.manifestUrl = objectSource;
+        }
+      } catch (error) {
+        console.error('Failed to fetch IIIF manifest:', error);
+        alert('Failed to load IIIF manifest. Please check the URL.');
+        return;
+      }
+    }
+
+    // If type is SketchFab, extract model ID from HTML embed code
+    if (objectType === 'sketchfab') {
+      try {
+        let modelId = '';
+        let modelTitle = objectCaption; // Default to caption
+
+        // Extract model ID from iframe src in embed code
+        const iframeSrcMatch = objectSource.match(/src="https:\/\/sketchfab\.com\/models\/([a-f0-9]+)\/embed/);
+        if (iframeSrcMatch) {
+          modelId = iframeSrcMatch[1];
+        }
+
+        // Try to extract title from iframe title attribute
+        const titleMatch = objectSource.match(/title="([^"]+)"/);
+        if (titleMatch && titleMatch[1]) {
+          modelTitle = titleMatch[1];
+          data.caption = modelTitle; // Update caption with extracted title
+        }
+
+        if (modelId) {
+          // SketchFab oEmbed API to get thumbnail
+          const oembedUrl = `https://sketchfab.com/oembed?url=https://sketchfab.com/models/${modelId}`;
+          const response = await fetch(oembedUrl);
+          const oembedData = await response.json();
+
+          if (oembedData.thumbnail_url) {
+            data.source = oembedData.thumbnail_url;
+          }
+
+          // If oEmbed returned a title and we don't have one from HTML, use it
+          if (!titleMatch && oembedData.title) {
+            data.caption = oembedData.title;
+          }
+
+          data.manifestUrl = objectSource; // Store original embed code
+          data.canvasId = modelId; // Store model ID
+        } else {
+          alert('Could not extract model ID from SketchFab embed code. Please check the format.');
+          return;
+        }
+      } catch (error) {
+        console.error('Failed to process SketchFab embed code:', error);
+        alert('Failed to process SketchFab embed code.');
+        return;
+      }
+    }
 
     await objectMetadataService.addMedia(manifestUrl, data, user.uid);
 
@@ -819,7 +1037,6 @@ const Home: NextPage = () => {
     }
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const deleteObjectMedia = async (index: number) => {
     if (!manifestUrl || !user) return;
 
@@ -1150,10 +1367,32 @@ const Home: NextPage = () => {
       // Object Mediaの詳細を追加
       if (objectMetadata.media && objectMetadata.media.length > 0) {
         objectMetadata.media.forEach((item) => {
-          turtleData += `\n<${IRI}object-media-${item.id}> a :Media ;\n`;
+          turtleData += `\n<http://example.com/${item.id}> a :Media ;\n`;
           turtleData += `  schema:uri "${item.source}" ;\n`;
           turtleData += `  schema:description "${item.caption}" ;\n`;
-          turtleData += `  schema:additionalType :${item.type} .\n`;
+          turtleData += `  schema:additionalType :${item.type}`;
+
+          // IIIFタイプの場合、manifest URLとcanvas IDを追加
+          if (item.type === 'iiif' && item.manifestUrl) {
+            turtleData += ` ;\n`;
+            turtleData += `  :iiifManifest <${item.manifestUrl}>`;
+            if (item.canvasId) {
+              turtleData += ` ;\n`;
+              turtleData += `  :iiifCanvas <${item.canvasId}>`;
+            }
+          }
+
+          // SketchFabタイプの場合、model URLとmodel IDを追加
+          if (item.type === 'sketchfab' && item.manifestUrl) {
+            turtleData += ` ;\n`;
+            turtleData += `  :sketchfabUrl <${item.manifestUrl}>`;
+            if (item.canvasId) {
+              turtleData += ` ;\n`;
+              turtleData += `  :sketchfabModelId "${item.canvasId}"`;
+            }
+          }
+
+          turtleData += ` .\n`;
         });
       }
 
@@ -1242,7 +1481,29 @@ const Home: NextPage = () => {
               turtleData += `\n<${IRI}${item.id}> a :Media ;\n`;
               turtleData += `  schema:uri "${item.source}" ;\n`;
               turtleData += `  schema:description "${item.caption}" ;\n`;
-              turtleData += `  schema:additionalType :${item.type} .\n`;
+              turtleData += `  schema:additionalType :${item.type}`;
+
+              // IIIFタイプの場合、manifest URLとcanvas IDを追加
+              if (item.type === 'iiif' && item.manifestUrl) {
+                turtleData += ` ;\n`;
+                turtleData += `  :iiifManifest <${item.manifestUrl}>`;
+                if (item.canvasId) {
+                  turtleData += ` ;\n`;
+                  turtleData += `  :iiifCanvas <${item.canvasId}>`;
+                }
+              }
+
+              // SketchFabタイプの場合、model URLとmodel IDを追加
+              if (item.type === 'sketchfab' && item.manifestUrl) {
+                turtleData += ` ;\n`;
+                turtleData += `  :sketchfabUrl <${item.manifestUrl}>`;
+                if (item.canvasId) {
+                  turtleData += ` ;\n`;
+                  turtleData += `  :sketchfabModelId "${item.canvasId}"`;
+                }
+              }
+
+              turtleData += ` .\n`;
             });
           }
 
@@ -1747,14 +2008,14 @@ const Home: NextPage = () => {
                 className="ml-10 p-0 bg-transparent border-0 cursor-pointer hover:opacity-70 transition-opacity"
                 title="Export RDF"
               >
-                <img src="/images/rdf.png" alt="RDF" className="w-8 h-8" />
+                <img src="/images/rdf.png" alt="RDF" className="w-8 h-8 object-contain" />
               </button>
               <button
                 onClick={() => downloadIIIFManifest(manifestUrl)}
                 className="ml-4 p-0 bg-transparent border-0 cursor-pointer hover:opacity-70 transition-opacity"
                 title="View IIIF Manifest"
               >
-                <img src="/images/iiif.png" alt="IIIF" className="w-10 h-10" />
+                <img src="/images/iiif.png" alt="IIIF" className="w-10 h-10 object-contain" />
               </button>
               <button
                 onClick={() => setIsBulkWikidataDialogOpen(true)}
@@ -1889,47 +2150,89 @@ const Home: NextPage = () => {
                             <FaUpload className="w-3.5 h-3.5" />
                           </button>
                         </div>
-                        <div className="overflow-y-auto grid grid-cols-5 gap-2" style={{ height: '220px' }}>
-                          {objectMetadata?.media && objectMetadata.media.length > 0 ? (
-                            objectMetadata.media.map((mediaItem, index) => (
-                              <div key={index} className="cursor-pointer hover:opacity-80 transition-opacity rounded overflow-hidden aspect-square">
-                                {mediaItem.type === 'img' && (
-                                  <img
-                                    src={mediaItem.source}
-                                    alt={mediaItem.caption || 'Resource'}
-                                    className="w-full h-full object-cover"
-                                    onClick={() =>
+                        <div className="overflow-y-auto" style={{ height: '220px' }}>
+                          <div className="flex flex-wrap gap-3">
+                            {objectMetadata?.media && objectMetadata.media.length > 0 ? (
+                              objectMetadata.media.map((mediaItem, index) => (
+                                <div key={index} className="bg-[var(--card-bg)] border border-[var(--border)] rounded-lg overflow-hidden hover:shadow-md transition-shadow" style={{ width: 'calc(50% - 6px)' }}>
+                                  {/* Thumbnail */}
+                                  <div className="relative w-full h-32 bg-gray-100 cursor-pointer" onClick={() => {
+                                    if (mediaItem.type === 'img') {
                                       setSelectedImage({
                                         source: mediaItem.source,
                                         caption: mediaItem.caption,
                                         index: index,
-                                      })
-                                    }
-                                  />
-                                )}
-                                {mediaItem.type === 'video' && (
-                                  <img
-                                    src={`https://img.youtube.com/vi/${
-                                      mediaItem.source.split('/')[3].split('?')[0]
-                                    }/default.jpg`}
-                                    alt={mediaItem.caption || 'Resource'}
-                                    className="w-full h-full object-cover"
-                                    onClick={() =>
+                                      });
+                                    } else if (mediaItem.type === 'video') {
                                       setSelectedVideo({
-                                        source: `https://www.youtube.com/embed/${
-                                          mediaItem.source.split('/')[3]
-                                        }`,
+                                        source: `https://www.youtube.com/embed/${mediaItem.source.split('/')[3]}`,
                                         caption: mediaItem.caption,
                                         index: index,
-                                      })
+                                      });
+                                    } else if (mediaItem.type === 'iiif' && mediaItem.manifestUrl) {
+                                      setSelectedIIIF({
+                                        manifestUrl: mediaItem.manifestUrl,
+                                        caption: mediaItem.caption,
+                                        index: index,
+                                      });
+                                    } else if (mediaItem.type === 'sketchfab' && mediaItem.canvasId) {
+                                      setSelectedSketchFab({
+                                        modelId: mediaItem.canvasId,
+                                        caption: mediaItem.caption,
+                                        index: index,
+                                      });
                                     }
-                                  />
-                                )}
-                              </div>
-                            ))
-                          ) : (
-                            <p className="col-span-5 text-center text-sm text-[var(--text-secondary)] mt-4">No resources available</p>
-                          )}
+                                  }}>
+                                    {mediaItem.type === 'img' && (
+                                      <img src={mediaItem.source} alt={mediaItem.caption || 'Resource'} className="w-full h-full object-cover" />
+                                    )}
+                                    {mediaItem.type === 'video' && (
+                                      <img
+                                        src={`https://img.youtube.com/vi/${mediaItem.source.split('/')[3].split('?')[0]}/default.jpg`}
+                                        alt={mediaItem.caption || 'Resource'}
+                                        className="w-full h-full object-cover"
+                                      />
+                                    )}
+                                    {mediaItem.type === 'iiif' && (
+                                      <img src={mediaItem.source} alt={mediaItem.caption || 'Resource'} className="w-full h-full object-cover" />
+                                    )}
+                                    {mediaItem.type === 'sketchfab' && (
+                                      <img src={mediaItem.source} alt={mediaItem.caption || 'Resource'} className="w-full h-full object-cover" />
+                                    )}
+                                  </div>
+
+                                  {/* Caption and Type Badge */}
+                                  <div className="p-3">
+                                    <div className="flex items-start justify-between mb-2">
+                                      <div className="flex-1">
+                                        <p className="text-sm font-medium text-[var(--text-primary)] line-clamp-2">{mediaItem.caption}</p>
+                                        <span className={`inline-block px-2 py-1 text-xs font-medium rounded mt-1 ${
+                                          mediaItem.type === 'iiif' ? 'bg-purple-100 text-purple-700' :
+                                          mediaItem.type === 'video' ? 'bg-red-100 text-red-700' :
+                                          mediaItem.type === 'sketchfab' ? 'bg-green-100 text-green-700' :
+                                          'bg-blue-100 text-blue-700'
+                                        }`}>
+                                          {mediaItem.type === 'iiif' ? 'IIIF' : mediaItem.type === 'video' ? 'YouTube' : mediaItem.type === 'sketchfab' ? 'SketchFab' : 'Image'}
+                                        </span>
+                                      </div>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          deleteObjectMedia(index);
+                                        }}
+                                        className="text-red-500 hover:text-red-700 transition-colors p-1"
+                                        title="Delete"
+                                      >
+                                        <FaTrashAlt className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))
+                            ) : (
+                              <p className="col-span-2 text-center text-sm text-[var(--text-secondary)] mt-4">No resources available</p>
+                            )}
+                          </div>
                         </div>
                       </div>
                     )}
@@ -2189,46 +2492,89 @@ const Home: NextPage = () => {
                         <img src="/images/upload.png" alt="Upload" className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                    <div className="overflow-y-auto grid grid-cols-5 gap-2" style={{ height: '220px' }}>
-                    {infoPanelContent?.media && infoPanelContent.media.length > 0
-                      ? infoPanelContent.media.map((mediaItem, index) => (
-                          <div key={index} className="cursor-pointer hover:opacity-80 transition-opacity rounded overflow-hidden aspect-square">
-                            {mediaItem.type === 'img' && (
-                              <img
-                                src={mediaItem.source}
-                                alt={mediaItem.caption}
-                                className="w-full h-full object-cover"
-                                onClick={() =>
-                                  setSelectedImage({
-                                    source: mediaItem.source,
-                                    caption: mediaItem.caption,
-                                    index: index,
-                                  })
-                                }
-                              />
-                            )}
+                    <div className="overflow-y-auto" style={{ height: '220px' }}>
+                      <div className="flex flex-wrap gap-3">
+                        {infoPanelContent?.media && infoPanelContent.media.length > 0
+                          ? infoPanelContent.media.map((mediaItem, index) => (
+                              <div key={index} className="bg-[var(--card-bg)] border border-[var(--border)] rounded-lg overflow-hidden hover:shadow-md transition-shadow" style={{ width: 'calc(50% - 6px)' }}>
+                                {/* Thumbnail */}
+                                <div className="relative w-full h-32 bg-gray-100 cursor-pointer" onClick={() => {
+                                  if (mediaItem.type === 'img') {
+                                    setSelectedImage({
+                                      source: mediaItem.source,
+                                      caption: mediaItem.caption,
+                                      index: index,
+                                    });
+                                  } else if (mediaItem.type === 'video') {
+                                    setSelectedVideo({
+                                      source: `https://www.youtube.com/embed/${mediaItem.source.split('/')[3]}`,
+                                      caption: mediaItem.caption,
+                                      index: index,
+                                    });
+                                  } else if (mediaItem.type === 'iiif' && mediaItem.manifestUrl) {
+                                    setSelectedIIIF({
+                                      manifestUrl: mediaItem.manifestUrl,
+                                      caption: mediaItem.caption,
+                                      index: index,
+                                    });
+                                  } else if (mediaItem.type === 'sketchfab' && mediaItem.canvasId) {
+                                    setSelectedSketchFab({
+                                      modelId: mediaItem.canvasId,
+                                      caption: mediaItem.caption,
+                                      index: index,
+                                    });
+                                  }
+                                }}>
+                                  {mediaItem.type === 'img' && (
+                                    <img src={mediaItem.source} alt={mediaItem.caption} className="w-full h-full object-cover" />
+                                  )}
+                                  {mediaItem.type === 'video' && (
+                                    <img
+                                      src={`https://img.youtube.com/vi/${mediaItem.source.split('/')[3].split('?')[0]}/default.jpg`}
+                                      alt={mediaItem.caption}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  )}
+                                  {mediaItem.type === 'iiif' && (
+                                    <img src={mediaItem.source} alt={mediaItem.caption} className="w-full h-full object-cover" />
+                                  )}
+                                  {mediaItem.type === 'sketchfab' && (
+                                    <img src={mediaItem.source} alt={mediaItem.caption} className="w-full h-full object-cover" />
+                                  )}
+                                </div>
 
-                            {mediaItem.type === 'video' && (
-                              <img
-                                src={`https://img.youtube.com/vi/${
-                                  mediaItem.source.split('/')[3].split('?')[0]
-                                }/default.jpg`}
-                                alt={mediaItem.caption}
-                                className="w-full h-full object-cover"
-                                onClick={() =>
-                                  setSelectedVideo({
-                                    source: `https://www.youtube.com/embed/${
-                                      mediaItem.source.split('/')[3]
-                                    }`,
-                                    caption: mediaItem.caption,
-                                    index: index,
-                                  })
-                                }
-                              />
-                            )}
-                          </div>
-                        ))
-                      : null}
+                                {/* Caption and Type Badge */}
+                                <div className="p-3">
+                                  <div className="flex items-start justify-between mb-2">
+                                    <div className="flex-1">
+                                      <p className="text-sm font-medium text-[var(--text-primary)] line-clamp-2">{mediaItem.caption}</p>
+                                      <span className={`inline-block px-2 py-1 text-xs font-medium rounded mt-1 ${
+                                        mediaItem.type === 'iiif' ? 'bg-purple-100 text-purple-700' :
+                                        mediaItem.type === 'video' ? 'bg-red-100 text-red-700' :
+                                        mediaItem.type === 'sketchfab' ? 'bg-green-100 text-green-700' :
+                                        'bg-blue-100 text-blue-700'
+                                      }`}>
+                                        {mediaItem.type === 'iiif' ? 'IIIF' : mediaItem.type === 'video' ? 'YouTube' : mediaItem.type === 'sketchfab' ? 'SketchFab' : 'Image'}
+                                      </span>
+                                    </div>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (infoPanelContent?.id) {
+                                          deleteMedia(infoPanelContent.id, index);
+                                        }
+                                      }}
+                                      className="text-red-500 hover:text-red-700 transition-colors p-1"
+                                      title="Delete"
+                                    >
+                                      <FaTrashAlt className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            ))
+                          : <p className="col-span-2 text-center text-sm text-[var(--text-secondary)] mt-4">No resources available</p>}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -2564,12 +2910,13 @@ const Home: NextPage = () => {
             <form className="flex flex-col gap-4">
               <label className="font-bold text-lg">
                 Source URI:
-                <input
+                <textarea
                   name="source"
                   value={source}
                   required
                   onChange={(e) => setSource(e.target.value)}
-                  className="input-field"
+                  className="input-field resize-y min-h-24"
+                  placeholder={type === 'sketchfab' ? 'Paste SketchFab HTML embed code here...' : 'Enter URL or embed code...'}
                 />
               </label>
               <label className="font-bold text-lg">
@@ -2577,6 +2924,8 @@ const Home: NextPage = () => {
                 <select name="type" value={type} onChange={(e) => setType(e.target.value)} className="input-field">
                   <option value="img">Image</option>
                   <option value="video">Youtube</option>
+                  <option value="iiif">IIIF Manifest</option>
+                  <option value="sketchfab">SketchFab</option>
                 </select>
               </label>
               <label className="font-bold text-lg">
@@ -3035,12 +3384,13 @@ const Home: NextPage = () => {
               <h2 className="text-xl font-bold text-[var(--text-primary)]">Add Object Media</h2>
               <label className="font-bold text-lg">
                 Source URI:
-                <input
+                <textarea
                   name="source"
                   value={objectSource}
                   required
                   onChange={(e) => setObjectSource(e.target.value)}
-                  className="input-field"
+                  className="input-field resize-y min-h-24"
+                  placeholder={objectType === 'sketchfab' ? 'Paste SketchFab HTML embed code here...' : 'Enter URL or embed code...'}
                 />
               </label>
               <label className="font-bold text-lg">
@@ -3048,6 +3398,8 @@ const Home: NextPage = () => {
                 <select name="type" value={objectType} onChange={(e) => setObjectType(e.target.value)} className="input-field">
                   <option value="img">Image</option>
                   <option value="video">Youtube</option>
+                  <option value="iiif">IIIF Manifest</option>
+                  <option value="sketchfab">SketchFab</option>
                 </select>
               </label>
               <label className="font-bold text-lg">
@@ -3176,6 +3528,59 @@ const Home: NextPage = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* IIIF Mirador Viewer Dialog */}
+      {selectedIIIF && (
+        <div className="dialog-overlay" onClick={() => setSelectedIIIF(null)}>
+          <div className="w-[90vw] h-[90vh] bg-white rounded-lg shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
+              <h3 className="text-lg font-semibold text-gray-800">{selectedIIIF.caption}</h3>
+              <button
+                onClick={() => setSelectedIIIF(null)}
+                className="text-gray-500 hover:text-gray-700 transition-colors text-2xl font-bold"
+                title="Close"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="w-full h-[calc(100%-4rem)]">
+              <iframe
+                src={`https://projectmirador.org/embed/?iiif-content=${encodeURIComponent(selectedIIIF.manifestUrl)}`}
+                className="w-full h-full border-0"
+                title="IIIF Mirador Viewer"
+                allow="fullscreen"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SketchFab Viewer Dialog */}
+      {selectedSketchFab && (
+        <div className="dialog-overlay" onClick={() => setSelectedSketchFab(null)}>
+          <div className="w-[90vw] h-[90vh] bg-white rounded-lg shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
+              <h3 className="text-lg font-semibold text-gray-800">{selectedSketchFab.caption}</h3>
+              <button
+                onClick={() => setSelectedSketchFab(null)}
+                className="text-gray-500 hover:text-gray-700 transition-colors text-2xl font-bold"
+                title="Close"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="w-full h-[calc(100%-4rem)]">
+              <iframe
+                src={`https://sketchfab.com/models/${selectedSketchFab.modelId}/embed?autostart=1&ui_theme=dark`}
+                className="w-full h-full border-0"
+                title="SketchFab 3D Model Viewer"
+                allow="autoplay; fullscreen; xr-spatial-tracking"
+                allowFullScreen
+              />
+            </div>
           </div>
         </div>
       )}

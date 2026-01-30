@@ -151,7 +151,7 @@ export const downloadIIIFManifest = async (
   firebaseDocuments: NewAnnotation[],
   baseUrl: string,
   objectMetadata?: {
-    media: { id: string; type: string; source: string; caption: string }[];
+    media: { id: string; type: string; source: string; caption: string; manifestUrl?: string; canvasId?: string }[];
     wikidata: { type: string; label: string; uri: string; wikipedia?: string; lat?: string; lng?: string; thumbnail?: string }[];
     bibliography: { id: string; author: string; title: string; year: string; page?: string; pdf?: string }[];
     location?: { lat: string; lng: string };
@@ -346,6 +346,40 @@ export const downloadIIIFManifest = async (
           bibEntry.id = bibItem.pdf;
         }
         data.seeAlso.push(bibEntry);
+      });
+    }
+
+    // MediaをseeAlsoに追加
+    if (objectMetadata.media && objectMetadata.media.length > 0) {
+      objectMetadata.media.forEach((mediaItem) => {
+        const mediaEntry: Record<string, unknown> = {
+          type: mediaItem.type === 'iiif' ? 'Manifest' : (mediaItem.type === 'video' ? 'Video' : 'Image'),
+          label: { en: [mediaItem.caption] },
+        };
+
+        // IIIFの場合はmanifestUrlを、それ以外はsourceを使用
+        if (mediaItem.type === 'iiif' && mediaItem.manifestUrl) {
+          mediaEntry.id = mediaItem.manifestUrl;
+          mediaEntry.format = 'application/ld+json';
+          mediaEntry.profile = 'http://iiif.io/api/presentation/3/context.json';
+          if (mediaItem.canvasId) {
+            mediaEntry.partOf = [{
+              id: mediaItem.manifestUrl,
+              type: 'Manifest'
+            }];
+            mediaEntry.id = mediaItem.canvasId;
+            mediaEntry.type = 'Canvas';
+          }
+        } else {
+          mediaEntry.id = mediaItem.source;
+          if (mediaItem.type === 'video') {
+            mediaEntry.format = 'video/mp4';
+          } else if (mediaItem.type === 'img') {
+            mediaEntry.format = 'image/jpeg';
+          }
+        }
+
+        data.seeAlso.push(mediaEntry);
       });
     }
 

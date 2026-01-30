@@ -324,7 +324,18 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
     fetchManifest().then((manifest) => {
       //getAnnotations().then(annotationData => {
 
+      console.log('Loaded manifest:', manifest);
+
+      // Check if the manifest structure is correct
+      if (!manifest.items || !manifest.items[0] || !manifest.items[0].items ||
+          !manifest.items[0].items[0] || !manifest.items[0].items[0].items ||
+          !manifest.items[0].items[0].items[0] || !manifest.items[0].items[0].items[0].body) {
+        console.error('Invalid manifest structure:', manifest);
+        return;
+      }
+
       const importedModel = manifest.items[0].items[0].items[0].body.id;
+      console.log('Model URL:', importedModel);
       //const importedModelType = manifest.items[0].items[0].items[0].body.type;
       // Use the input manifestUrl instead of manifest.id to ensure consistency
       targetManifest.current = manifestUrl;
@@ -332,14 +343,24 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
 
       // GLTFLoader
       const loader = new GLTFLoader();
-      const dracoLoader = new DRACOLoader();
-      dracoLoader.setDecoderPath('https://www.gstatic.com/draco/v1/decoders/');
-      loader.setDRACOLoader(dracoLoader);
+
+      // Try to set up DRACO loader, but make it optional
+      try {
+        const dracoLoader = new DRACOLoader();
+        dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+        dracoLoader.preload();
+        loader.setDRACOLoader(dracoLoader);
+        console.log('DRACO loader configured');
+      } catch (error) {
+        console.warn('DRACO loader failed to initialize, continuing without it:', error);
+      }
+
       loader.load(
         //'/models/inscription_1.glb', // Replace with the path to your .glb file
         importedModel,
 
         (gltf) => {
+          console.log('Model loaded successfully:', gltf);
           const model = gltf.scene;
           scene.add(model);
 
@@ -352,6 +373,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
         (xhr) => {
           // ロード進捗を取得
           const progress = (xhr.loaded / xhr.total) * 100;
+          console.log(`Loading model: ${progress.toFixed(2)}%`);
           // 進捗バーを更新する場合
           const progressBar = document.getElementById('progress-bar');
           if (progressBar) {
@@ -359,7 +381,8 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
           }
         },
         (error) => {
-          console.error('An error happened', error);
+          console.error('An error happened loading the model:', error);
+          setIsProgressVisible(false);
         }
       );
 
