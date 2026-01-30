@@ -418,7 +418,7 @@ const Home: NextPage = () => {
 
   const saveMedias = async () => {
     // const mediaData = { source, type, caption };
-    let data: {
+    const data: {
       id: string;
       source: string;
       type: string;
@@ -858,7 +858,7 @@ const Home: NextPage = () => {
   const saveObjectMedia = async () => {
     if (!manifestUrl || !user) return;
 
-    let data: {
+    const data: {
       id: string;
       source: string;
       type: string;
