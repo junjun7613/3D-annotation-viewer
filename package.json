@@ -16,7 +16,6 @@
     "@editorjs/list": "^2.0.6",
     "@iiif/presentation-3": "^2.1.0",
     "@tailwindcss/postcss": "^4.0.15",
-    "axios": "^1.8.4",
     "CETEIcean": "^1.9.5",
     "ckeditor5": "^44.3.0",
     "ckeditor5-premium-features": "^44.3.0",

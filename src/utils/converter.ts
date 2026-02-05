@@ -206,6 +206,80 @@ export const downloadIIIFManifest = async (
       },
     };
 
+    // アノテーションごとのseeAlsoを構築
+    const seeAlsoItems: Record<string, unknown>[] = [];
+
+    // Mediaを追加
+    if (doc.media && doc.media.length > 0) {
+      doc.media.forEach((mediaItem) => {
+        const mediaEntry: Record<string, unknown> = {
+          type: mediaItem.type === 'iiif' ? 'Manifest' : (mediaItem.type === 'video' ? 'Video' : (mediaItem.type === 'sketchfab' ? 'Model' : 'Image')),
+          label: { en: [mediaItem.caption || mediaItem.type] },
+        };
+
+        if (mediaItem.type === 'iiif' && mediaItem.manifestUrl) {
+          mediaEntry.id = mediaItem.manifestUrl;
+          mediaEntry.format = 'application/ld+json';
+          mediaEntry.profile = 'http://iiif.io/api/presentation/3/context.json';
+        } else if (mediaItem.type === 'sketchfab' && mediaItem.canvasId) {
+          mediaEntry.id = `https://sketchfab.com/models/${mediaItem.canvasId}`;
+          mediaEntry.format = 'text/html';
+        } else if (mediaItem.type === 'video') {
+          mediaEntry.id = mediaItem.source;
+          mediaEntry.format = 'text/html';
+        } else {
+          mediaEntry.id = mediaItem.source;
+          mediaEntry.format = 'image/jpeg';
+        }
+
+        seeAlsoItems.push(mediaEntry);
+      });
+    }
+
+    // Wikidataを追加
+    if (doc.wikidata && doc.wikidata.length > 0) {
+      doc.wikidata.forEach((wikiItem: WikidataItem) => {
+        const wikiEntry: Record<string, unknown> = {
+          id: wikiItem.uri,
+          type: 'Dataset',
+          label: { en: [wikiItem.label] },
+          format: 'application/ld+json',
+          profile: 'https://www.wikidata.org',
+        };
+
+        if (wikiItem.wikipedia) {
+          seeAlsoItems.push({
+            id: wikiItem.wikipedia,
+            type: 'Text',
+            label: { en: [`Wikipedia: ${wikiItem.label}`] },
+            format: 'text/html',
+          });
+        }
+
+        seeAlsoItems.push(wikiEntry);
+      });
+    }
+
+    // Bibliographyを追加
+    if (doc.bibliography && doc.bibliography.length > 0) {
+      doc.bibliography.forEach((bibItem) => {
+        const bibEntry: Record<string, unknown> = {
+          type: 'Text',
+          label: { en: [`${bibItem.author} (${bibItem.year}). ${bibItem.title}`] },
+          format: bibItem.pdf ? 'application/pdf' : 'text/plain',
+        };
+        if (bibItem.pdf) {
+          bibEntry.id = bibItem.pdf;
+        }
+        seeAlsoItems.push(bibEntry);
+      });
+    }
+
+    // seeAlsoがある場合のみ追加
+    if (seeAlsoItems.length > 0) {
+      annotation.seeAlso = seeAlsoItems;
+    }
+
     annotations.push(annotation);
 
     // Geo features from location

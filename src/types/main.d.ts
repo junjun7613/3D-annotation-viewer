@@ -69,6 +69,7 @@ export interface IIIFAnnotation {
   motivation: string;
   body: { value: string; label: string; type: string };
   target: { source: string; selector: { value: [number, number, number]; type: string } };
+  seeAlso?: Record<string, unknown>[];
 }
 export interface MediaItem {
   id: string;
