@@ -7,7 +7,7 @@ import type { NextPage } from 'next';
 import SignIn from './components/SignIn';
 import ThreeCanvas from './components/ThreeCanvasManifest';
 import SwitchButton from './components/SwitchButton';
-import DisplayTEI from './components/DisplayTEI';
+import TEILinkViewer from './components/TEILinkViewer';
 import { FaPencilAlt, FaBook, FaRegFilePdf, FaTrashAlt, FaList, FaUpload, FaBars } from 'react-icons/fa';
 import { FaLink } from 'react-icons/fa6';
 import { PiShareNetwork } from 'react-icons/pi';
@@ -27,8 +27,6 @@ import List from '@editorjs/list';
 // import HTMLViewer from './components/HTMLviewer';
 
 import { createSlug } from '@/utils/converter';
-import { generateSourceDocTei } from '@/utils/teiGenerator';
-import type { AnnotationCoords } from '@/utils/teiGenerator';
 
 import type { ToolConstructable } from '@editorjs/editorjs';
 
@@ -41,12 +39,26 @@ import db from '@/lib/firebase/firebase';
 import { deleteDoc, doc, getDoc, getDocs, updateDoc, collection } from 'firebase/firestore';
 import { createWikidataItem } from '@/lib/services/wikidata';
 import { objectMetadataService } from '@/lib/services/objectMetadata';
-import type { ObjectMetadata } from '@/types/main';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import type { MediaItem, WikidataItem, BibliographyItem, LocationItem } from '@/types/main';
 
 import type EditorJS from '@editorjs/editorjs';
 // import { link } from 'fs';
+
+// Custom hooks
+import { useManifestUrl } from './hooks/useManifestUrl';
+import { useObjectMetadata } from './hooks/useObjectMetadata';
+import { useTeiLinking } from './hooks/useTeiLinking';
+import { useAnnotationList } from './hooks/useAnnotationList';
+
+// Dialog components
+import {
+  MediaDialog,
+  WikidataDialog,
+  BibliographyDialog,
+  TitleEditDialog,
+  AnnotationListDialog,
+} from './components/dialogs';
 
 const Home: NextPage = () => {
   const editorRef = useRef<EditorJS | null>(null);
@@ -56,7 +68,51 @@ const Home: NextPage = () => {
   // sprite annotationとpolygon annotationの表示を切り替える
   const [annotationMode, setAnnotationMode] = useState(false);
   const [compactMarkers, setCompactMarkers] = useState(false);
-  const [manifestUrl, setManifestUrl] = useState<string>('');
+
+  // Custom hooks
+  const { manifestUrl, handleManifestUrlChange } = useManifestUrl();
+  const [infoPanelContent] = useAtom(infoPanelAtom);
+  const {
+    objectMetadata,
+    setObjectMetadata,
+    objectLocationLat,
+    setObjectLocationLat,
+    objectLocationLng,
+    setObjectLocationLng,
+    savedTeiOriginal,
+    savedTeiLineMappings,
+  } = useObjectMetadata(manifestUrl);
+  const {
+    teiLineMappings,
+    selectedTeiLine,
+    setSelectedTeiLine,
+    originalTeiXml,
+    setOriginalTeiXml,
+    setTeiLineMappings,
+    isGeneratingTei,
+    highlightedLineNumber,
+    handleTeiLineClick,
+    handleTeiUnlink,
+    downloadSourceDocTei,
+  } = useTeiLinking({
+    infoPanelContent,
+    manifestUrl,
+    user,
+    savedTeiOriginal,
+    savedTeiLineMappings,
+  });
+  const {
+    annotationList,
+    isAnnotationListOpen,
+    setIsAnnotationListOpen,
+    focusAnnotationId,
+    setFocusAnnotationId,
+    handleAnnotationListOpen,
+  } = useAnnotationList(manifestUrl);
+
+  // Compute effective selected TEI line (highlightedLineNumber takes priority)
+  const effectiveSelectedTeiLine = highlightedLineNumber ?? selectedTeiLine;
+
   // infoPanelContentという連想配列を作成
 
   const [, /*editorData*/ setEditorData] = useState<OutputData | undefined>();
@@ -83,9 +139,6 @@ const Home: NextPage = () => {
   }
   */
 
-  const [infoPanelContent] = useAtom(infoPanelAtom);
-  const [objectMetadata, setObjectMetadata] = useState<ObjectMetadata | null>(null);
-
   const [uploadedAuthorityContent, setUploadedAuthorityContent] = useState('');
   const [uploadedMediaContent, setUploadedMediaContent] = useState('');
   const [uploadedBibContent, setUploadedBibContent] = useState('');
@@ -97,9 +150,6 @@ const Home: NextPage = () => {
   const [isWikidataDialogOpen, setIsWikidataDialogOpen] = useState(false);
   const [isTitleDialogOpen, setIsTitleDialogOpen] = useState(false);
   const [editTitle, setEditTitle] = useState('');
-  const [isAnnotationListOpen, setIsAnnotationListOpen] = useState(false);
-  const [annotationList, setAnnotationList] = useState<{ id: string; title: string; createdAt: number }[]>([]);
-  const [focusAnnotationId, setFocusAnnotationId] = useState<string | null>(null);
 
   const [isMediaUploadDialogOpen, setIsMediaUploadDialogOpen] = useState(false);
   const [isAuthorityUploadDialogOpen, setIsAuthorityUploadDialogOpen] = useState(false);
@@ -128,27 +178,11 @@ const Home: NextPage = () => {
   const [isViewerMenuOpen, setIsViewerMenuOpen] = useState(false);
 
   const [IRI, setIRI] = useState('');
-  //mediaの情報をstateで管理
-  const [source, setSource] = useState('');
-  const [type, setType] = useState('img');
-  const [wikiType, setWikiType] = useState('wikidata');
-  const [caption, setCaption] = useState('');
-  //bibliographyの情報をstateで管理
-  const [bibAuthor, setBibAuthor] = useState('');
-  const [bibTitle, setBibTitle] = useState('');
-  const [bibYear, setBibYear] = useState('');
-  const [bibPage, setBibPage] = useState('');
-  const [bibPDF, setBibPDF] = useState('');
   //descriptionの情報をstateで管理
   const [desc, setDesc] = useState('');
-  // wikidataの情報をstateで管理
-  const [wikidata, setWikidata] = useState('');
   // locationの情報をstateで管理（annotation用）
   const [locationLat, setLocationLat] = useState('');
   const [locationLng, setLocationLng] = useState('');
-  // locationの情報をstateで管理（object用）
-  const [objectLocationLat, setObjectLocationLat] = useState('');
-  const [objectLocationLng, setObjectLocationLng] = useState('');
 
   // Object用の入力データ状態
   const [objectSource, setObjectSource] = useState('');
@@ -183,124 +217,8 @@ const Home: NextPage = () => {
     index: number;
   } | null>(null);
 
-  // TEI行とアノテーションの紐づけstate
-  const [teiLineMappings, setTeiLineMappings] = useState<import('@/types/main').TeiLineMappingMap>({});
-  const [selectedTeiLine, setSelectedTeiLine] = useState<string | null>(null);
-  const [originalTeiXml, setOriginalTeiXml] = useState<string>('');
-  const [isGeneratingTei, setIsGeneratingTei] = useState(false);
-
-  // 選択中アノテーションに対応する行番号（ハイライト用）
-  const highlightedLineNumber = infoPanelContent?.id
-    ? (Object.values(teiLineMappings).find((m) => m.annotationId === infoPanelContent.id)?.lineNumber ?? null)
-    : null;
-
-  const downloadSourceDocTei = async () => {
-    if (!originalTeiXml) { alert('Please upload a TEI/XML file first.'); return; }
-    if (Object.keys(teiLineMappings).length === 0) { alert('Please link at least one line to an annotation.'); return; }
-    setIsGeneratingTei(true);
-    try {
-      const linkedIds = Array.from(new Set(
-        Object.values(teiLineMappings).map((m) => m.annotationId).filter((id): id is string => id !== null)
-      ));
-      const annotationCoords: Record<string, AnnotationCoords> = {};
-      await Promise.all(linkedIds.map(async (id) => {
-        const snap = await getDoc(doc(db, 'test', id));
-        if (snap.exists()) {
-          const d = snap.data();
-          annotationCoords[id] = {
-            id,
-            label: d.data?.body?.label || id,
-            position: d.data?.target?.selector?.value || [0, 0, 0],
-            area: d.data?.target?.selector?.area || [0, 0, 0],
-            camPos: d.data?.target?.selector?.camPos || [0, 0, 0],
-          };
-        }
-      }));
-      const xml = generateSourceDocTei({ originalXml: originalTeiXml, lineMappings: teiLineMappings, annotationCoords, modelUrl: manifestUrl });
-      // Firestoreに保存
-      if (user) {
-        await objectMetadataService.saveTei(manifestUrl, originalTeiXml, xml, teiLineMappings, user.uid);
-      }
-      // ダウンロード
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(new Blob([xml], { type: 'application/xml' }));
-      a.download = 'sourceDoc_tei.xml';
-      a.click();
-    } catch (e) {
-      console.error(e);
-      alert('Failed to generate TEI XML.');
-    } finally {
-      setIsGeneratingTei(false);
-    }
-  };
-
-  const handleTeiLineClick = (lineNumber: string, lineText: string) => {
-    if (!infoPanelContent?.id) {
-      setSelectedTeiLine((prev) => (prev === lineNumber ? null : lineNumber));
-      return;
-    }
-    setTeiLineMappings((prev) => {
-      // 同じ行・同じアノテーション → 解除
-      if (prev[lineNumber]?.annotationId === infoPanelContent.id) {
-        const next = { ...prev };
-        delete next[lineNumber];
-        return next;
-      }
-      // このアノテーションが既に別の行に紐づいていれば先に解除（1アノテーション1行）
-      const next = Object.fromEntries(
-        Object.entries(prev).filter(([, m]) => m.annotationId !== infoPanelContent.id)
-      );
-      next[lineNumber] = { lineNumber, lineText, annotationId: infoPanelContent.id };
-      return next;
-    });
-    setSelectedTeiLine(lineNumber);
-  };
-
-  const handleTeiUnlink = (lineNumber: string) => {
-    setTeiLineMappings((prev) => {
-      const next = { ...prev };
-      delete next[lineNumber];
-      return next;
-    });
-    setSelectedTeiLine((prev) => (prev === lineNumber ? null : prev));
-  };
-
-  // URLからマニフェストURLを取得して設定するuseEffect
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const manifestParam = params.get('manifest');
-    if (manifestParam) {
-      setManifestUrl(manifestParam);
-    }
-  }, []);
-
-  // manifestUrlが変更されたらobjectMetadataを取得（TEI含む）
-  useEffect(() => {
-    const fetchObjectMetadata = async () => {
-      if (manifestUrl) {
-        const metadata = await objectMetadataService.getObjectMetadata(manifestUrl);
-        setObjectMetadata(metadata);
-        if (metadata?.location) {
-          setObjectLocationLat(metadata.location.lat || '');
-          setObjectLocationLng(metadata.location.lng || '');
-        } else {
-          setObjectLocationLat('');
-          setObjectLocationLng('');
-        }
-        // 保存済みTEIがあれば復元
-        if (metadata?.tei_original) {
-          setOriginalTeiXml(metadata.tei_original);
-          setTeiLineMappings(metadata.tei_line_mappings || {});
-          setSelectedTeiLine(null);
-        } else {
-          setOriginalTeiXml('');
-          setTeiLineMappings({});
-          setSelectedTeiLine(null);
-        }
-      }
-    };
-    fetchObjectMetadata();
-  }, [manifestUrl]);
+  // (TEI state, handlers, manifest URL useEffect, and object metadata useEffect
+  //  are now managed by useManifestUrl, useObjectMetadata, and useTeiLinking hooks)
 
   // description editor関連
   useEffect(() => {
@@ -492,8 +410,8 @@ const Home: NextPage = () => {
     }
   };
 
-  const saveMedias = async () => {
-    // const mediaData = { source, type, caption };
+  const saveMedias = async (dialogData: { source: string; type: string; caption: string }) => {
+    const { source, type, caption } = dialogData;
     const data: {
       id: string;
       source: string;
@@ -703,7 +621,8 @@ const Home: NextPage = () => {
     handleMediaUploadCloseDialog();
   };
 
-  const saveWikidata = async () => {
+  const saveWikidata = async (dialogData: { wikiType: string; uri: string }) => {
+    const { wikiType, uri: wikidata } = dialogData;
     let data: WikidataItem = {
       type: '',
       uri: '',
@@ -858,8 +777,8 @@ const Home: NextPage = () => {
     setIsAuthorityUploadDialogOpen(false);
   };
 
-  const saveBib = async () => {
-    // const bibData = { bibAuthor, bibTitle, bibYear, bibPage, bibPDF };
+  const saveBib = async (dialogData: { author: string; title: string; year: string; page: string; pdf: string }) => {
+    const { author: bibAuthor, title: bibTitle, year: bibYear, page: bibPage, pdf: bibPDF } = dialogData;
     const data = {
       id: uuidv4(),
       author: bibAuthor,
@@ -1298,19 +1217,6 @@ const Home: NextPage = () => {
     setAnnotationMode(mode !== undefined ? mode : !annotationMode);
   };
 
-  const handleManifestUrlChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const newUrl = event.target.value;
-    setManifestUrl(newUrl);
-
-    // URLのgetパラメータに反映
-    const url = new URL(window.location.href);
-    if (newUrl) {
-      url.searchParams.set('manifest', newUrl);
-    } else {
-      url.searchParams.delete('manifest');
-    }
-    window.history.replaceState({}, '', url.toString());
-  };
 
   const deleteAnnotation = (id: string) => {
     if (infoPanelContent?.creator == user?.uid) {
@@ -1778,28 +1684,6 @@ const Home: NextPage = () => {
     setIsDescDialogOpen(false);
   };
 
-  const handleAnnotationListOpen = async () => {
-    if (!manifestUrl) {
-      alert('Please enter a manifest URL first.');
-      return;
-    }
-    const querySnapshot = await getDocs(collection(db, 'test'));
-    const list: { id: string; title: string; createdAt: number }[] = [];
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      if (data.target_manifest === manifestUrl) {
-        list.push({
-          id: doc.id,
-          title: data.data?.body?.label || 'Untitled',
-          createdAt: data.createdAt || 0,
-        });
-      }
-    });
-    // 作成時間の昇順（古い順）にソート
-    list.sort((a, b) => a.createdAt - b.createdAt);
-    setAnnotationList(list);
-    setIsAnnotationListOpen(true);
-  };
 
   const handleTitleOpenDialog = () => {
     if (infoPanelContent?.creator == user?.uid) {
@@ -1812,17 +1696,17 @@ const Home: NextPage = () => {
   const handleTitleCloseDialog = () => {
     setIsTitleDialogOpen(false);
   };
-  const saveTitle = async () => {
+  const saveTitle = async (newTitle: string) => {
     const docRef = doc(db, 'test', infoPanelContent?.id || '');
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
       await updateDoc(docRef, {
-        'data.body.label': editTitle,
+        'data.body.label': newTitle,
       });
       // infoPanelContentのtitleを更新
       if (infoPanelContent) {
-        infoPanelContent.title = editTitle;
+        infoPanelContent.title = newTitle;
       }
     } else {
       console.warn('No such document!');
@@ -1832,9 +1716,7 @@ const Home: NextPage = () => {
 
   const handleWikidataOpenDialog = () => {
     if (infoPanelContent?.creator == user?.uid) {
-      setWikidata(infoPanelContent?.wikidata.join(',') || '');
       setIsWikidataDialogOpen(true);
-      setWikidata('');
     } else {
       alert('You are not the creator of this annotation.');
     }
@@ -2131,14 +2013,14 @@ const Home: NextPage = () => {
                 ></div>
               </div>
               <div className="flex-1 card">
-                <DisplayTEI
+                <TEILinkViewer
                   manifestUrl={manifestUrl}
                   initialXml={originalTeiXml || undefined}
-                  onTextLoad={(xml) => { setOriginalTeiXml(xml); setTeiLineMappings({}); setSelectedTeiLine(null); }}
+                  onTextLoad={(xml: string) => { setOriginalTeiXml(xml); setTeiLineMappings({}); setSelectedTeiLine(null); }}
                   onLineClick={handleTeiLineClick}
                   onUnlink={handleTeiUnlink}
                   lineMappings={teiLineMappings}
-                  selectedLineNumber={selectedTeiLine}
+                  selectedLineNumber={effectiveSelectedTeiLine}
                   highlightedLineNumber={highlightedLineNumber}
                   canExport={!!originalTeiXml && Object.keys(teiLineMappings).length > 0}
                   isExporting={isGeneratingTei}
@@ -2149,6 +2031,7 @@ const Home: NextPage = () => {
             <div className="flex-1 overflow-hidden flex flex-col">
               <div className="card flex-1 overflow-hidden flex flex-col">
                 {/* Meta-level Tab Navigation: Object/Annotation */}
+
                 <div className="flex gap-2 mb-3 border-b-2 border-[var(--border)] flex-shrink-0">
                   <button
                     className={`px-4 py-2 text-sm font-bold transition-colors ${
@@ -2992,52 +2875,11 @@ const Home: NextPage = () => {
         </div>
       )}
 
-      {isMediaDialogOpen && (
-        <div className="dialog-overlay" onClick={handleMediaCloseDialog}>
-          <div className="dialog w-[500px]" onClick={(e) => e.stopPropagation()}>
-            <form className="flex flex-col gap-4">
-              <label className="font-bold text-lg">
-                Source URI:
-                <textarea
-                  name="source"
-                  value={source}
-                  required
-                  onChange={(e) => setSource(e.target.value)}
-                  className="input-field resize-y min-h-24"
-                  placeholder={type === 'sketchfab' ? 'Paste SketchFab HTML embed code here...' : 'Enter URL or embed code...'}
-                />
-              </label>
-              <label className="font-bold text-lg">
-                Type:
-                <select name="type" value={type} onChange={(e) => setType(e.target.value)} className="input-field">
-                  <option value="img">Image</option>
-                  <option value="video">Youtube</option>
-                  <option value="iiif">IIIF Manifest</option>
-                  <option value="sketchfab">SketchFab</option>
-                </select>
-              </label>
-              <label className="font-bold text-lg">
-                Caption:
-                <textarea
-                  name="caption"
-                  value={caption}
-                  required
-                  onChange={(e) => setCaption(e.target.value)}
-                  className="input-field resize-y min-h-24"
-                />
-              </label>
-              <div className="flex justify-end gap-3">
-                <button type="button" onClick={saveMedias} className="btn-info">
-                  Save
-                </button>
-                <button type="button" onClick={handleMediaCloseDialog} className="btn-primary">
-                  Close
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <MediaDialog
+        isOpen={isMediaDialogOpen}
+        onClose={handleMediaCloseDialog}
+        onSave={(data) => saveMedias(data)}
+      />
 
       {isAuthorityUploadDialogOpen && (
         <div className="dialog-overlay" onClick={handleAuthorityUploadCloseDialog}>
@@ -3061,44 +2903,11 @@ const Home: NextPage = () => {
         </div>
       )}
 
-      {isWikidataDialogOpen && (
-        <div className="dialog-overlay" onClick={handleWikidataCloseDialog}>
-          <div className="dialog w-[500px]" onClick={(e) => e.stopPropagation()}>
-            <form className="flex flex-col gap-4">
-              <label className="font-bold text-lg">
-                Type:
-                <select
-                  name="type"
-                  value={wikiType}
-                  onChange={(e) => setWikiType(e.target.value)}
-                  className="input-field"
-                >
-                  <option value="wikidata">Wikidata</option>
-                  <option value="geonames">GeoNames</option>
-                </select>
-              </label>
-              <label className="font-bold text-lg">
-                URI:
-                <input
-                  name="wikidata"
-                  value={wikidata}
-                  required
-                  onChange={(e) => setWikidata(e.target.value)}
-                  className="input-field"
-                />
-              </label>
-              <div className="flex justify-end gap-3">
-                <button type="button" onClick={saveWikidata} className="btn-info">
-                  Save
-                </button>
-                <button type="button" onClick={handleWikidataCloseDialog} className="btn-primary">
-                  Close
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <WikidataDialog
+        isOpen={isWikidataDialogOpen}
+        onClose={handleWikidataCloseDialog}
+        onSave={(data) => saveWikidata(data)}
+      />
 
       {isBibUploadDialogOpen && (
         <div className="dialog-overlay" onClick={handleBibUploadCloseDialog}>
@@ -3122,138 +2931,25 @@ const Home: NextPage = () => {
         </div>
       )}
 
-      {isBibDialogOpen && (
-        <div className="dialog-overlay" onClick={handleBibCloseDialog}>
-          <div className="dialog w-[500px]" onClick={(e) => e.stopPropagation()}>
-            <form className="flex flex-col gap-4">
-              <label className="font-bold text-lg">
-                Author:
-                <input
-                  name="bibAuthor"
-                  value={bibAuthor}
-                  required
-                  onChange={(e) => setBibAuthor(e.target.value)}
-                  className="input-field"
-                />
-              </label>
-              <label className="font-bold text-lg">
-                Title:
-                <textarea
-                  name="bibTitle"
-                  value={bibTitle}
-                  required
-                  onChange={(e) => setBibTitle(e.target.value)}
-                  className="input-field resize-y min-h-20"
-                />
-              </label>
-              <label className="font-bold text-lg">
-                Year:
-                <input
-                  name="bibYear"
-                  value={bibYear}
-                  required
-                  onChange={(e) => setBibYear(e.target.value)}
-                  className="input-field"
-                />
-              </label>
-              <label className="font-bold text-lg">
-                Page URL:
-                <input
-                  name="bibPage"
-                  value={bibPage}
-                  required
-                  onChange={(e) => setBibPage(e.target.value)}
-                  className="input-field"
-                />
-              </label>
-              <label className="font-bold text-lg">
-                PDF:
-                <input
-                  name="bibPDF"
-                  value={bibPDF}
-                  required
-                  onChange={(e) => setBibPDF(e.target.value)}
-                  className="input-field"
-                />
-              </label>
-              <div className="flex justify-end gap-3">
-                <button type="button" onClick={saveBib} className="btn-info">
-                  Save
-                </button>
-                <button type="button" onClick={handleBibCloseDialog} className="btn-primary">
-                  Close
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <BibliographyDialog
+        isOpen={isBibDialogOpen}
+        onClose={handleBibCloseDialog}
+        onSave={(data) => saveBib(data)}
+      />
 
-      {isAnnotationListOpen && (
-        <div className="dialog-overlay" onClick={() => setIsAnnotationListOpen(false)}>
-          <div className="dialog w-[500px] max-h-[80vh]" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-[var(--text-primary)] m-0">Annotation List</h2>
-              <button
-                onClick={() => setIsAnnotationListOpen(false)}
-                className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="overflow-y-auto max-h-[60vh]">
-              {annotationList.length > 0 ? (
-                <ul className="space-y-2 m-0 p-0 list-none">
-                  {annotationList.map((annotation) => (
-                    <li
-                      key={annotation.id}
-                      className="p-3 bg-[var(--background)] border border-[var(--border)] rounded-md hover:bg-[var(--secondary-bg)] cursor-pointer transition-colors"
-                      onClick={() => {
-                        // 一度nullにしてから設定することで、同じIDでも再度フォーカス可能にする
-                        setFocusAnnotationId(null);
-                        setTimeout(() => setFocusAnnotationId(annotation.id), 0);
-                        setIsAnnotationListOpen(false);
-                      }}
-                    >
-                      <p className="m-0 text-sm font-medium text-[var(--text-primary)]">{annotation.title}</p>
-                      <p className="m-0 text-xs text-[var(--text-tertiary)] mt-1 truncate">{annotation.id}</p>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-[var(--text-secondary)] text-center py-8">No annotations found for this manifest.</p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <AnnotationListDialog
+        isOpen={isAnnotationListOpen}
+        onClose={() => setIsAnnotationListOpen(false)}
+        annotations={annotationList}
+        onSelect={(id) => setFocusAnnotationId(id)}
+      />
 
-      {isTitleDialogOpen && (
-        <div className="dialog-overlay" onClick={handleTitleCloseDialog}>
-          <div className="dialog w-[400px]" onClick={(e) => e.stopPropagation()}>
-            <form className="flex flex-col gap-4">
-              <label className="font-bold text-lg">
-                Title:
-                <input
-                  type="text"
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  className="input-field"
-                  required
-                />
-              </label>
-              <div className="flex justify-end gap-3">
-                <button type="button" onClick={saveTitle} className="btn-info">
-                  Save
-                </button>
-                <button type="button" onClick={handleTitleCloseDialog} className="btn-primary">
-                  Close
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <TitleEditDialog
+        isOpen={isTitleDialogOpen}
+        onClose={handleTitleCloseDialog}
+        onSave={(title) => saveTitle(title)}
+        initialTitle={editTitle}
+      />
 
       {isDescDialogOpen && (
         <div className="dialog-overlay" onClick={handleDescCloseDialog}>
