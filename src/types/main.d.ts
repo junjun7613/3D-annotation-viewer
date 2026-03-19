@@ -123,6 +123,17 @@ export interface Annotation3 {
   targetPosition: Vector3;
 }
 
+// TEI行とアノテーションの紐づけ
+export interface TeiLineMapping {
+  lineNumber: string;          // <lb n="N"> の N
+  lineText: string;            // その行のテキスト内容
+  annotationId: string | null; // 紐づいたアノテーションID（nullは未紐づけ）
+}
+
+export interface TeiLineMappingMap {
+  [lineNumber: string]: TeiLineMapping;
+}
+
 export interface ObjectMetadata {
   manifest_url: string;
   media: MediaItem[];

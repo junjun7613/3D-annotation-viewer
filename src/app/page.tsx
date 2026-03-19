@@ -181,6 +181,36 @@ const Home: NextPage = () => {
     index: number;
   } | null>(null);
 
+  // TEI行とアノテーションの紐づけstate
+  const [teiLineMappings, setTeiLineMappings] = useState<import('@/types/main').TeiLineMappingMap>({});
+  const [selectedTeiLine, setSelectedTeiLine] = useState<string | null>(null);
+
+  const handleTeiLineClick = (lineNumber: string, lineText: string) => {
+    // 行をクリック → 選択中アノテーションと紐づけ
+    if (!infoPanelContent?.id) {
+      setSelectedTeiLine((prev) => (prev === lineNumber ? null : lineNumber));
+      return;
+    }
+    setTeiLineMappings((prev) => {
+      const existing = prev[lineNumber];
+      // 同じアノテーションが既に紐づいている場合は解除
+      if (existing?.annotationId === infoPanelContent.id) {
+        const next = { ...prev };
+        delete next[lineNumber];
+        return next;
+      }
+      return {
+        ...prev,
+        [lineNumber]: {
+          lineNumber,
+          lineText,
+          annotationId: infoPanelContent.id,
+        },
+      };
+    });
+    setSelectedTeiLine(lineNumber);
+  };
+
   // URLからマニフェストURLを取得して設定するuseEffect
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -2038,7 +2068,12 @@ const Home: NextPage = () => {
                 ></div>
               </div>
               <div className="flex-1 card">
-                <DisplayTEI manifestUrl={manifestUrl} />
+                <DisplayTEI
+                  manifestUrl={manifestUrl}
+                  onLineClick={handleTeiLineClick}
+                  lineMappings={teiLineMappings}
+                  selectedLineNumber={selectedTeiLine}
+                />
               </div>
             </div>
             <div className="flex-1 overflow-hidden flex flex-col">
