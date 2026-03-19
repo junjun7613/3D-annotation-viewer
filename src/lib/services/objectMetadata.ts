@@ -211,4 +211,30 @@ export const objectMetadataService = {
       await objectMetadataService.updateLocation(manifestUrl, location, userId);
     }
   },
+
+  // TEIデータを保存（元XML・sourceDoc XML・行マッピング）
+  saveTei: async (
+    manifestUrl: string,
+    teiOriginal: string,
+    teiSourcedoc: string,
+    teiLineMappings: import('@/types/main').TeiLineMappingMap,
+    userId: string
+  ): Promise<void> => {
+    const docId = encodeManifestUrl(manifestUrl);
+    const docRef = doc(db, 'manifest_metadata', docId);
+    const docSnap = await getDoc(docRef);
+    const payload = {
+      tei_original: teiOriginal,
+      tei_sourcedoc: teiSourcedoc,
+      tei_line_mappings: teiLineMappings,
+      lastUpdatedBy: userId,
+      updatedAt: Date.now(),
+    };
+    if (docSnap.exists()) {
+      await updateDoc(docRef, payload);
+    } else {
+      await objectMetadataService.initializeObjectMetadata(manifestUrl, userId);
+      await updateDoc(docRef, payload);
+    }
+  },
 };

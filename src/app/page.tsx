@@ -27,6 +27,8 @@ import List from '@editorjs/list';
 // import HTMLViewer from './components/HTMLviewer';
 
 import { createSlug } from '@/utils/converter';
+import { generateSourceDocTei } from '@/utils/teiGenerator';
+import type { AnnotationCoords } from '@/utils/teiGenerator';
 
 import type { ToolConstructable } from '@editorjs/editorjs';
 
@@ -184,31 +186,83 @@ const Home: NextPage = () => {
   // TEI行とアノテーションの紐づけstate
   const [teiLineMappings, setTeiLineMappings] = useState<import('@/types/main').TeiLineMappingMap>({});
   const [selectedTeiLine, setSelectedTeiLine] = useState<string | null>(null);
+  const [originalTeiXml, setOriginalTeiXml] = useState<string>('');
+  const [isGeneratingTei, setIsGeneratingTei] = useState(false);
+
+  // 選択中アノテーションに対応する行番号（ハイライト用）
+  const highlightedLineNumber = infoPanelContent?.id
+    ? (Object.values(teiLineMappings).find((m) => m.annotationId === infoPanelContent.id)?.lineNumber ?? null)
+    : null;
+
+  const downloadSourceDocTei = async () => {
+    if (!originalTeiXml) { alert('Please upload a TEI/XML file first.'); return; }
+    if (Object.keys(teiLineMappings).length === 0) { alert('Please link at least one line to an annotation.'); return; }
+    setIsGeneratingTei(true);
+    try {
+      const linkedIds = Array.from(new Set(
+        Object.values(teiLineMappings).map((m) => m.annotationId).filter((id): id is string => id !== null)
+      ));
+      const annotationCoords: Record<string, AnnotationCoords> = {};
+      await Promise.all(linkedIds.map(async (id) => {
+        const snap = await getDoc(doc(db, 'test', id));
+        if (snap.exists()) {
+          const d = snap.data();
+          annotationCoords[id] = {
+            id,
+            label: d.data?.body?.label || id,
+            position: d.data?.target?.selector?.value || [0, 0, 0],
+            area: d.data?.target?.selector?.area || [0, 0, 0],
+            camPos: d.data?.target?.selector?.camPos || [0, 0, 0],
+          };
+        }
+      }));
+      const xml = generateSourceDocTei({ originalXml: originalTeiXml, lineMappings: teiLineMappings, annotationCoords, modelUrl: manifestUrl });
+      // Firestoreに保存
+      if (user) {
+        await objectMetadataService.saveTei(manifestUrl, originalTeiXml, xml, teiLineMappings, user.uid);
+      }
+      // ダウンロード
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([xml], { type: 'application/xml' }));
+      a.download = 'sourceDoc_tei.xml';
+      a.click();
+    } catch (e) {
+      console.error(e);
+      alert('Failed to generate TEI XML.');
+    } finally {
+      setIsGeneratingTei(false);
+    }
+  };
 
   const handleTeiLineClick = (lineNumber: string, lineText: string) => {
-    // 行をクリック → 選択中アノテーションと紐づけ
     if (!infoPanelContent?.id) {
       setSelectedTeiLine((prev) => (prev === lineNumber ? null : lineNumber));
       return;
     }
     setTeiLineMappings((prev) => {
-      const existing = prev[lineNumber];
-      // 同じアノテーションが既に紐づいている場合は解除
-      if (existing?.annotationId === infoPanelContent.id) {
+      // 同じ行・同じアノテーション → 解除
+      if (prev[lineNumber]?.annotationId === infoPanelContent.id) {
         const next = { ...prev };
         delete next[lineNumber];
         return next;
       }
-      return {
-        ...prev,
-        [lineNumber]: {
-          lineNumber,
-          lineText,
-          annotationId: infoPanelContent.id,
-        },
-      };
+      // このアノテーションが既に別の行に紐づいていれば先に解除（1アノテーション1行）
+      const next = Object.fromEntries(
+        Object.entries(prev).filter(([, m]) => m.annotationId !== infoPanelContent.id)
+      );
+      next[lineNumber] = { lineNumber, lineText, annotationId: infoPanelContent.id };
+      return next;
     });
     setSelectedTeiLine(lineNumber);
+  };
+
+  const handleTeiUnlink = (lineNumber: string) => {
+    setTeiLineMappings((prev) => {
+      const next = { ...prev };
+      delete next[lineNumber];
+      return next;
+    });
+    setSelectedTeiLine((prev) => (prev === lineNumber ? null : prev));
   };
 
   // URLからマニフェストURLを取得して設定するuseEffect
@@ -220,19 +274,28 @@ const Home: NextPage = () => {
     }
   }, []);
 
-  // manifestUrlが変更されたらobjectMetadataを取得
+  // manifestUrlが変更されたらobjectMetadataを取得（TEI含む）
   useEffect(() => {
     const fetchObjectMetadata = async () => {
       if (manifestUrl) {
         const metadata = await objectMetadataService.getObjectMetadata(manifestUrl);
         setObjectMetadata(metadata);
-        // objectMetadataのlocationをフォームに反映
         if (metadata?.location) {
           setObjectLocationLat(metadata.location.lat || '');
           setObjectLocationLng(metadata.location.lng || '');
         } else {
           setObjectLocationLat('');
           setObjectLocationLng('');
+        }
+        // 保存済みTEIがあれば復元
+        if (metadata?.tei_original) {
+          setOriginalTeiXml(metadata.tei_original);
+          setTeiLineMappings(metadata.tei_line_mappings || {});
+          setSelectedTeiLine(null);
+        } else {
+          setOriginalTeiXml('');
+          setTeiLineMappings({});
+          setSelectedTeiLine(null);
         }
       }
     };
@@ -2070,9 +2133,16 @@ const Home: NextPage = () => {
               <div className="flex-1 card">
                 <DisplayTEI
                   manifestUrl={manifestUrl}
+                  initialXml={originalTeiXml || undefined}
+                  onTextLoad={(xml) => { setOriginalTeiXml(xml); setTeiLineMappings({}); setSelectedTeiLine(null); }}
                   onLineClick={handleTeiLineClick}
+                  onUnlink={handleTeiUnlink}
                   lineMappings={teiLineMappings}
                   selectedLineNumber={selectedTeiLine}
+                  highlightedLineNumber={highlightedLineNumber}
+                  canExport={!!originalTeiXml && Object.keys(teiLineMappings).length > 0}
+                  isExporting={isGeneratingTei}
+                  onExport={originalTeiXml ? downloadSourceDocTei : undefined}
                 />
               </div>
             </div>

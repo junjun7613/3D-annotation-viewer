@@ -142,4 +142,7 @@ export interface ObjectMetadata {
   location?: LocationItem;
   lastUpdatedBy?: string;
   updatedAt?: number;
+  tei_original?: string;
+  tei_sourcedoc?: string;
+  tei_line_mappings?: TeiLineMappingMap;
 }
