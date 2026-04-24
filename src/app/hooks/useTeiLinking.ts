@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { getDoc, doc } from 'firebase/firestore';
 import db from '@/lib/firebase/firebase';
 import { objectMetadataService } from '@/lib/services/objectMetadata';
@@ -33,9 +33,13 @@ export function useTeiLinking({
   const [originalTeiXml, setOriginalTeiXml] = useState<string>('');
   const [isGeneratingTei, setIsGeneratingTei] = useState(false);
 
+  // Track whether current state was restored from Firestore (skip auto-save in that case)
+  const isRestoringRef = useRef(false);
+
   // Restore saved TEI data when it becomes available (e.g. after metadata fetch)
   useEffect(() => {
     if (savedTeiOriginal !== undefined) {
+      isRestoringRef.current = true;
       if (savedTeiOriginal) {
         setOriginalTeiXml(savedTeiOriginal);
         setTeiLineMappings(savedTeiLineMappings || {});
@@ -47,6 +51,16 @@ export function useTeiLinking({
       }
     }
   }, [savedTeiOriginal, savedTeiLineMappings]);
+
+  // Auto-save on upload (originalTeiXml set) and on mapping changes
+  useEffect(() => {
+    if (!originalTeiXml || !manifestUrl || !user) return;
+    if (isRestoringRef.current) {
+      isRestoringRef.current = false;
+      return;
+    }
+    objectMetadataService.saveTei(manifestUrl, originalTeiXml, null, teiLineMappings, user.uid).catch(console.error);
+  }, [originalTeiXml, teiLineMappings, manifestUrl, user]);
 
   // Highlighted line number for the currently selected annotation
   const highlightedLineNumber = infoPanelContent?.id
@@ -78,6 +92,17 @@ export function useTeiLinking({
     },
     [infoPanelContent?.id]
   );
+
+  // Clear all TEI data (state + Firestore)
+  const clearTei = useCallback(async () => {
+    isRestoringRef.current = true;
+    setOriginalTeiXml('');
+    setTeiLineMappings({});
+    setSelectedTeiLine(null);
+    if (manifestUrl && user) {
+      await objectMetadataService.clearTei(manifestUrl, user.uid).catch(console.error);
+    }
+  }, [manifestUrl, user]);
 
   // Unlink a specific line
   const handleTeiUnlink = useCallback((lineNumber: string) => {
@@ -130,8 +155,9 @@ export function useTeiLinking({
         annotationCoords,
         modelUrl: manifestUrl,
       });
-      // Save to Firestore
+      // Save to Firestore (with tei_sourcedoc)
       if (user) {
+        isRestoringRef.current = true; // prevent double-save from auto-save effect
         await objectMetadataService.saveTei(manifestUrl, originalTeiXml, xml, teiLineMappings, user.uid);
       }
       // Download
@@ -158,6 +184,7 @@ export function useTeiLinking({
     highlightedLineNumber,
     handleTeiLineClick,
     handleTeiUnlink,
+    clearTei,
     downloadSourceDocTei,
   };
 }

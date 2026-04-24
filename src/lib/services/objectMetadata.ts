@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, deleteField } from 'firebase/firestore';
 import db from '@/lib/firebase/firebase';
 import type { ObjectMetadata, MediaItem, WikidataItem, BibliographyItem, LocationItem } from '@/types/main';
 
@@ -212,29 +212,42 @@ export const objectMetadataService = {
     }
   },
 
-  // TEIデータを保存（元XML・sourceDoc XML・行マッピング）
+  // TEIデータを保存（元XML・行マッピング、オプションでsourceDoc XML）
   saveTei: async (
     manifestUrl: string,
     teiOriginal: string,
-    teiSourcedoc: string,
+    teiSourcedoc: string | null,
     teiLineMappings: import('@/types/main').TeiLineMappingMap,
     userId: string
   ): Promise<void> => {
     const docId = encodeManifestUrl(manifestUrl);
     const docRef = doc(db, 'manifest_metadata', docId);
     const docSnap = await getDoc(docRef);
-    const payload = {
+    const base = {
       tei_original: teiOriginal,
-      tei_sourcedoc: teiSourcedoc,
       tei_line_mappings: teiLineMappings,
       lastUpdatedBy: userId,
       updatedAt: Date.now(),
     };
+    const payload = teiSourcedoc !== null ? { ...base, tei_sourcedoc: teiSourcedoc } : base;
     if (docSnap.exists()) {
       await updateDoc(docRef, payload);
     } else {
       await objectMetadataService.initializeObjectMetadata(manifestUrl, userId);
       await updateDoc(docRef, payload);
     }
+  },
+
+  // TEIデータを削除
+  clearTei: async (manifestUrl: string, userId: string): Promise<void> => {
+    const docId = encodeManifestUrl(manifestUrl);
+    const docRef = doc(db, 'manifest_metadata', docId);
+    await updateDoc(docRef, {
+      tei_original: deleteField(),
+      tei_sourcedoc: deleteField(),
+      tei_line_mappings: deleteField(),
+      lastUpdatedBy: userId,
+      updatedAt: Date.now(),
+    });
   },
 };

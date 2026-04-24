@@ -93,6 +93,7 @@ const Home: NextPage = () => {
     highlightedLineNumber,
     handleTeiLineClick,
     handleTeiUnlink,
+    clearTei,
     downloadSourceDocTei,
   } = useTeiLinking({
     infoPanelContent,
@@ -1895,16 +1896,18 @@ const Home: NextPage = () => {
         }
       `}</style>
       <div className="flex flex-col h-full w-full bg-[var(--background)]">
-        <header className="bg-[var(--card-bg)] border-b border-[var(--border)] py-4 px-6 flex justify-between items-center shadow-sm">
-          <h1 className="m-0 text-xl font-bold text-[var(--text-primary)]">IIIF 3D Editor</h1>
-          <nav className="flex items-center gap-6">
+        <header className="bg-[var(--card-bg)] border-b border-[var(--border)] h-14 px-6 flex justify-between items-center shadow-sm flex-shrink-0">
+          <h1 className="m-0 text-lg sm:text-xl font-bold text-[var(--text-primary)]">IIIF 3D Semantic Editor</h1>
+          <nav className="flex items-center gap-4">
             <a href="#home" className="text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors text-sm font-medium">
               Home
             </a>
             <a href="/about" className="text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors text-sm font-medium">
               About
             </a>
-            <SignIn />
+            <div className="ml-2 border-l border-[var(--border)] pl-4">
+              <SignIn />
+            </div>
           </nav>
         </header>
         <div className="flex flex-1">
@@ -1951,45 +1954,46 @@ const Home: NextPage = () => {
               )}
             </div>
           </div>
-          <div className="flex-1 flex flex-col p-4 bg-[var(--secondary-bg)] overflow-hidden">
-            <div className="flex items-center gap-3 border-b border-[var(--border)] pb-3 mb-3 flex-shrink-0">
+          <div className="flex-1 flex flex-col p-3 bg-[var(--secondary-bg)] overflow-hidden">
+            <div className="flex items-center gap-2 border-b border-[var(--border)] pb-3 mb-3 flex-shrink-0">
               <input
                 type="text"
                 value={manifestUrl}
                 onChange={handleManifestUrlChange}
                 placeholder="Enter IIIF Manifest URL"
-                className="input-field mb-0"
-                style={{ width: '600px' }}
+                className="input-field mb-0 flex-1"
               />
-              <button
-                onClick={() => handleRDFOpenDialog()}
-                className="ml-10 p-0 bg-transparent border-0 cursor-pointer hover:opacity-70 transition-opacity"
-                title="Export RDF"
-              >
-                <img src="/images/rdf.png" alt="RDF" className="w-8 h-8 object-contain" />
-              </button>
-              <button
-                onClick={() => downloadIIIFManifest(manifestUrl)}
-                className="ml-4 p-0 bg-transparent border-0 cursor-pointer hover:opacity-70 transition-opacity"
-                title="View IIIF Manifest"
-              >
-                <img src="/images/iiif.png" alt="IIIF" className="w-10 h-10 object-contain" />
-              </button>
-              <button
-                onClick={() => setIsBulkWikidataDialogOpen(true)}
-                className="ml-4 flex items-center gap-2 px-3 py-2 text-sm font-medium text-[var(--text-primary)] bg-[var(--background)] hover:bg-[var(--secondary-bg)] border border-[var(--border)] rounded-md transition-colors"
-                title="Bulk Wikidata Registration"
-              >
-                <FaUpload className="w-4 h-4" />
-                Bulk Wikidata
-              </button>
+              <div className="flex items-center gap-1 ml-2">
+                <button
+                  onClick={() => handleRDFOpenDialog()}
+                  className="p-1.5 rounded-md bg-transparent border-0 cursor-pointer hover:bg-[var(--secondary-bg)] transition-colors"
+                  title="Export RDF"
+                >
+                  <img src="/images/rdf.png" alt="RDF" className="w-7 h-7 object-contain" />
+                </button>
+                <button
+                  onClick={() => downloadIIIFManifest(manifestUrl)}
+                  className="p-1.5 rounded-md bg-transparent border-0 cursor-pointer hover:bg-[var(--secondary-bg)] transition-colors"
+                  title="View IIIF Manifest"
+                >
+                  <img src="/images/iiif.png" alt="IIIF" className="w-8 h-8 object-contain" />
+                </button>
+                <button
+                  onClick={() => setIsBulkWikidataDialogOpen(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-[var(--text-primary)] bg-[var(--background)] hover:bg-[var(--card-hover)] border border-[var(--border)] rounded-md transition-colors"
+                  title="Bulk Wikidata Registration"
+                >
+                  <FaUpload className="w-3.5 h-3.5" />
+                  Bulk Wikidata
+                </button>
+              </div>
             </div>
-            <div className="flex gap-4 border-b border-[var(--border)] pb-4 mb-4 flex-shrink-0" style={{ minHeight: '320px', maxHeight: '320px' }}>
+            <div className="flex gap-3 border-b border-[var(--border)] pb-3 mb-3 flex-shrink-0" style={{ minHeight: '300px', maxHeight: '300px' }}>
               <div className="flex-1 card">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-lg m-0 text-[var(--text-primary)]">
-                      {infoPanelContent?.title || 'Annotation Details'}
+                    <h3 className="text-base font-semibold m-0 text-[var(--text-primary)]">
+                      {infoPanelContent?.title || 'DESCRIPTION'}
                     </h3>
                     <button
                       onClick={handleTitleOpenDialog}
@@ -2025,6 +2029,7 @@ const Home: NextPage = () => {
                   canExport={!!originalTeiXml && Object.keys(teiLineMappings).length > 0}
                   isExporting={isGeneratingTei}
                   onExport={originalTeiXml ? downloadSourceDocTei : undefined}
+                  onClearTei={originalTeiXml ? clearTei : undefined}
                 />
               </div>
             </div>
@@ -2032,9 +2037,9 @@ const Home: NextPage = () => {
               <div className="card flex-1 overflow-hidden flex flex-col">
                 {/* Meta-level Tab Navigation: Object/Annotation */}
 
-                <div className="flex gap-2 mb-3 border-b-2 border-[var(--border)] flex-shrink-0">
+                <div className="flex gap-1 mb-2 border-b-2 border-[var(--border)] flex-shrink-0">
                   <button
-                    className={`px-4 py-2 text-sm font-bold transition-colors ${
+                    className={`px-3 py-1.5 text-sm font-bold transition-colors ${
                       metaTab === 'object'
                         ? 'text-[var(--primary)] border-b-2 border-[var(--primary)] -mb-[2px]'
                         : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -2044,7 +2049,7 @@ const Home: NextPage = () => {
                     Object
                   </button>
                   <button
-                    className={`px-4 py-2 text-sm font-bold transition-colors ${
+                    className={`px-3 py-1.5 text-sm font-bold transition-colors ${
                       metaTab === 'annotation'
                         ? 'text-[var(--primary)] border-b-2 border-[var(--primary)] -mb-[2px]'
                         : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -2059,9 +2064,9 @@ const Home: NextPage = () => {
                 {metaTab === 'object' && (
                   <div className="flex-1 overflow-hidden flex flex-col">
                     {/* Sub-level Tab Navigation: Resources/Linked Data/References/Location */}
-                    <div className="flex gap-2 mb-3 border-b border-[var(--border)] flex-shrink-0">
+                    <div className="flex gap-1 mb-2 border-b border-[var(--border)] flex-shrink-0">
                       <button
-                        className={`px-4 py-2 text-sm font-medium transition-colors ${
+                        className={`px-3 py-1.5 text-sm font-medium transition-colors ${
                           objectTab === 'resources'
                             ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]'
                             : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -2071,7 +2076,7 @@ const Home: NextPage = () => {
                         Resources
                       </button>
                       <button
-                        className={`px-4 py-2 text-sm font-medium transition-colors ${
+                        className={`px-3 py-1.5 text-sm font-medium transition-colors ${
                           objectTab === 'linkedData'
                             ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]'
                             : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -2081,7 +2086,7 @@ const Home: NextPage = () => {
                         Linked Data
                       </button>
                       <button
-                        className={`px-4 py-2 text-sm font-medium transition-colors ${
+                        className={`px-3 py-1.5 text-sm font-medium transition-colors ${
                           objectTab === 'references'
                             ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]'
                             : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -2091,7 +2096,7 @@ const Home: NextPage = () => {
                         References
                       </button>
                       <button
-                        className={`px-4 py-2 text-sm font-medium transition-colors ${
+                        className={`px-3 py-1.5 text-sm font-medium transition-colors ${
                           objectTab === 'location'
                             ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]'
                             : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -2401,9 +2406,9 @@ const Home: NextPage = () => {
                 {metaTab === 'annotation' && (
                   <div className="flex-1 overflow-hidden flex flex-col">
                     {/* Sub-level Tab Navigation: Resources/Linked Data/References */}
-                    <div className="flex gap-2 mb-3 border-b border-[var(--border)] flex-shrink-0">
+                    <div className="flex gap-1 mb-2 border-b border-[var(--border)] flex-shrink-0">
                       <button
-                        className={`px-4 py-2 text-sm font-medium transition-colors ${
+                        className={`px-3 py-1.5 text-sm font-medium transition-colors ${
                           infoTab === 'resources'
                             ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]'
                             : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -2413,7 +2418,7 @@ const Home: NextPage = () => {
                         Resources
                       </button>
                       <button
-                        className={`px-4 py-2 text-sm font-medium transition-colors ${
+                        className={`px-3 py-1.5 text-sm font-medium transition-colors ${
                           infoTab === 'linkedData'
                             ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]'
                             : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -2423,7 +2428,7 @@ const Home: NextPage = () => {
                         Linked Data
                       </button>
                       <button
-                        className={`px-4 py-2 text-sm font-medium transition-colors ${
+                        className={`px-3 py-1.5 text-sm font-medium transition-colors ${
                           infoTab === 'references'
                             ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]'
                             : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -2433,7 +2438,7 @@ const Home: NextPage = () => {
                         References
                       </button>
                       <button
-                        className={`px-4 py-2 text-sm font-medium transition-colors ${
+                        className={`px-3 py-1.5 text-sm font-medium transition-colors ${
                           infoTab === 'location'
                             ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]'
                             : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
