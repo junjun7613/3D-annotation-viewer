@@ -147,30 +147,32 @@ export async function fetchManifestLabel(manifestUrl: string): Promise<{ label: 
 }
 
 // seeAlsoアイテムを構築する関数
-function buildSeeAlsoItems(doc: NewAnnotation): Record<string, unknown>[] {
+function buildSeeAlsoItems(doc: NewAnnotation, manifestBase: string): Record<string, unknown>[] {
   const seeAlsoItems: Record<string, unknown>[] = [];
 
   // Mediaを追加
   if (doc.media && doc.media.length > 0) {
     doc.media.forEach((mediaItem) => {
       const mediaEntry: Record<string, unknown> = {
+        // RDFと同一のURIを id として付与
+        id: `${manifestBase}/media/${mediaItem.id}`,
         type: mediaItem.type === 'iiif' ? 'Manifest' : (mediaItem.type === 'video' ? 'Video' : (mediaItem.type === 'sketchfab' ? 'Model' : 'Image')),
         label: { en: [mediaItem.caption || mediaItem.type] },
       };
 
       if (mediaItem.type === 'iiif' && mediaItem.manifestUrl) {
-        mediaEntry.id = mediaItem.manifestUrl;
         mediaEntry.format = 'application/ld+json';
         mediaEntry.profile = 'http://iiif.io/api/presentation/3/context.json';
+        mediaEntry.source = mediaItem.manifestUrl;
       } else if (mediaItem.type === 'sketchfab' && mediaItem.canvasId) {
-        mediaEntry.id = `https://sketchfab.com/models/${mediaItem.canvasId}`;
         mediaEntry.format = 'text/html';
+        mediaEntry.source = `https://sketchfab.com/models/${mediaItem.canvasId}`;
       } else if (mediaItem.type === 'video') {
-        mediaEntry.id = mediaItem.source;
         mediaEntry.format = 'text/html';
+        mediaEntry.source = mediaItem.source;
       } else {
-        mediaEntry.id = mediaItem.source;
         mediaEntry.format = 'image/jpeg';
+        mediaEntry.source = mediaItem.source;
       }
 
       seeAlsoItems.push(mediaEntry);
@@ -205,12 +207,14 @@ function buildSeeAlsoItems(doc: NewAnnotation): Record<string, unknown>[] {
   if (doc.bibliography && doc.bibliography.length > 0) {
     doc.bibliography.forEach((bibItem) => {
       const bibEntry: Record<string, unknown> = {
+        // RDFと同一のURIを id として付与
+        id: `${manifestBase}/bibliography/${bibItem.id}`,
         type: 'Text',
         label: { en: [`${bibItem.author} (${bibItem.year}). ${bibItem.title}`] },
         format: bibItem.pdf ? 'application/pdf' : 'text/plain',
       };
       if (bibItem.pdf) {
-        bibEntry.id = bibItem.pdf;
+        bibEntry.source = bibItem.pdf;
       }
       seeAlsoItems.push(bibEntry);
     });
@@ -246,7 +250,7 @@ function convertAnnotationToIIIF(
   };
 
   // seeAlsoを構築
-  const seeAlsoItems = buildSeeAlsoItems(doc);
+  const seeAlsoItems = buildSeeAlsoItems(doc, newUrl);
   if (seeAlsoItems.length > 0) {
     annotation.seeAlso = seeAlsoItems;
   }

@@ -90,13 +90,26 @@ export interface WikidataItem {
   thumbnail?: string;
 }
 
+export type BibliographyProperty =
+  | 'crm:P67_refers_to'
+  | 'crm:P70_documents'
+  | 'crm:P65_shows_visual_item';
+
 export interface BibliographyItem {
   id: string;
   author: string;
   title: string;
   year: string;
-  page?: string;
-  pdf?: string;
+  page?: string;       // Page URL
+  pdf?: string;        // PDF URL
+  property?: BibliographyProperty;
+  // 論文・会議録向け追加フィールド
+  containerTitle?: string;  // 雑誌名 / 会議録名
+  volume?: string;
+  issue?: string;
+  pages?: string;      // ページ範囲 (例: "90-97")
+  publisher?: string;
+  doi?: string;
 }
 
 export interface LocationItem {

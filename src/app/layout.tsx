@@ -16,8 +16,8 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: 'IIIF 3D Semantic Editor',
-  description: 'IIIF 3D Semantic Editor',
+  title: 'IIIF Semantic Editor',
+  description: 'IIIF Semantic Editor',
 };
 
 export default function RootLayout({
