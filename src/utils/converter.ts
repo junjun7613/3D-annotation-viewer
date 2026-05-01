@@ -488,5 +488,19 @@ export const downloadIIIFManifest = async (
     addObjectMetadataToManifest(data, objectMetadata, baseUrl, manifestLabel);
   }
 
+  // RDF APIへのseeAlsoをトップレベルに追加
+  const rdfUrl = `${baseUrl}/api/3/${createSlug(manifestUrl)}/rdf`;
+  const existingSeeAlso: unknown[] = Array.isArray(data.seeAlso) ? data.seeAlso : [];
+  data.seeAlso = [
+    ...existingSeeAlso,
+    {
+      id: rdfUrl,
+      type: 'Dataset',
+      label: { en: ['RDF/Turtle description'] },
+      format: 'text/turtle',
+      profile: 'https://www.w3.org/TR/turtle/',
+    },
+  ];
+
   return data;
 };
