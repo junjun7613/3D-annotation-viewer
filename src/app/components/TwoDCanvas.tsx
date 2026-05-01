@@ -163,7 +163,7 @@ export default function TwoDCanvas({
     });
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    viewer.addHandler('canvas-double-click', (_event: any) => {
+    viewer.addHandler('canvas-double-click', () => {
       if (annotationModeRef.current !== 'polygon') return;
       const pts = polygonPointsRef.current;
       if (pts.length >= 3) {
