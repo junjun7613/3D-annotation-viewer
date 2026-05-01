@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import SignIn from '@/app/components/SignIn';
 import { FaCube, FaImage } from 'react-icons/fa';
+import { PiGraphLight } from 'react-icons/pi';
 
 export default function Home() {
   const router = useRouter();
@@ -12,6 +13,10 @@ export default function Home() {
   const openEditor = (mode: '2d' | '3d') => {
     const path = `/editor/${mode}${manifestUrl ? `?manifest=${encodeURIComponent(manifestUrl)}` : ''}`;
     router.push(path);
+  };
+
+  const openSearch = () => {
+    router.push('/search');
   };
 
   return (
@@ -47,7 +52,7 @@ export default function Home() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-6 w-full">
+          <div className="grid grid-cols-3 gap-6 w-full">
             <button
               onClick={() => openEditor('2d')}
               className="flex flex-col items-center gap-4 p-8 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl hover:border-[var(--primary)] hover:shadow-md transition-all group"
@@ -71,6 +76,19 @@ export default function Home() {
               <div className="text-center">
                 <p className="font-semibold text-[var(--text-primary)] text-lg">3D Editor</p>
                 <p className="text-[var(--text-secondary)] text-sm mt-1">Annotate 3D models and scenes</p>
+              </div>
+            </button>
+
+            <button
+              onClick={openSearch}
+              className="flex flex-col items-center gap-4 p-8 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl hover:border-[var(--primary)] hover:shadow-md transition-all group"
+            >
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-full group-hover:bg-blue-100 transition-colors">
+                <PiGraphLight className="w-8 h-8 text-[var(--primary)]" />
+              </div>
+              <div className="text-center">
+                <p className="font-semibold text-[var(--text-primary)] text-lg">Semantic Search</p>
+                <p className="text-[var(--text-secondary)] text-sm mt-1">Search annotations by semantic relationships</p>
               </div>
             </button>
           </div>

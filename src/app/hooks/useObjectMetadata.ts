@@ -4,6 +4,36 @@ import { useEffect, useState } from 'react';
 import { objectMetadataService } from '@/lib/services/objectMetadata';
 import type { ObjectMetadata } from '@/types/main';
 
+interface ManifestMeta { thumbnail: string | null; label: string | null; }
+
+async function fetchManifestMeta(manifestUrl: string): Promise<ManifestMeta> {
+  try {
+    const res = await fetch(manifestUrl);
+    const manifest = await res.json();
+
+    // thumbnail
+    let thumbnail: string | null = null;
+    if (manifest.thumbnail?.[0]?.id) thumbnail = manifest.thumbnail[0].id;
+    else if (manifest.items?.[0]?.thumbnail?.[0]?.id) thumbnail = manifest.items[0].thumbnail[0].id;
+    else if (manifest.thumbnail?.['@id']) thumbnail = manifest.thumbnail['@id'];
+    else if (manifest.sequences?.[0]?.thumbnail?.['@id']) thumbnail = manifest.sequences[0].thumbnail['@id'];
+
+    // label (IIIF v3: { lang: [str] }, v2: string)
+    let label: string | null = null;
+    const raw = manifest.label;
+    if (typeof raw === 'string') {
+      label = raw;
+    } else if (raw && typeof raw === 'object') {
+      const vals = Object.values(raw as Record<string, string[]>);
+      label = vals[0]?.[0] ?? null;
+    }
+
+    return { thumbnail, label };
+  } catch {
+    return { thumbnail: null, label: null };
+  }
+}
+
 /**
  * Fetches and manages object metadata from Firestore when the manifest URL changes.
  * Also exposes the saved TEI original XML and line mappings from the metadata.
@@ -19,15 +49,26 @@ export function useObjectMetadata(manifestUrl: string) {
 
   useEffect(() => {
     const fetchObjectMetadata = async () => {
-      if (manifestUrl) {
-        const metadata = await objectMetadataService.getObjectMetadata(manifestUrl);
-        setObjectMetadata(metadata);
-        if (metadata?.location) {
-          setObjectLocationLat(metadata.location.lat || '');
-          setObjectLocationLng(metadata.location.lng || '');
-        } else {
-          setObjectLocationLat('');
-          setObjectLocationLng('');
+      if (!manifestUrl) return;
+      const metadata = await objectMetadataService.getObjectMetadata(manifestUrl);
+      setObjectMetadata(metadata);
+      if (metadata?.location) {
+        setObjectLocationLat(metadata.location.lat || '');
+        setObjectLocationLng(metadata.location.lng || '');
+      } else {
+        setObjectLocationLat('');
+        setObjectLocationLng('');
+      }
+      // thumbnail_url または manifest_label が未保存なら取得して保存
+      if (metadata && (!metadata.thumbnail_url || !metadata.manifest_label)) {
+        const { thumbnail, label } = await fetchManifestMeta(manifestUrl);
+        if (thumbnail && !metadata.thumbnail_url) {
+          await objectMetadataService.saveThumbnailUrl(manifestUrl, thumbnail);
+          setObjectMetadata((prev) => prev ? { ...prev, thumbnail_url: thumbnail } : prev);
+        }
+        if (label && !metadata.manifest_label) {
+          await objectMetadataService.saveManifestLabel(manifestUrl, label);
+          setObjectMetadata((prev) => prev ? { ...prev, manifest_label: label } : prev);
         }
       }
     };

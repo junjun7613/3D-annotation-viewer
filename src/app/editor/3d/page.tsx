@@ -1850,8 +1850,12 @@ const Home: NextPage = () => {
               annotationsVisible={annotationsVisible}
               annotationMode={annotationMode}
               manifestUrl={manifestUrl}
-              compactMarkers={compactMarkers}
               focusAnnotationId={focusAnnotationId}
+              onCapture={async (dataUrl) => {
+                if (!manifestUrl) return;
+                await objectMetadataService.updateThumbnailUrl(manifestUrl, dataUrl);
+                alert('サムネイルを保存しました。');
+              }}
             />
             {/* Annotation mode toolbar */}
             <div className="absolute top-4 left-4 z-[100] flex flex-col gap-1">

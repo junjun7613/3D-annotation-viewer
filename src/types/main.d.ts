@@ -149,6 +149,8 @@ export interface TeiLineMappingMap {
 
 export interface ObjectMetadata {
   manifest_url: string;
+  thumbnail_url?: string;
+  manifest_label?: string;
   media: MediaItem[];
   wikidata: WikidataItem[];
   bibliography: BibliographyItem[];

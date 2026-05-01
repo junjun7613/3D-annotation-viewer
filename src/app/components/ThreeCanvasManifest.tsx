@@ -57,6 +57,7 @@ interface ThreeCanvasProps {
   editable?: boolean;
   compactMarkers?: boolean;
   focusAnnotationId?: string | null;
+  onCapture?: (dataUrl: string) => void;
 }
 
 //firebaseからデータを取得する関数
@@ -91,9 +92,10 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   editable = true,
   compactMarkers = false,
   focusAnnotationId = null,
+  onCapture,
 }) => {
   //const canvasRef = useRef<HTMLDivElement>(null);
-  //const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   // イベントリスナーの存在を追跡するフラグ
   const clickListenerAdded = useRef(false);
   const dblClickListenerAdded = useRef(false);
@@ -301,10 +303,12 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
       canvas: canvas,
       antialias: true,
       alpha: true,
+      preserveDrawingBuffer: true, // toDataURL() のために必要
     });
     renderer.setSize(sizes.width, sizes.height);
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setClearColor(0x000000); // 背景色を黒に設定
+    rendererRef.current = renderer;
 
     // CSS2DRenderer
     const labelRenderer = new CSS2DRenderer();
@@ -1211,9 +1215,28 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
     return () => unsubscribe();
   }, []);
 
+  const handleCapture = useCallback(() => {
+    if (!rendererRef.current || !onCapture) return;
+    const dataUrl = rendererRef.current.domElement.toDataURL('image/jpeg', 0.85);
+    onCapture(dataUrl);
+  }, [onCapture]);
+
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
       <canvas id="canvas" style={{ width: '100%', height: '100%', display: 'block' }} />
+      {onCapture && (
+        <button
+          onClick={handleCapture}
+          title="現在のビューをサムネイルとして保存"
+          className="absolute bottom-3 right-3 z-10 flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-black/60 text-white hover:bg-black/80 transition-colors backdrop-blur-sm"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+            <path d="M10 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" />
+            <path fillRule="evenodd" d="M.664 10.59a1.651 1.651 0 0 1 0-1.186A10.004 10.004 0 0 1 10 3c4.257 0 7.893 2.66 9.336 6.41.147.381.146.804 0 1.186A10.004 10.004 0 0 1 10 17c-4.257 0-7.893-2.66-9.336-6.41ZM14 10a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z" clipRule="evenodd" />
+          </svg>
+          サムネイルを保存
+        </button>
+      )}
       {annotationInputVisible && annotationPosition && (
         <div
           className="absolute bg-[var(--card-bg)] p-3 border border-[var(--border)] rounded-lg shadow-lg z-[100]"

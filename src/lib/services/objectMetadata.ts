@@ -212,6 +212,39 @@ export const objectMetadataService = {
     }
   },
 
+  // サムネイルURLを保存（未設定の場合のみ）
+  saveThumbnailUrl: async (manifestUrl: string, thumbnailUrl: string): Promise<void> => {
+    const docId = encodeManifestUrl(manifestUrl);
+    const docRef = doc(db, 'manifest_metadata', docId);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists() && !docSnap.data().thumbnail_url) {
+      await updateDoc(docRef, { thumbnail_url: thumbnailUrl });
+    }
+  },
+
+  // マニフェストラベルを保存（未設定の場合のみ）
+  saveManifestLabel: async (manifestUrl: string, label: string): Promise<void> => {
+    const docId = encodeManifestUrl(manifestUrl);
+    const docRef = doc(db, 'manifest_metadata', docId);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists() && !docSnap.data().manifest_label) {
+      await updateDoc(docRef, { manifest_label: label });
+    }
+  },
+
+  // サムネイルURLを強制上書き保存
+  updateThumbnailUrl: async (manifestUrl: string, thumbnailUrl: string): Promise<void> => {
+    const docId = encodeManifestUrl(manifestUrl);
+    const docRef = doc(db, 'manifest_metadata', docId);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      await updateDoc(docRef, { thumbnail_url: thumbnailUrl });
+    } else {
+      await objectMetadataService.initializeObjectMetadata(manifestUrl, '');
+      await updateDoc(docRef, { thumbnail_url: thumbnailUrl });
+    }
+  },
+
   // TEIデータを保存（元XML・行マッピング、オプションでsourceDoc XML）
   saveTei: async (
     manifestUrl: string,
