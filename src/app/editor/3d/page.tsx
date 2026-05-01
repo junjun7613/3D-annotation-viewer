@@ -1,13 +1,11 @@
 'use client';
 
-import { useEffect, useState, useRef, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useEffect, useState, useRef } from 'react';
 import { auth } from '@/lib/firebase/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import type { NextPage } from 'next';
 import SignIn from '@/app/components/SignIn';
 import ThreeCanvas from '@/app/components/ThreeCanvasManifest';
-import SwitchButton from '@/app/components/SwitchButton';
 import TEILinkViewer from '@/app/components/TEILinkViewer';
 import { FaPencilAlt, FaBook, FaRegFilePdf, FaTrashAlt, FaList, FaUpload } from 'react-icons/fa';
 import { LuMapPin, LuLasso, LuEye, LuEyeOff, LuCircleDot } from 'react-icons/lu';
@@ -178,8 +176,6 @@ const Home: NextPage = () => {
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
   const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0, currentLabel: '' });
   const [bulkWikidataLang, setBulkWikidataLang] = useState('ja');
-  const [isViewerMenuOpen, setIsViewerMenuOpen] = useState(false);
-
   //descriptionの情報をstateで管理
   const [desc, setDesc] = useState('');
   // locationの情報をstateで管理（annotation用）
@@ -1221,15 +1217,6 @@ const Home: NextPage = () => {
     }
   };
   */
-
-  const handleSwitchChange = (checked?: boolean) => {
-    setAnnotationsVisible(checked !== undefined ? checked : !annotationsVisible);
-  };
-
-  const handleAnnotationModeChange = (mode?: boolean) => {
-    setAnnotationMode(mode !== undefined ? mode : !annotationMode);
-  };
-
 
   const deleteAnnotation = (id: string) => {
     if (infoPanelContent?.creator == user?.uid) {

@@ -1,16 +1,14 @@
 'use client';
 
-import { useEffect, useState, useRef, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useEffect, useState, useRef } from 'react';
 import { auth } from '@/lib/firebase/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import type { NextPage } from 'next';
 import SignIn from '@/app/components/SignIn';
 import TwoDCanvas from '@/app/components/TwoDCanvas';
 import type { Annotation2D } from '@/app/components/TwoDCanvas';
-import SwitchButton from '@/app/components/SwitchButton';
 import TEILinkViewer from '@/app/components/TEILinkViewer';
-import { FaPencilAlt, FaBook, FaRegFilePdf, FaTrashAlt, FaList, FaUpload, FaBars } from 'react-icons/fa';
+import { FaPencilAlt, FaBook, FaRegFilePdf, FaTrashAlt, FaList, FaUpload } from 'react-icons/fa';
 import { LuMousePointer, LuSquareDashed, LuLasso, LuEye, LuEyeOff } from 'react-icons/lu';
 import { FaLink } from 'react-icons/fa6';
 import { PiShareNetwork } from 'react-icons/pi';
@@ -69,7 +67,7 @@ const Home: NextPage = () => {
 
   const [annotationsVisible, setAnnotationsVisible] = useState(true);
   const [annotationMode, setAnnotationMode] = useState<'none' | 'rect' | 'polygon'>('none');
-  const [compactMarkers, setCompactMarkers] = useState(false);
+
 
   // Custom hooks
   const { manifestUrl, handleManifestUrlChange } = useManifestUrl();
@@ -178,8 +176,6 @@ const Home: NextPage = () => {
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
   const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0, currentLabel: '' });
   const [bulkWikidataLang, setBulkWikidataLang] = useState('ja');
-  const [isViewerMenuOpen, setIsViewerMenuOpen] = useState(false);
-
   // 2D annotations
   const [annotations2D, setAnnotations2D] = useState<Annotation2D[]>([]);
   // pending annotation waiting for title input
@@ -1281,16 +1277,6 @@ const Home: NextPage = () => {
     }
   };
   */
-
-  const handleSwitchChange = (checked?: boolean) => {
-    setAnnotationsVisible(checked !== undefined ? checked : !annotationsVisible);
-  };
-
-  const handleAnnotationModeChange = (mode?: boolean) => {
-    // legacy: used by viewer menu switch (maps boolean to none/rect)
-    setAnnotationMode(mode !== undefined ? (mode ? 'rect' : 'none') : (annotationMode === 'none' ? 'rect' : 'none'));
-  };
-
 
   const deleteAnnotation = (id: string) => {
     if (infoPanelContent?.creator == user?.uid) {
