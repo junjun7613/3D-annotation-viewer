@@ -1,0 +1,54 @@
+digraph G {
+  graph [
+    rankdir=LR
+    fontname="Helvetica Neue"
+    bgcolor="#F8F9FA"
+    pad="1.2,1.2"
+    splines=polyline
+    nodesep=1.4
+    ranksep=2.2
+    fontsize=22
+  ]
+  node [fontname="Helvetica Neue" fontsize=13 style="filled,rounded" shape=box margin="0.35,0.22"]
+  edge [fontname="Helvetica Neue" fontsize=11 color="#555555"]
+
+  // Col 1: External Sources
+  { rank=same
+    ext_iiif [label="外部 IIIF Manifest" shape=cylinder fillcolor="#C7D2FE" color="#6366F1" style=filled]
+    ext_apis [label="外部 API\nWikidata / CrossRef / NDL" shape=cylinder fillcolor="#C7D2FE" color="#6366F1" style=filled]
+  }
+
+  // Col 2: Editor
+  { rank=same
+    editor3d [label="3D Editor" fillcolor="#6EE7B7" color="#059669"]
+  }
+
+  // Col 3: Firestore + API
+  { rank=same
+    col_test [label="Firestore\nAnnotations" shape=cylinder fillcolor="#FED7AA" color="#EA580C" style=filled]
+    api      [label="API Route" fillcolor="#BFDBFE" color="#2563EB"]
+    col_meta [label="Firestore\nObject Metadata" shape=cylinder fillcolor="#FED7AA" color="#EA580C" style=filled]
+  }
+
+  // Col 4: Outputs
+  { rank=same
+    out_iiif [label="拡張 IIIF Manifest" fillcolor="#DCFCE7" color="#16A34A"]
+    out_rdf  [label="RDF / Turtle" fillcolor="#DCFCE7" color="#16A34A"]
+  }
+
+  // Edges
+  ext_iiif -> editor3d [color="#6366F1"]
+  ext_apis -> editor3d [style=dashed color="#6366F1"]
+
+  editor3d -> col_test [color="#F97316"]
+  editor3d -> col_meta [color="#F97316"]
+
+  col_test -> api      [color="#2563EB"]
+  col_meta -> api      [color="#2563EB"]
+  ext_iiif -> api      [style=dashed color="#6366F1"]
+
+  api      -> out_iiif [color="#22C55E" penwidth=2]
+
+  col_test -> out_rdf  [style=dashed color="#22C55E"]
+  col_meta -> out_rdf  [style=dashed color="#22C55E"]
+}
