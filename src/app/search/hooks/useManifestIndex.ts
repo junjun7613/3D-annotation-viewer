@@ -8,26 +8,35 @@ export interface ManifestIndexEntry {
   thumbnailUrl?: string;
   manifestLabel?: string;
   wikidata: WikidataItem[];
-  // オブジェクトレベル + アノテーションレベルの書誌を統合したもの
   bibliography: BibliographyItem[];
   location?: { lat: number; lng: number };
   geoPoints: { lat: number; lng: number; label: string; source: 'location' | 'wikidata' }[];
 }
 
-// 書誌検索UIで使う、書誌とそれが紐づくマニフェストのリスト
 export interface BibliographyIndexEntry {
   bib: BibliographyItem;
   manifestUrls: string[];
 }
 
-export function useManifestIndex() {
+export type SearchScope = 'all' | 'mine';
+
+export function useManifestIndex(scope: SearchScope = 'all', idToken?: string | null) {
   const [entries, setEntries] = useState<ManifestIndexEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // scope=mine のときはトークンが揃うまで待つ
+    if (scope === 'mine' && idToken === undefined) return;
+
     const fetchAll = async () => {
+      setLoading(true);
       try {
-        const res = await fetch('/api/search/manifests');
+        const url = scope === 'mine' ? '/api/search/manifests?scope=mine' : '/api/search/manifests';
+        const headers: HeadersInit = {};
+        if (scope === 'mine' && idToken) {
+          headers['Authorization'] = `Bearer ${idToken}`;
+        }
+        const res = await fetch(url, { headers });
         const data: ManifestIndexEntry[] = await res.json();
         setEntries(data);
       } catch (e) {
@@ -37,7 +46,7 @@ export function useManifestIndex() {
       }
     };
     fetchAll();
-  }, []);
+  }, [scope, idToken]);
 
   return { entries, loading };
 }

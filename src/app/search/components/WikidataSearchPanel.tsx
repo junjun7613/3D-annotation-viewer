@@ -19,9 +19,8 @@ const isQid = (q: string) => /^Q\d+$/i.test(q.trim());
 
 export default function WikidataSearchPanel({ entries, loading }: Props) {
   const [query, setQuery] = useState('');
-  const [selectedWikidata, setSelectedWikidata] = useState<WikidataItem | null>(null);
+  const [selectedWikidata, setSelectedWikidata] = useState<WikidataItem[]>([]);
 
-  // 全 Wikidata エンティティを uri で重複排除しつつ集約
   const allWikidata = useMemo<WikidataWithManifests[]>(() => {
     const map = new Map<string, WikidataWithManifests>();
     entries.forEach((entry) => {
@@ -37,7 +36,6 @@ export default function WikidataSearchPanel({ entries, loading }: Props) {
     return Array.from(map.values());
   }, [entries]);
 
-  // フィルタ後の候補（未入力時は空）
   const filtered = useMemo<WikidataWithManifests[]>(() => {
     const q = query.trim().toLowerCase();
     if (!q) return [];
@@ -50,13 +48,23 @@ export default function WikidataSearchPanel({ entries, loading }: Props) {
     });
   }, [query, allWikidata]);
 
-  // 選択した Wikidata に紐づくマニフェスト
+  // AND: 選択した全エンティティを含むマニフェスト
   const resultEntries = useMemo<ManifestIndexEntry[]>(() => {
-    if (!selectedWikidata) return [];
+    if (selectedWikidata.length === 0) return [];
+    const uris = selectedWikidata.map((w) => w.uri);
     return entries.filter((entry) =>
-      entry.wikidata.some((w) => w.uri === selectedWikidata.uri)
+      uris.every((uri) => entry.wikidata.some((w) => w.uri === uri))
     );
   }, [selectedWikidata, entries]);
+
+  const toggleSelection = (w: WikidataItem) => {
+    setSelectedWikidata((prev) => {
+      const exists = prev.some((s) => s.uri === w.uri);
+      return exists ? prev.filter((s) => s.uri !== w.uri) : [...prev, w];
+    });
+  };
+
+  const isSelected = (uri: string) => selectedWikidata.some((s) => s.uri === uri);
 
   return (
     <div className="flex flex-col gap-6">
@@ -65,13 +73,13 @@ export default function WikidataSearchPanel({ entries, loading }: Props) {
         <input
           type="text"
           value={query}
-          onChange={(e) => { setQuery(e.target.value); setSelectedWikidata(null); }}
+          onChange={(e) => setQuery(e.target.value)}
           placeholder="ラベル（例: 東大寺）または QID（例: Q276748）で絞り込み"
           className="input-field mb-0 flex-1"
         />
         {query && (
           <button
-            onClick={() => { setQuery(''); setSelectedWikidata(null); }}
+            onClick={() => setQuery('')}
             className="px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border)] rounded-lg transition-colors"
           >
             クリア
@@ -81,87 +89,118 @@ export default function WikidataSearchPanel({ entries, loading }: Props) {
 
       {loading && <p className="text-sm text-[var(--text-secondary)]">読み込み中...</p>}
 
-      {/* Step 1: Wikidata 候補一覧 */}
-      {!loading && !selectedWikidata && (
-        <>
-          <p className="text-sm text-[var(--text-secondary)]">
-            {!query.trim()
-              ? 'ラベルまたは QID を入力してください。'
-              : filtered.length > 0
-              ? `${filtered.length} 件のエンティティが見つかりました。検索の起点にするエンティティを選択してください。`
-              : '条件に一致するエンティティがありません。'}
-          </p>
-
-          <div className="flex flex-col gap-2">
-            {filtered.map(({ wikidata: w, manifestUrls }) => (
-              <button
+      {/* Selected chips */}
+      {selectedWikidata.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide">
+              選択中（AND 検索）
+            </p>
+            <button
+              onClick={() => setSelectedWikidata([])}
+              className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+            >
+              すべて解除
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {selectedWikidata.map((w) => (
+              <span
                 key={w.uri}
-                onClick={() => setSelectedWikidata(w)}
-                className="flex items-center gap-3 p-3 text-left rounded-xl border border-[var(--border)] hover:border-[var(--primary)] hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors group"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-medium"
               >
                 {w.thumbnail && (
-                  <img
-                    src={w.thumbnail}
-                    alt={w.label}
-                    className="w-10 h-10 rounded-full object-cover flex-shrink-0"
-                  />
+                  <img src={w.thumbnail} alt="" className="w-4 h-4 rounded-full object-cover flex-shrink-0" />
                 )}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-[var(--text-primary)] group-hover:text-[var(--primary)]">
-                    {w.label}
-                  </p>
-                  <div className="flex gap-2 text-xs text-[var(--text-secondary)] mt-0.5">
-                    {w.type && <span>{w.type}</span>}
-                    <span className="font-mono opacity-60">{w.uri.split('/').pop()}</span>
-                  </div>
-                </div>
-                <span className="text-xs text-[var(--text-secondary)] flex-shrink-0">
-                  {manifestUrls.length} 件のオブジェクト
-                </span>
-              </button>
+                {w.label}
+                <button
+                  onClick={() => toggleSelection(w)}
+                  className="ml-0.5 leading-none opacity-70 hover:opacity-100"
+                  aria-label={`${w.label}を解除`}
+                >
+                  ×
+                </button>
+              </span>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Candidate list */}
+      {!loading && (
+        <>
+          {query.trim() ? (
+            <p className="text-sm text-[var(--text-secondary)]">
+              {filtered.length > 0
+                ? `${filtered.length} 件のエンティティが見つかりました。`
+                : '条件に一致するエンティティがありません。'}
+            </p>
+          ) : (
+            selectedWikidata.length === 0 && (
+              <p className="text-sm text-[var(--text-secondary)]">ラベルまたは QID を入力してください。</p>
+            )
+          )}
+
+          <div className="flex flex-col gap-2">
+            {filtered.map(({ wikidata: w, manifestUrls }) => {
+              const selected = isSelected(w.uri);
+              return (
+                <button
+                  key={w.uri}
+                  onClick={() => toggleSelection(w)}
+                  className={`flex items-center gap-3 p-3 text-left rounded-xl border transition-colors group ${
+                    selected
+                      ? 'border-[var(--primary)] bg-blue-50 dark:bg-blue-900/10'
+                      : 'border-[var(--border)] hover:border-[var(--primary)] hover:bg-blue-50 dark:hover:bg-blue-900/10'
+                  }`}
+                >
+                  <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 border-2 transition-colors ${
+                    selected ? 'bg-[var(--primary)] border-[var(--primary)]' : 'border-[var(--border)]'
+                  }`}>
+                    {selected && <span className="text-white text-xs leading-none">✓</span>}
+                  </div>
+                  {w.thumbnail && (
+                    <img src={w.thumbnail} alt={w.label} className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-medium ${selected ? 'text-[var(--primary)]' : 'text-[var(--text-primary)] group-hover:text-[var(--primary)]'}`}>
+                      {w.label}
+                    </p>
+                    <div className="flex gap-2 text-xs text-[var(--text-secondary)] mt-0.5">
+                      {w.type && <span>{w.type}</span>}
+                      <span className="font-mono opacity-60">{w.uri.split('/').pop()}</span>
+                    </div>
+                  </div>
+                  <span className="text-xs text-[var(--text-secondary)] flex-shrink-0">
+                    {manifestUrls.length} 件のオブジェクト
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </>
       )}
 
-      {/* Step 2: 選択したエンティティに紐づくマニフェスト */}
-      {!loading && selectedWikidata && (
-        <>
-          <div className="flex items-center gap-3 p-3 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-[var(--primary)]">
-            {selectedWikidata.thumbnail && (
-              <img
-                src={selectedWikidata.thumbnail}
-                alt={selectedWikidata.label}
-                className="w-10 h-10 rounded-full object-cover flex-shrink-0"
-              />
-            )}
-            <div className="flex-1 min-w-0">
-              <p className="text-xs text-[var(--text-secondary)] mb-0.5">選択中のエンティティ</p>
-              <p className="text-sm font-semibold text-[var(--text-primary)]">{selectedWikidata.label}</p>
-              <p className="text-xs text-[var(--text-secondary)] font-mono">{selectedWikidata.uri}</p>
-            </div>
-            <button
-              onClick={() => setSelectedWikidata(null)}
-              className="text-xs px-2 py-1 rounded border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex-shrink-0"
-            >
-              ← 戻る
-            </button>
-          </div>
-
+      {/* Results */}
+      {!loading && selectedWikidata.length > 0 && (
+        <div className="border-t border-[var(--border)] pt-4 flex flex-col gap-4">
           <p className="text-sm text-[var(--text-secondary)]">
-            このエンティティが紐づく {resultEntries.length} 件のオブジェクト
+            {resultEntries.length > 0
+              ? `条件に一致する ${resultEntries.length} 件のオブジェクト`
+              : '選択したすべてのエンティティに一致するオブジェクトはありません。'}
           </p>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {resultEntries.map((entry) => (
-              <ManifestCard
-                key={entry.manifestUrl}
-                entry={entry}
-                highlightWikidataUri={selectedWikidata.uri}
-              />
-            ))}
-          </div>
-        </>
+          {resultEntries.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {resultEntries.map((entry) => (
+                <ManifestCard
+                  key={entry.manifestUrl}
+                  entry={entry}
+                  highlightWikidataUri={selectedWikidata[0]?.uri}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

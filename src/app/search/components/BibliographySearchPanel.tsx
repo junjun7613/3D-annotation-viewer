@@ -30,9 +30,8 @@ interface Props {
 export default function BibliographySearchPanel({ entries, loading }: Props) {
   const [query, setQuery] = useState('');
   const [propertyFilter, setPropertyFilter] = useState<BibliographyProperty | 'all'>('all');
-  const [selectedBib, setSelectedBib] = useState<BibliographyItem | null>(null);
+  const [selectedBibs, setSelectedBibs] = useState<BibliographyItem[]>([]);
 
-  // 全書誌を id で重複排除しつつ集約、どのマニフェストに紐づくかも保持
   const allBibs = useMemo<BibWithManifests[]>(() => {
     const bibMap = new Map<string, BibWithManifests>();
     entries.forEach((entry) => {
@@ -48,9 +47,9 @@ export default function BibliographySearchPanel({ entries, loading }: Props) {
     return Array.from(bibMap.values());
   }, [entries]);
 
-  // フィルタ適用後の書誌候補
   const filteredBibs = useMemo<BibWithManifests[]>(() => {
     const q = query.trim().toLowerCase();
+    if (!q && propertyFilter === 'all') return [];
     return allBibs.filter(({ bib }) => {
       const propMatch =
         propertyFilter === 'all' ||
@@ -68,13 +67,23 @@ export default function BibliographySearchPanel({ entries, loading }: Props) {
     });
   }, [query, propertyFilter, allBibs]);
 
-  // 選択した書誌に紐づくマニフェストのエントリ
+  // AND: 選択した全書誌を含むマニフェスト
   const resultEntries = useMemo<ManifestIndexEntry[]>(() => {
-    if (!selectedBib) return [];
+    if (selectedBibs.length === 0) return [];
+    const ids = selectedBibs.map((b) => b.id);
     return entries.filter((entry) =>
-      entry.bibliography.some((b) => b.id === selectedBib.id)
+      ids.every((id) => entry.bibliography.some((b) => b.id === id))
     );
-  }, [selectedBib, entries]);
+  }, [selectedBibs, entries]);
+
+  const toggleSelection = (bib: BibliographyItem) => {
+    setSelectedBibs((prev) => {
+      const exists = prev.some((s) => s.id === bib.id);
+      return exists ? prev.filter((s) => s.id !== bib.id) : [...prev, bib];
+    });
+  };
+
+  const isSelected = (id?: string) => selectedBibs.some((s) => s.id === id);
 
   const propLabel = (prop?: string) =>
     CRM_PROPERTIES.find((o) => o.value === (prop ?? 'crm:P67_refers_to'))?.label ?? prop ?? '';
@@ -89,7 +98,7 @@ export default function BibliographySearchPanel({ entries, loading }: Props) {
           {CRM_PROPERTIES.map((opt) => (
             <button
               key={opt.value}
-              onClick={() => { setPropertyFilter(opt.value as BibliographyProperty | 'all'); setSelectedBib(null); }}
+              onClick={() => setPropertyFilter(opt.value as BibliographyProperty | 'all')}
               title={opt.description}
               className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
                 propertyFilter === opt.value
@@ -113,13 +122,13 @@ export default function BibliographySearchPanel({ entries, loading }: Props) {
         <input
           type="text"
           value={query}
-          onChange={(e) => { setQuery(e.target.value); setSelectedBib(null); }}
+          onChange={(e) => setQuery(e.target.value)}
           placeholder="著者・タイトル・DOI・出版社などで絞り込み"
           className="input-field mb-0 flex-1"
         />
         {query && (
           <button
-            onClick={() => { setQuery(''); setSelectedBib(null); }}
+            onClick={() => setQuery('')}
             className="px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border)] rounded-lg transition-colors"
           >
             クリア
@@ -129,12 +138,51 @@ export default function BibliographySearchPanel({ entries, loading }: Props) {
 
       {loading && <p className="text-sm text-[var(--text-secondary)]">読み込み中...</p>}
 
-      {/* Step 1: 書誌候補一覧 */}
-      {!loading && !selectedBib && (
+      {/* Selected chips */}
+      {selectedBibs.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide">
+              選択中（AND 検索）
+            </p>
+            <button
+              onClick={() => setSelectedBibs([])}
+              className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+            >
+              すべて解除
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {selectedBibs.map((bib) => {
+              const prop = bib.property ?? 'crm:P67_refers_to';
+              return (
+                <span
+                  key={bib.id}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${CRM_BADGE[prop] ?? CRM_BADGE['crm:P67_refers_to']}`}
+                >
+                  <span className="max-w-[16rem] truncate">{bib.title || '（タイトルなし）'}</span>
+                  <button
+                    onClick={() => toggleSelection(bib)}
+                    className="ml-0.5 leading-none opacity-70 hover:opacity-100"
+                    aria-label={`${bib.title}を解除`}
+                  >
+                    ×
+                  </button>
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Bibliography candidate list */}
+      {!loading && (
         <>
           <p className="text-sm text-[var(--text-secondary)]">
-            {filteredBibs.length > 0
-              ? `${filteredBibs.length} 件の書誌が見つかりました。検索の起点にする書誌を選択してください。`
+            {!query.trim() && propertyFilter === 'all'
+              ? 'CRM プロパティを選択するか、テキストを入力してください。'
+              : filteredBibs.length > 0
+              ? `${filteredBibs.length} 件の書誌が見つかりました。`
               : allBibs.length === 0
               ? '登録された書誌情報がありません。'
               : '条件に一致する書誌がありません。'}
@@ -143,14 +191,24 @@ export default function BibliographySearchPanel({ entries, loading }: Props) {
           <div className="flex flex-col gap-2">
             {filteredBibs.map(({ bib, manifestUrls }) => {
               const prop = bib.property ?? 'crm:P67_refers_to';
+              const selected = isSelected(bib.id);
               return (
                 <button
                   key={bib.id}
-                  onClick={() => setSelectedBib(bib)}
-                  className="flex items-start gap-3 p-3 text-left rounded-xl border border-[var(--border)] hover:border-[var(--primary)] hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors group"
+                  onClick={() => toggleSelection(bib)}
+                  className={`flex items-start gap-3 p-3 text-left rounded-xl border transition-colors group ${
+                    selected
+                      ? 'border-[var(--primary)] bg-blue-50 dark:bg-blue-900/10'
+                      : 'border-[var(--border)] hover:border-[var(--primary)] hover:bg-blue-50 dark:hover:bg-blue-900/10'
+                  }`}
                 >
+                  <div className={`w-5 h-5 mt-0.5 rounded flex items-center justify-center flex-shrink-0 border-2 transition-colors ${
+                    selected ? 'bg-[var(--primary)] border-[var(--primary)]' : 'border-[var(--border)]'
+                  }`}>
+                    {selected && <span className="text-white text-xs leading-none">✓</span>}
+                  </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-[var(--text-primary)] group-hover:text-[var(--primary)] leading-snug">
+                    <p className={`text-sm font-medium leading-snug ${selected ? 'text-[var(--primary)]' : 'text-[var(--text-primary)] group-hover:text-[var(--primary)]'}`}>
                       {bib.title || '（タイトルなし）'}
                     </p>
                     <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-[var(--text-secondary)] mt-0.5">
@@ -175,64 +233,50 @@ export default function BibliographySearchPanel({ entries, loading }: Props) {
         </>
       )}
 
-      {/* Step 2: 選択した書誌に紐づくマニフェスト */}
-      {!loading && selectedBib && (
-        <>
-          <div className="flex items-start gap-3 p-3 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-[var(--primary)]">
-            <div className="flex-1 min-w-0">
-              <p className="text-xs text-[var(--text-secondary)] mb-0.5">選択中の書誌</p>
-              <p className="text-sm font-semibold text-[var(--text-primary)]">{selectedBib.title}</p>
-              {selectedBib.author && (
-                <p className="text-xs text-[var(--text-secondary)]">{selectedBib.author}{selectedBib.year ? `（${selectedBib.year}）` : ''}</p>
-              )}
-            </div>
-            <button
-              onClick={() => setSelectedBib(null)}
-              className="text-xs px-2 py-1 rounded border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex-shrink-0"
-            >
-              ← 戻る
-            </button>
-          </div>
-
+      {/* Results */}
+      {!loading && selectedBibs.length > 0 && (
+        <div className="border-t border-[var(--border)] pt-4 flex flex-col gap-3">
           <p className="text-sm text-[var(--text-secondary)]">
-            この書誌が紐づく {resultEntries.length} 件のオブジェクト
+            {resultEntries.length > 0
+              ? `条件に一致する ${resultEntries.length} 件のオブジェクト`
+              : '選択したすべての書誌に一致するオブジェクトはありません。'}
           </p>
-
-          <div className="flex flex-col gap-3">
-            {resultEntries.map((entry) => {
-              const thumbnail = entry.thumbnailUrl ?? entry.wikidata.find((w) => w.thumbnail)?.thumbnail;
-              return (
-                <div key={entry.manifestUrl} className="flex gap-4 p-4 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl items-center">
-                  <div className="w-28 h-18 flex-shrink-0 rounded-lg overflow-hidden bg-[var(--secondary-bg)] flex items-center justify-center" style={{ minHeight: '4.5rem' }}>
-                    {thumbnail ? (
-                      <img src={thumbnail} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="text-xs text-[var(--text-secondary)]">No image</span>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-[var(--text-secondary)] font-mono truncate">{entry.manifestUrl}</p>
-                    {entry.wikidata.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1.5">
-                        {entry.wikidata.slice(0, 4).map((w) => (
-                          <span key={w.uri} className="text-xs px-2 py-0.5 rounded-full bg-[var(--secondary-bg)] text-[var(--text-secondary)]">
-                            {w.label}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <a
-                    href={`/editor/3d?manifest=${encodeURIComponent(entry.manifestUrl)}`}
-                    className="flex-shrink-0 text-xs font-medium px-3 py-1.5 rounded-lg bg-[var(--primary)] text-white hover:opacity-90 transition-opacity whitespace-nowrap"
-                  >
-                    3D Editorで開く
-                  </a>
+          {resultEntries.map((entry) => {
+            const thumbnail = entry.thumbnailUrl ?? entry.wikidata.find((w) => w.thumbnail)?.thumbnail;
+            return (
+              <div key={entry.manifestUrl} className="flex gap-4 p-4 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl items-center">
+                <div className="w-28 flex-shrink-0 rounded-lg overflow-hidden bg-[var(--secondary-bg)] flex items-center justify-center" style={{ minHeight: '4.5rem' }}>
+                  {thumbnail ? (
+                    <img src={thumbnail} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-xs text-[var(--text-secondary)]">No image</span>
+                  )}
                 </div>
-              );
-            })}
-          </div>
-        </>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-[var(--text-primary)] leading-snug mb-1">
+                    {entry.manifestLabel ?? entry.manifestUrl.replace(/^https?:\/\//, '').slice(0, 60)}
+                  </p>
+                  <p className="text-xs text-[var(--text-secondary)] font-mono truncate">{entry.manifestUrl}</p>
+                  {entry.wikidata.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {entry.wikidata.slice(0, 4).map((w) => (
+                        <span key={w.uri} className="text-xs px-2 py-0.5 rounded-full bg-[var(--secondary-bg)] text-[var(--text-secondary)]">
+                          {w.label}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <a
+                  href={`/editor/3d?manifest=${encodeURIComponent(entry.manifestUrl)}`}
+                  className="flex-shrink-0 text-xs font-medium px-3 py-1.5 rounded-lg bg-[var(--primary)] text-white hover:opacity-90 transition-opacity whitespace-nowrap"
+                >
+                  3D Editorで開く
+                </a>
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );

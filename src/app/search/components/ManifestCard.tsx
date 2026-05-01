@@ -1,6 +1,5 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import type { ManifestIndexEntry } from '../hooks/useManifestIndex';
 
 interface Props {
@@ -9,7 +8,6 @@ interface Props {
 }
 
 export default function ManifestCard({ entry, highlightWikidataUri }: Props) {
-  const router = useRouter();
 
   const shortUrl = entry.manifestUrl.replace(/^https?:\/\//, '').slice(0, 60);
 
@@ -78,12 +76,14 @@ export default function ManifestCard({ entry, highlightWikidataUri }: Props) {
         )}
 
         {/* Open button */}
-        <button
-          onClick={() => router.push(`/editor/3d?manifest=${encodeURIComponent(entry.manifestUrl)}`)}
+        <a
+          href={`/editor/3d?manifest=${encodeURIComponent(entry.manifestUrl)}`}
+          target="_blank"
+          rel="noopener noreferrer"
           className="mt-auto text-sm font-medium px-3 py-1.5 rounded-lg bg-[var(--primary)] text-white hover:opacity-90 transition-opacity text-center"
         >
           3D Editorで開く
-        </button>
+        </a>
       </div>
     </div>
   );
