@@ -1,13 +1,15 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import dynamic from 'next/dynamic';
 import { auth } from '@/lib/firebase/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import type { NextPage } from 'next';
 import SignIn from '@/app/components/SignIn';
-import TwoDCanvas from '@/app/components/TwoDCanvas';
 import type { Annotation2D } from '@/app/components/TwoDCanvas';
 import TEILinkViewer from '@/app/components/TEILinkViewer';
+
+const TwoDCanvas = dynamic(() => import('@/app/components/TwoDCanvas'), { ssr: false });
 import { FaPencilAlt, FaBook, FaRegFilePdf, FaTrashAlt, FaList, FaUpload } from 'react-icons/fa';
 import { LuMousePointer, LuSquareDashed, LuLasso, LuEye, LuEyeOff } from 'react-icons/lu';
 import { FaLink } from 'react-icons/fa6';
@@ -17,7 +19,6 @@ import { LiaMapMarkedSolid } from 'react-icons/lia';
 import { useAtom, useSetAtom } from 'jotai';
 import { infoPanelAtom } from '@/app/atoms/infoPanelAtom';
 
-//import dynamic from 'next/dynamic';
 
 import EditorJSHtml from 'editorjs-html';
 import Header from '@editorjs/header';
