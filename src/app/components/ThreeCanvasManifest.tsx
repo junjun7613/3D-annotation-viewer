@@ -920,7 +920,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
       controls.enableDamping = true; // 慣性を有効にする
       controls.dampingFactor = 0.1; // ダンピングの強さ（大きいほど早く止まる）
       controls.minDistance = 0.8; // ズームインの最小距離
-      controls.maxDistance = 10; // ズームアウトの最大距離
+      controls.maxDistance = 100; // ズームアウトの最大距離
       controls.domElement = renderer.domElement;
       controlsRef.current = controls; // コントロールへの参照を保存
 

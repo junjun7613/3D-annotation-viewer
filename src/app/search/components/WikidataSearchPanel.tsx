@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import type { ManifestIndexEntry } from '../hooks/useManifestIndex';
 import type { WikidataItem } from '@/types/main';
 import ManifestCard from './ManifestCard';
@@ -17,10 +17,34 @@ interface Props {
 
 const isQid = (q: string) => /^Q\d+$/i.test(q.trim());
 
+// Wikidata wbsearchentities API でQIDの集合を返す
+async function searchWikidataQids(query: string): Promise<Set<string>> {
+  const url = new URL('https://www.wikidata.org/w/api.php');
+  url.searchParams.set('action', 'wbsearchentities');
+  url.searchParams.set('search', query);
+  url.searchParams.set('language', 'ja');
+  url.searchParams.set('uselang', 'ja');
+  url.searchParams.set('type', 'item');
+  url.searchParams.set('limit', '50');
+  url.searchParams.set('format', 'json');
+  url.searchParams.set('origin', '*');
+  const res = await fetch(url.toString());
+  const data = await res.json();
+  const qids = new Set<string>();
+  for (const item of data.search ?? []) {
+    if (item.id) qids.add(item.id);
+  }
+  return qids;
+}
+
 export default function WikidataSearchPanel({ entries, loading }: Props) {
   const [query, setQuery] = useState('');
   const [selectedWikidata, setSelectedWikidata] = useState<WikidataItem[]>([]);
+  const [wikidataQids, setWikidataQids] = useState<Set<string> | null>(null);
+  const [wikidataSearching, setWikidataSearching] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // 全登録エンティティをURIでインデックス化
   const allWikidata = useMemo<WikidataWithManifests[]>(() => {
     const map = new Map<string, WikidataWithManifests>();
     entries.forEach((entry) => {
@@ -36,17 +60,61 @@ export default function WikidataSearchPanel({ entries, loading }: Props) {
     return Array.from(map.values());
   }, [entries]);
 
-  const filtered = useMemo<WikidataWithManifests[]>(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return [];
-    return allWikidata.filter(({ wikidata: w }) => {
-      if (isQid(query)) {
-        const qid = w.uri.split('/').pop()?.toLowerCase() ?? '';
-        return qid === q.toLowerCase();
+  // クエリが変わったらデバウンスしてWikidata APIを叩く
+  useEffect(() => {
+    const q = query.trim();
+    if (!q) {
+      setWikidataQids(null);
+      return;
+    }
+    if (isQid(q)) {
+      // QID直接入力はAPI不要
+      setWikidataQids(null);
+      return;
+    }
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      setWikidataSearching(true);
+      try {
+        const qids = await searchWikidataQids(q);
+        setWikidataQids(qids);
+      } catch {
+        setWikidataQids(null);
+      } finally {
+        setWikidataSearching(false);
       }
-      return w.label.toLowerCase().includes(q);
+    }, 400);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [query]);
+
+  // フィルタ済み候補
+  const filtered = useMemo<WikidataWithManifests[]>(() => {
+    const q = query.trim();
+    if (!q) return [];
+
+    if (isQid(q)) {
+      // QID直接一致
+      return allWikidata.filter(({ wikidata: w }) => {
+        const qid = w.uri.split('/').pop()?.toUpperCase() ?? '';
+        return qid === q.toUpperCase();
+      });
+    }
+
+    if (wikidataQids === null) {
+      // APIレスポンス待ち or エラー時はローカルラベル一致にフォールバック
+      return allWikidata.filter(({ wikidata: w }) =>
+        w.label.toLowerCase().includes(q.toLowerCase())
+      );
+    }
+
+    // APIヒットのQIDと登録済みエンティティを照合
+    return allWikidata.filter(({ wikidata: w }) => {
+      const qid = w.uri.split('/').pop() ?? '';
+      return wikidataQids.has(qid);
     });
-  }, [query, allWikidata]);
+  }, [query, allWikidata, wikidataQids]);
 
   // AND: 選択した全エンティティを含むマニフェスト
   const resultEntries = useMemo<ManifestIndexEntry[]>(() => {
@@ -66,6 +134,14 @@ export default function WikidataSearchPanel({ entries, loading }: Props) {
 
   const isSelected = (uri: string) => selectedWikidata.some((s) => s.uri === uri);
 
+  const statusMessage = () => {
+    const q = query.trim();
+    if (!q) return selectedWikidata.length === 0 ? 'ラベルまたは QID を入力してください。' : null;
+    if (wikidataSearching) return 'Wikidata を検索中...';
+    if (filtered.length > 0) return `${filtered.length} 件のエンティティが見つかりました。`;
+    return '条件に一致するエンティティがありません。';
+  };
+
   return (
     <div className="flex flex-col gap-6">
       {/* Search input */}
@@ -74,12 +150,12 @@ export default function WikidataSearchPanel({ entries, loading }: Props) {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="ラベル（例: 東大寺）または QID（例: Q276748）で絞り込み"
+          placeholder="ラベル（例: Artemis）または QID（例: Q39503）で絞り込み"
           className="input-field mb-0 flex-1"
         />
         {query && (
           <button
-            onClick={() => setQuery('')}
+            onClick={() => { setQuery(''); setWikidataQids(null); }}
             className="px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border)] rounded-lg transition-colors"
           >
             クリア
@@ -129,16 +205,8 @@ export default function WikidataSearchPanel({ entries, loading }: Props) {
       {/* Candidate list */}
       {!loading && (
         <>
-          {query.trim() ? (
-            <p className="text-sm text-[var(--text-secondary)]">
-              {filtered.length > 0
-                ? `${filtered.length} 件のエンティティが見つかりました。`
-                : '条件に一致するエンティティがありません。'}
-            </p>
-          ) : (
-            selectedWikidata.length === 0 && (
-              <p className="text-sm text-[var(--text-secondary)]">ラベルまたは QID を入力してください。</p>
-            )
+          {statusMessage() && (
+            <p className="text-sm text-[var(--text-secondary)]">{statusMessage()}</p>
           )}
 
           <div className="flex flex-col gap-2">
