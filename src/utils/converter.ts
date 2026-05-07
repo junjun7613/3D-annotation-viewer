@@ -223,6 +223,36 @@ function buildSeeAlsoItems(doc: NewAnnotation, manifestBase: string): Record<str
   return seeAlsoItems;
 }
 
+// Firebase保存形式のセレクターをIIIF 3D Draft仕様形式に変換する
+// 元データ構造: { type: '3DSelector'|'PolygonSelector', value: [x,y,z], area: [x,y,z], camPos: [x,y,z] }
+// 仕様参照: https://iiif.github.io/3d/temp-draft-4.html
+function convertSelectorToIIIF3D(selector: {
+  type: string;
+  value: [number, number, number];
+  area?: [number, number, number];
+  camPos?: [number, number, number];
+}): Record<string, unknown> {
+  if (selector.type === '3DSelector') {
+    return {
+      type: 'PointSelector',
+      x: selector.value[0],
+      y: selector.value[1],
+      z: selector.value[2],
+    };
+  }
+  if (selector.type === 'PolygonSelector') {
+    // PolygonZSelector: area を WKT POLYGONZ 形式で表現
+    // area は頂点群として [x,y,z] の繰り返しを想定
+    const coords = selector.area ?? selector.value;
+    return {
+      type: 'PolygonZSelector',
+      value: `POLYGONZ((${coords[0]} ${coords[1]} ${coords[2]}))`,
+    };
+  }
+  // 未知のタイプはそのまま返す
+  return selector as unknown as Record<string, unknown>;
+}
+
 // アノテーションをIIIF形式に変換する関数
 function convertAnnotationToIIIF(
   doc: NewAnnotation,
@@ -244,8 +274,12 @@ function convertAnnotationToIIIF(
       type: doc.data.body.type,
     },
     target: {
-      source: doc.target_canvas,
-      selector: doc.data.target.selector,
+      type: 'SpecificResource',
+      source: [{ id: doc.target_canvas, type: 'Scene' }],
+      selector: [convertSelectorToIIIF3D(doc.data.target.selector)],
+      // 元のFirebase保存形式に戻す場合は以下を使用:
+      // source: doc.target_canvas,
+      // selector: doc.data.target.selector,
     },
   };
 
