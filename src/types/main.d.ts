@@ -33,6 +33,7 @@ export interface Annotation {
 export interface NewAnnotation {
   id: string;
   creator: string;
+  createdAt?: number;
   title: string;
   description: string;
   media: MediaItem[];
@@ -80,6 +81,11 @@ export interface MediaItem {
   canvasId?: string; // For IIIF type: the canvas ID; For SketchFab type: the model ID
 }
 
+export type WikidataProperty =
+  | 'crm:P138_represents'
+  | 'crm:P67_refers_to'
+  | 'crm:P2_has_type';
+
 export interface WikidataItem {
   type: string;
   label: string;
@@ -88,12 +94,12 @@ export interface WikidataItem {
   lat?: string;
   lng?: string;
   thumbnail?: string;
+  property?: WikidataProperty;
 }
 
 export type BibliographyProperty =
-  | 'crm:P67_refers_to'
   | 'crm:P70_documents'
-  | 'crm:P65_shows_visual_item';
+  | 'crm:P67_refers_to';
 
 export interface BibliographyItem {
   id: string;

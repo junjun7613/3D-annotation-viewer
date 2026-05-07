@@ -6,19 +6,14 @@ import type { BibliographyProperty } from '@/types/main';
 
 const PROPERTY_OPTIONS: { value: BibliographyProperty; label: string; description: string }[] = [
   {
-    value: 'crm:P67_refers_to',
-    label: 'Refers to',
-    description: '論文・書籍がこの対象に言及している',
-  },
-  {
     value: 'crm:P70_documents',
-    label: 'Documents',
-    description: '報告書・記録がこの対象を記録している',
+    label: 'P70 Documents',
+    description: '報告書・記録など、この対象を一次資料として記録・証拠立てている文献',
   },
   {
-    value: 'crm:P65_shows_visual_item',
-    label: 'Shows visual item',
-    description: '図録・報告書に図版・写真が掲載されている',
+    value: 'crm:P67_refers_to',
+    label: 'P67 Refers to',
+    description: '論文・書籍など、この対象に言及・参照している二次文献',
   },
 ];
 
@@ -173,7 +168,7 @@ const BibliographyDialog: React.FC<BibliographyDialogProps> = ({
   initialYear = '',
   initialPage = '',
   initialPdf = '',
-  initialProperty = 'crm:P67_refers_to',
+  initialProperty = 'crm:P70_documents',
 }) => {
   const [identifier, setIdentifier] = useState('');
   const [fetchStatus, setFetchStatus] = useState<'idle' | 'loading' | 'success' | 'error' | 'unknown'>('idle');

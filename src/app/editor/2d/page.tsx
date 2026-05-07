@@ -42,7 +42,7 @@ import { deleteDoc, doc, getDoc, getDocs, updateDoc, collection, addDoc, onSnaps
 import { createWikidataItem } from '@/lib/services/wikidata';
 import { objectMetadataService } from '@/lib/services/objectMetadata';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import type { MediaItem, WikidataItem, BibliographyItem, LocationItem } from '@/types/main';
+import type { MediaItem, WikidataItem, WikidataProperty, BibliographyItem, LocationItem } from '@/types/main';
 
 import type EditorJS from '@editorjs/editorjs';
 // import { link } from 'fs';
@@ -691,8 +691,8 @@ const Home: NextPage = () => {
     handleMediaUploadCloseDialog();
   };
 
-  const saveWikidata = async (dialogData: { wikiType: string; uri: string }) => {
-    const { wikiType, uri: wikidata } = dialogData;
+  const saveWikidata = async (dialogData: { wikiType: string; uri: string; property: WikidataProperty }) => {
+    const { wikiType, uri: wikidata, property } = dialogData;
     let data: WikidataItem = {
       type: '',
       uri: '',
@@ -701,10 +701,11 @@ const Home: NextPage = () => {
       lat: '',
       lng: '',
       thumbnail: '',
+      property,
     };
     if (wikiType === 'wikidata') {
       // 共通ライブラリを使用してWikidata情報を取得
-      data = await createWikidataItem(wikidata);
+      data = { ...await createWikidataItem(wikidata), property };
     } else if (wikiType === 'geonames') {
       const id = wikidata.split('/').pop();
       const url = `http://api.geonames.org/getJSON?geonameId=${id}&username=${process.env.NEXT_PUBLIC_GEONAMES_USERNAME}`;
@@ -722,6 +723,7 @@ const Home: NextPage = () => {
         label: label,
         lat: lat,
         lng: lng,
+        property,
       };
       if (wikipedia) {
         data.wikipedia = wikipedia;

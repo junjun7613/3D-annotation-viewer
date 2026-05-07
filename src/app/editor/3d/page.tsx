@@ -40,8 +40,10 @@ import db from '@/lib/firebase/firebase';
 import { deleteDoc, doc, getDoc, getDocs, updateDoc, collection } from 'firebase/firestore';
 import { createWikidataItem } from '@/lib/services/wikidata';
 import { objectMetadataService } from '@/lib/services/objectMetadata';
+import { buildTurtle } from '@/utils/rdf';
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import type { MediaItem, WikidataItem, BibliographyItem, BibliographyProperty, LocationItem } from '@/types/main';
+import type { MediaItem, WikidataItem, WikidataProperty, BibliographyItem, BibliographyProperty, LocationItem, NewAnnotation } from '@/types/main';
 
 import type EditorJS from '@editorjs/editorjs';
 // import { link } from 'fs';
@@ -620,8 +622,8 @@ const Home: NextPage = () => {
     handleMediaUploadCloseDialog();
   };
 
-  const saveWikidata = async (dialogData: { wikiType: string; uri: string }) => {
-    const { wikiType, uri: wikidata } = dialogData;
+  const saveWikidata = async (dialogData: { wikiType: string; uri: string; property: WikidataProperty }) => {
+    const { wikiType, uri: wikidata, property } = dialogData;
     let data: WikidataItem = {
       type: '',
       uri: '',
@@ -630,10 +632,11 @@ const Home: NextPage = () => {
       lat: '',
       lng: '',
       thumbnail: '',
+      property,
     };
     if (wikiType === 'wikidata') {
       // 共通ライブラリを使用してWikidata情報を取得
-      data = await createWikidataItem(wikidata);
+      data = { ...await createWikidataItem(wikidata), property };
     } else if (wikiType === 'geonames') {
       const id = wikidata.split('/').pop();
       const url = `http://api.geonames.org/getJSON?geonameId=${id}&username=${process.env.NEXT_PUBLIC_GEONAMES_USERNAME}`;
@@ -651,6 +654,7 @@ const Home: NextPage = () => {
         label: label,
         lat: lat,
         lng: lng,
+        property,
       };
       if (wikipedia) {
         data.wikipedia = wikipedia;
@@ -1260,202 +1264,12 @@ const Home: NextPage = () => {
     const querySnapshot = await getDocs(collection(db, 'test'));
     const objectMetadata = await objectMetadataService.getObjectMetadata(id);
 
-    // ManifestベースURLからURIを生成（IIIF Manifest出力と同一URIを使用）
-    const manifestBase = id.split('/').slice(0, -1).join('/');
-    const annoBase = `${manifestBase}/annotation`;
-    const mediaBase = `${manifestBase}/media`;
-    const bibBase = `${manifestBase}/bibliography`;
+    const annotations = querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as NewAnnotation[];
 
-    let turtleData =
-      '@prefix : <https://www.example.com/vocabulary/> .\n@prefix schema: <https://schema.org/> .\n@prefix dc: <http://purl.org/dc/elements/1.1/> .\n@prefix geo: <http://www.w3.org/2003/01/geo/wgs84_pos#> .\n@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n@prefix foaf: <http://xmlns.com/foaf/0.1/> .\n@prefix crm: <http://www.cidoc-crm.org/cidoc-crm/> .';
-    turtleData += '\n';
-
-    // Manifestエンティティを追加（Object level metadata）
-    if (objectMetadata) {
-      turtleData += `\n<${id}> a :Manifest ;\n`;
-      const manifestProperties = [];
-
-      if (objectMetadata.wikidata && objectMetadata.wikidata.length > 0) {
-        objectMetadata.wikidata.forEach((item) => {
-          manifestProperties.push(`  :relatedEntity <${item.uri}>`);
-        });
-      }
-
-      if (objectMetadata.media && objectMetadata.media.length > 0) {
-        objectMetadata.media.forEach((item) => {
-          manifestProperties.push(`  :media <${mediaBase}/object-${item.id}>`);
-        });
-      }
-
-      if (objectMetadata.bibliography && objectMetadata.bibliography.length > 0) {
-        objectMetadata.bibliography.forEach((item) => {
-          const prop = item.property ?? 'crm:P67_refers_to';
-          manifestProperties.push(`  ${prop} <${bibBase}/object-${item.id}>`);
-        });
-      }
-
-      if (objectMetadata.location) {
-        manifestProperties.push(`  geo:lat "${objectMetadata.location.lat}"`);
-        manifestProperties.push(`  geo:long "${objectMetadata.location.lng}"`);
-      }
-
-      if (manifestProperties.length > 0) {
-        manifestProperties.forEach((prop, index) => {
-          turtleData += prop + (index < manifestProperties.length - 1 ? ' ;\n' : ' .\n');
-        });
-      } else {
-        turtleData += '.\n';
-      }
-
-      // Wikidataエンティティの詳細
-      if (objectMetadata.wikidata && objectMetadata.wikidata.length > 0) {
-        objectMetadata.wikidata.forEach((item) => {
-          turtleData += `\n<${item.uri}> a :WikidataEntity ;\n`;
-          const wikiProperties = [];
-          wikiProperties.push(`  rdfs:label "${item.label}"`);
-          wikiProperties.push(`  :wikidataType "${item.type}"`);
-          if (item.lat && item.lng) {
-            wikiProperties.push(`  geo:lat "${item.lat}"`);
-            wikiProperties.push(`  geo:long "${item.lng}"`);
-          }
-          if (item.thumbnail) wikiProperties.push(`  foaf:depiction <${item.thumbnail}>`);
-          if (item.wikipedia) wikiProperties.push(`  rdfs:seeAlso <${item.wikipedia}>`);
-          wikiProperties.forEach((prop, index) => {
-            turtleData += prop + (index < wikiProperties.length - 1 ? ' ;\n' : ' .\n');
-          });
-        });
-      }
-
-      // Object Mediaの詳細
-      if (objectMetadata.media && objectMetadata.media.length > 0) {
-        objectMetadata.media.forEach((item) => {
-          turtleData += `\n<${mediaBase}/object-${item.id}> a :Media ;\n`;
-          turtleData += `  schema:uri "${item.source}" ;\n`;
-          turtleData += `  schema:description "${item.caption}" ;\n`;
-          turtleData += `  schema:additionalType :${item.type}`;
-          if (item.type === 'iiif' && 'manifestUrl' in item && item.manifestUrl) {
-            turtleData += ` ;\n  :iiifManifest <${item.manifestUrl}>`;
-            if ('canvasId' in item && item.canvasId) {
-              turtleData += ` ;\n  :iiifCanvas <${item.canvasId}>`;
-            }
-          }
-          if (item.type === 'sketchfab' && 'manifestUrl' in item && item.manifestUrl) {
-            turtleData += ` ;\n  :sketchfabUrl <${item.manifestUrl}>`;
-            if ('canvasId' in item && item.canvasId) {
-              turtleData += ` ;\n  :sketchfabModelId "${item.canvasId}"`;
-            }
-          }
-          turtleData += ` .\n`;
-        });
-      }
-
-      // Object Bibliographyの詳細
-      if (objectMetadata.bibliography && objectMetadata.bibliography.length > 0) {
-        objectMetadata.bibliography.forEach((item) => {
-          turtleData += `\n<${bibBase}/object-${item.id}> a :Bibliography ;\n`;
-          const bibProperties = [];
-          if (item.author) bibProperties.push(`  dc:creator "${item.author}"`);
-          if (item.title) bibProperties.push(`  dc:title "${item.title}"`);
-          if (item.year) bibProperties.push(`  dc:date "${item.year}"`);
-          if (item.containerTitle) bibProperties.push(`  dc:isPartOf "${item.containerTitle}"`);
-          if (item.volume) bibProperties.push(`  schema:volumeNumber "${item.volume}"`);
-          if (item.issue) bibProperties.push(`  schema:issueNumber "${item.issue}"`);
-          if (item.pages) bibProperties.push(`  schema:pagination "${item.pages}"`);
-          if (item.publisher) bibProperties.push(`  dc:publisher "${item.publisher}"`);
-          if (item.doi) bibProperties.push(`  :doi "${item.doi}"`);
-          if (item.page) bibProperties.push(`  schema:url <${item.page}>`);
-          if (item.pdf) bibProperties.push(`  schema:contentUrl <${item.pdf}>`);
-          bibProperties.forEach((prop, index) => {
-            turtleData += prop + (index === bibProperties.length - 1 ? ' .\n' : ' ;\n');
-          });
-        });
-      }
-    }
-
-    // Annotationの処理
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      const parser = EditorJSHtml();
-      const cleanedData = JSON.parse(JSON.stringify(data.data.body.value || { blocks: [] }));
-      const html = parser.parse(cleanedData);
-      if (data.target_manifest === id) {
-        // IIIF Manifest出力と同一のアノテーションURI
-        turtleData += `\n<${annoBase}/${doc.id}> a :Annotation ;\n`;
-        const properties = [];
-
-        properties.push(`  rdfs:label "${data.data.body.label}"`);
-        properties.push(`  schema:description "${html}"`);
-        properties.push(`  :targetManifest <${data.target_manifest}>`);
-        properties.push(`  :targetCanvas <${data.target_canvas}>`);
-
-        if (data.wikidata) {
-          (data.wikidata as WikidataItem[]).forEach((item: WikidataItem) => {
-            properties.push(`  :wikidata <${item.uri}>`);
-          });
-        }
-        if (data.media) {
-          (data.media as MediaItem[]).forEach((item: MediaItem) => {
-            properties.push(`  :media <${mediaBase}/${item.id}>`);
-          });
-        }
-        if (data.bibliography) {
-          (data.bibliography as BibliographyItem[]).forEach((item: BibliographyItem) => {
-            const prop = item.property ?? 'crm:P67_refers_to';
-            properties.push(`  ${prop} <${bibBase}/${item.id}>`);
-          });
-        }
-
-        properties.forEach((prop, index) => {
-          turtleData += prop + (index < properties.length - 1 ? ' ;\n' : ' .\n');
-        });
-        if (properties.length === 0) turtleData += '.\n';
-
-        // Media詳細
-        if (data.media) {
-          (data.media as MediaItem[]).forEach((item: MediaItem) => {
-            turtleData += `\n<${mediaBase}/${item.id}> a :Media ;\n`;
-            turtleData += `  schema:uri "${item.source}" ;\n`;
-            turtleData += `  schema:description "${item.caption}" ;\n`;
-            turtleData += `  schema:additionalType :${item.type}`;
-            if (item.type === 'iiif' && 'manifestUrl' in item && item.manifestUrl) {
-              turtleData += ` ;\n  :iiifManifest <${item.manifestUrl}>`;
-              if ('canvasId' in item && item.canvasId) {
-                turtleData += ` ;\n  :iiifCanvas <${item.canvasId}>`;
-              }
-            }
-            if (item.type === 'sketchfab' && 'manifestUrl' in item && item.manifestUrl) {
-              turtleData += ` ;\n  :sketchfabUrl <${item.manifestUrl}>`;
-              if ('canvasId' in item && item.canvasId) {
-                turtleData += ` ;\n  :sketchfabModelId "${item.canvasId}"`;
-              }
-            }
-            turtleData += ` .\n`;
-          });
-        }
-
-        // Bibliography詳細
-        if (data.bibliography) {
-          data.bibliography.forEach((item: BibliographyItem) => {
-            turtleData += `\n<${bibBase}/${item.id}> a :Bibliography ;\n`;
-            const bibDetailProps = [];
-            if (item.author) bibDetailProps.push(`  dc:creator "${item.author}"`);
-            if (item.title) bibDetailProps.push(`  dc:title "${item.title}"`);
-            if (item.year) bibDetailProps.push(`  dc:date "${item.year}"`);
-            if (item.containerTitle) bibDetailProps.push(`  dc:isPartOf "${item.containerTitle}"`);
-            if (item.volume) bibDetailProps.push(`  schema:volumeNumber "${item.volume}"`);
-            if (item.issue) bibDetailProps.push(`  schema:issueNumber "${item.issue}"`);
-            if (item.pages) bibDetailProps.push(`  schema:pagination "${item.pages}"`);
-            if (item.publisher) bibDetailProps.push(`  dc:publisher "${item.publisher}"`);
-            if (item.doi) bibDetailProps.push(`  :doi "${item.doi}"`);
-            if (item.page) bibDetailProps.push(`  schema:url <${item.page}>`);
-            if (item.pdf) bibDetailProps.push(`  schema:contentUrl <${item.pdf}>`);
-            bibDetailProps.forEach((prop, index) => {
-              turtleData += prop + (index === bibDetailProps.length - 1 ? ' .\n' : ' ;\n');
-            });
-          });
-        }
-      }
-    });
+    const turtleData = buildTurtle(id, annotations, objectMetadata);
 
     const blob = new Blob([turtleData], { type: 'text/turtle' });
     const url = URL.createObjectURL(blob);

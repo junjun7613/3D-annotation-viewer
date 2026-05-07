@@ -101,6 +101,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   const dblClickListenerAdded = useRef(false);
   const contextMenuListenerAdded = useRef(false);
   const [user] = useAuthState(auth);
+  const userRef = useRef(user);
   const setInfoPanel = useSetAtom(infoPanelAtom);
   const selectedSpriteRef = useRef<THREE.Sprite | null>(null);
   const selectedPolygonRef = useRef<THREE.Mesh | null>(null);
@@ -267,6 +268,10 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   useEffect(() => {
     compactMarkersRef.current = compactMarkers;
   }, [compactMarkers]);
+
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
 
   useEffect(() => {
     //const q = query(collection(db, 'annotations'));
@@ -767,6 +772,10 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
                   const cameraPosition = camera.position;
                   camPos.current = cameraPosition;
 
+                  if (!userRef.current) {
+                    alert('アノテーションを作成するにはログインが必要です。');
+                    return;
+                  }
                   setAnnotationInputVisible(true);
                 } else {
                   // 頂点を追加
@@ -867,6 +876,10 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
                 const cameraPosition = camera.position;
                 camPos.current = cameraPosition;
 
+                if (!userRef.current) {
+                  alert('アノテーションを作成するにはログインが必要です。');
+                  return;
+                }
                 setAnnotationInputVisible(true);
 
                 // 一時的な視覚的フィードバックをクリーンアップ
@@ -1071,6 +1084,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   };
 
   const saveAnnotation = () => {
+    if (!user) return;
     // uuidを生成
     const id = uuidv4();
     if (annotationModeRef.current) {
