@@ -1,4 +1,5 @@
 import type { Vector3 } from 'three';
+import type { OutputData } from '@editorjs/editorjs';
 
 export interface Annotation {
   id: string;
@@ -72,22 +73,44 @@ export interface IIIFAnnotation {
   target: Record<string, unknown>;
   seeAlso?: Record<string, unknown>[];
 }
+
+// メディアフォーマット種別: 'img' | 'video' | 'iiif' | 'sketchfab'
+// メディア役割種別
+export type MediaRoleType =
+  | ':ObjectMedia'
+  | ':ExplanatoryMedia'
+  | ':ContextualMedia';
+
+// 参照レベル（直接=インスタンスレベル / 間接=カテゴリレベル）
+export type ReferenceLevel =
+  | ':DirectReference'
+  | ':IndirectReference';
+
 export interface MediaItem {
   id: string;
   type: string; // 'img' | 'video' | 'iiif' | 'sketchfab'
   source: string;
   caption: string;
-  manifestUrl?: string; // For IIIF type: the manifest URL; For SketchFab type: the model URL
-  canvasId?: string; // For IIIF type: the canvas ID; For SketchFab type: the model ID
+  manifestUrl?: string;
+  canvasId?: string;
+  roleType?: MediaRoleType;       // 未設定時のデフォルト: ':ObjectMedia'
+  referenceLevel?: ReferenceLevel; // 未設定時のデフォルト: ':DirectReference'
 }
 
-export type WikidataProperty =
-  | 'crm:P138_represents'
-  | 'crm:P67_refers_to'
-  | 'crm:P2_has_type';
+export type WikidataProperty = 'crm:P67_refers_to';
+
+// 典拠役割種別
+export type AuthorityRoleType =
+  | ':ObjectAuthority'
+  | ':GeographicAuthority'
+  | ':DepictedPlace'
+  | ':FoundAt'
+  | ':ProducedAt'
+  | ':OriginatedAt'
+  | ':DepictedAt';
 
 export interface WikidataItem {
-  type: string;
+  type: string; // 'wikidata' | 'geonames'
   label: string;
   uri: string;
   wikipedia?: string;
@@ -95,8 +118,17 @@ export interface WikidataItem {
   lng?: string;
   thumbnail?: string;
   property?: WikidataProperty;
+  roleType?: AuthorityRoleType;    // 未設定時のデフォルト: ':ObjectAuthority'
+  referenceLevel?: ReferenceLevel; // 未設定時のデフォルト: ':DirectReference'
 }
 
+// 書誌役割種別（BibliographyPropertyを置き換え）
+export type BibliographyRoleType =
+  | ':PrimarySource'
+  | ':ResearchLiterature'
+  | ':SurveyReport';
+
+// 後方互換のため残す
 export type BibliographyProperty =
   | 'crm:P70_documents'
   | 'crm:P67_refers_to';
@@ -106,14 +138,15 @@ export interface BibliographyItem {
   author: string;
   title: string;
   year: string;
-  page?: string;       // Page URL
-  pdf?: string;        // PDF URL
-  property?: BibliographyProperty;
-  // 論文・会議録向け追加フィールド
-  containerTitle?: string;  // 雑誌名 / 会議録名
+  page?: string;
+  pdf?: string;
+  property?: BibliographyProperty; // 既存データの後方互換用
+  roleType?: BibliographyRoleType;  // 未設定時のデフォルト: ':PrimarySource'
+  referenceLevel?: ReferenceLevel;  // 未設定時のデフォルト: ':DirectReference'
+  containerTitle?: string;
   volume?: string;
   issue?: string;
-  pages?: string;      // ページ範囲 (例: "90-97")
+  pages?: string;
   publisher?: string;
   doi?: string;
 }
@@ -142,11 +175,10 @@ export interface Annotation3 {
   targetPosition: Vector3;
 }
 
-// TEI行とアノテーションの紐づけ
 export interface TeiLineMapping {
-  lineNumber: string;          // <lb n="N"> の N
-  lineText: string;            // その行のテキスト内容
-  annotationId: string | null; // 紐づいたアノテーションID（nullは未紐づけ）
+  lineNumber: string;
+  lineText: string;
+  annotationId: string | null;
 }
 
 export interface TeiLineMappingMap {

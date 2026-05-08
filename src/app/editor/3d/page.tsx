@@ -43,7 +43,7 @@ import { objectMetadataService } from '@/lib/services/objectMetadata';
 import { buildTurtle } from '@/utils/rdf';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import type { MediaItem, WikidataItem, WikidataProperty, BibliographyItem, BibliographyProperty, LocationItem, NewAnnotation } from '@/types/main';
+import type { MediaItem, WikidataItem, BibliographyItem, BibliographyProperty, BibliographyRoleType, ReferenceLevel, MediaRoleType, AuthorityRoleType, LocationItem, NewAnnotation } from '@/types/main';
 
 import type EditorJS from '@editorjs/editorjs';
 // import { link } from 'fs';
@@ -164,6 +164,16 @@ const Home: NextPage = () => {
   const [isObjectMediaDialogOpen, setIsObjectMediaDialogOpen] = useState(false);
   const [isObjectWikidataDialogOpen, setIsObjectWikidataDialogOpen] = useState(false);
   const [isObjectBibDialogOpen, setIsObjectBibDialogOpen] = useState(false);
+
+  // Edit mode state for annotation-level resources
+  const [editMediaIndex, setEditMediaIndex] = useState<number | null>(null);
+  const [editWikiIndex, setEditWikiIndex] = useState<number | null>(null);
+  const [editBibIndex, setEditBibIndex] = useState<number | null>(null);
+
+  // Edit mode state for object-level resources
+  const [editObjectMediaIndex, setEditObjectMediaIndex] = useState<number | null>(null);
+  const [editObjectWikiIndex, setEditObjectWikiIndex] = useState<number | null>(null);
+  const [editObjectBibIndex, setEditObjectBibIndex] = useState<number | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isObjectMediaUploadDialogOpen, setIsObjectMediaUploadDialogOpen] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -411,8 +421,8 @@ const Home: NextPage = () => {
     }
   };
 
-  const saveMedias = async (dialogData: { source: string; type: string; caption: string }) => {
-    const { source, type, caption } = dialogData;
+  const saveMedias = async (dialogData: { source: string; type: string; caption: string; roleType: MediaRoleType; referenceLevel: ReferenceLevel }) => {
+    const { source, type, caption, roleType, referenceLevel } = dialogData;
     const data: {
       id: string;
       source: string;
@@ -420,11 +430,15 @@ const Home: NextPage = () => {
       caption: string;
       manifestUrl?: string;
       canvasId?: string;
+      roleType: MediaRoleType;
+      referenceLevel: ReferenceLevel;
     } = {
       id: uuidv4(),
       source: source,
       type: type,
       caption: caption,
+      roleType,
+      referenceLevel,
     };
 
     // If type is IIIF, fetch manifest and extract first canvas image
@@ -524,25 +538,26 @@ const Home: NextPage = () => {
       }
     }
 
-    // firebaseのannotationsコレクションのidを持つdocのMediaフィールド(Array)のdataをfirebaseから取得
-    //const docRef = doc(db, 'annotations', infoPanelContent?.id || '');
     const docRef = doc(db, 'test', infoPanelContent?.id || '');
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
       const origData = docSnap.data();
-      // firebaseのannotationsコレクションのidを持つdocのMediaフィールド(Array)にdataを追記
-      await updateDoc(docRef, {
-        media: [...origData.media, data],
-      });
+      if (editMediaIndex !== null) {
+        const existing = origData.media[editMediaIndex];
+        const updatedItem = { ...existing, ...data, id: existing.id };
+        const newMedia = origData.media.map((m: MediaItem, i: number) => i === editMediaIndex ? updatedItem : m);
+        await updateDoc(docRef, { media: newMedia });
+        if (infoPanelContent?.media) {
+          infoPanelContent.media[editMediaIndex] = updatedItem;
+        }
+      } else {
+        await updateDoc(docRef, { media: [...origData.media, data] });
+        infoPanelContent?.media.push(data);
+      }
     } else {
       console.warn('No such document!');
     }
-
-    //console.log(updatedData?.wikidata);
-
-    // infoPanelContentのwikidataにdataを追記
-    infoPanelContent?.media.push(data);
 
     handleMediaCloseDialog();
   };
@@ -622,8 +637,8 @@ const Home: NextPage = () => {
     handleMediaUploadCloseDialog();
   };
 
-  const saveWikidata = async (dialogData: { wikiType: string; uri: string; property: WikidataProperty }) => {
-    const { wikiType, uri: wikidata, property } = dialogData;
+  const saveWikidata = async (dialogData: { wikiType: string; uri: string; roleType: AuthorityRoleType; referenceLevel: ReferenceLevel }) => {
+    const { wikiType, uri: wikidata, roleType, referenceLevel } = dialogData;
     let data: WikidataItem = {
       type: '',
       uri: '',
@@ -632,11 +647,12 @@ const Home: NextPage = () => {
       lat: '',
       lng: '',
       thumbnail: '',
-      property,
+      property: 'crm:P67_refers_to',
+      roleType,
+      referenceLevel,
     };
     if (wikiType === 'wikidata') {
-      // 共通ライブラリを使用してWikidata情報を取得
-      data = { ...await createWikidataItem(wikidata), property };
+      data = { ...await createWikidataItem(wikidata), property: 'crm:P67_refers_to', roleType, referenceLevel };
     } else if (wikiType === 'geonames') {
       const id = wikidata.split('/').pop();
       const url = `http://api.geonames.org/getJSON?geonameId=${id}&username=${process.env.NEXT_PUBLIC_GEONAMES_USERNAME}`;
@@ -654,29 +670,33 @@ const Home: NextPage = () => {
         label: label,
         lat: lat,
         lng: lng,
-        property,
+        property: 'crm:P67_refers_to',
+        roleType,
+        referenceLevel,
       };
       if (wikipedia) {
         data.wikipedia = wikipedia;
       }
     }
 
-    // firebaseのannotationsコレクションのidを持つdocのMediaフィールド(Array)のdataをfirebaseから取得
     const docRef = doc(db, 'test', infoPanelContent?.id || '');
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
       const origData = docSnap.data();
-      // firebaseのannotationsコレクションのidを持つdocのMediaフィールド(Array)にdataを追記
-      await updateDoc(docRef, {
-        wikidata: [...origData.wikidata, data],
-      });
+      if (editWikiIndex !== null) {
+        const newWikidata = origData.wikidata.map((w: WikidataItem, i: number) => i === editWikiIndex ? data : w);
+        await updateDoc(docRef, { wikidata: newWikidata });
+        if (infoPanelContent?.wikidata) {
+          infoPanelContent.wikidata[editWikiIndex] = data;
+        }
+      } else {
+        await updateDoc(docRef, { wikidata: [...origData.wikidata, data] });
+        infoPanelContent?.wikidata.push(data);
+      }
     } else {
       console.warn('No such document!');
     }
-
-    // infoPanelContentのwikidataにdataを追記
-    infoPanelContent?.wikidata.push(data);
 
     handleWikidataCloseDialog();
   };
@@ -781,11 +801,12 @@ const Home: NextPage = () => {
   };
 
   const saveBib = async (dialogData: {
-    author: string; title: string; year: string; page: string; pdf: string; property: BibliographyProperty;
+    author: string; title: string; year: string; page: string; pdf: string;
+    roleType: BibliographyRoleType; referenceLevel: ReferenceLevel;
     containerTitle?: string; volume?: string; issue?: string; pages?: string; publisher?: string; doi?: string;
   }) => {
-    const { author: bibAuthor, title: bibTitle, year: bibYear, page: bibPage, pdf: bibPDF, property: bibProperty,
-      containerTitle, volume, issue, pages, publisher, doi } = dialogData;
+    const { author: bibAuthor, title: bibTitle, year: bibYear, page: bibPage, pdf: bibPDF,
+      roleType, referenceLevel, containerTitle, volume, issue, pages, publisher, doi } = dialogData;
     const data: BibliographyItem = {
       id: uuidv4(),
       author: bibAuthor,
@@ -793,7 +814,8 @@ const Home: NextPage = () => {
       year: bibYear,
       page: bibPage,
       pdf: bibPDF,
-      property: bibProperty,
+      roleType,
+      referenceLevel,
       ...(containerTitle && { containerTitle }),
       ...(volume && { volume }),
       ...(issue && { issue }),
@@ -802,25 +824,26 @@ const Home: NextPage = () => {
       ...(doi && { doi }),
     };
 
-    // firebaseのannotationsコレクションのidを持つdocのMediaフィールド(Array)のdataをfirebaseから取得
-    //const docRef = doc(db, 'annotations', infoPanelContent?.id || '');
     const docRef = doc(db, 'test', infoPanelContent?.id || '');
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
       const origData = docSnap.data();
-      // firebaseのannotationsコレクションのidを持つdocのMediaフィールド(Array)にdataを追記
-      await updateDoc(docRef, {
-        bibliography: [...origData.bibliography, data],
-      });
+      if (editBibIndex !== null) {
+        const existing = origData.bibliography[editBibIndex];
+        const updatedItem = { ...data, id: existing.id };
+        const newBib = origData.bibliography.map((b: BibliographyItem, i: number) => i === editBibIndex ? updatedItem : b);
+        await updateDoc(docRef, { bibliography: newBib });
+        if (infoPanelContent?.bibliography) {
+          infoPanelContent.bibliography[editBibIndex] = updatedItem;
+        }
+      } else {
+        await updateDoc(docRef, { bibliography: [...origData.bibliography, data] });
+        infoPanelContent?.bibliography.push(data);
+      }
     } else {
       console.warn('No such document!');
     }
-
-    //console.log(updatedData?.wikidata);
-
-    // infoPanelContentのwikidataにdataを追記
-    infoPanelContent?.bibliography.push(data);
 
     handleBibCloseDialog();
   };
@@ -978,14 +1001,23 @@ const Home: NextPage = () => {
       }
     }
 
-    await objectMetadataService.addMedia(manifestUrl, data, user.uid);
-
-    // objectMetadataを更新
-    setObjectMetadata(prev => prev ? { ...prev, media: [...(prev?.media || []), data] } : null);
+    if (editObjectMediaIndex !== null) {
+      const existing = objectMetadata?.media[editObjectMediaIndex];
+      if (existing) {
+        const updatedItem = { ...existing, ...data, id: existing.id };
+        const newMedia = (objectMetadata?.media || []).map((m, i) => i === editObjectMediaIndex ? updatedItem : m);
+        await objectMetadataService.updateMedia(manifestUrl, newMedia, user.uid);
+        setObjectMetadata(prev => prev ? { ...prev, media: newMedia } : null);
+      }
+    } else {
+      await objectMetadataService.addMedia(manifestUrl, data, user.uid);
+      setObjectMetadata(prev => prev ? { ...prev, media: [...(prev?.media || []), data] } : null);
+    }
 
     // フォームをリセット
     setObjectSource('');
     setObjectCaption('');
+    setEditObjectMediaIndex(null);
     setIsObjectMediaDialogOpen(false);
   };
 
@@ -994,32 +1026,49 @@ const Home: NextPage = () => {
 
     const data = await createWikidataItem(objectIRI);
 
-    await objectMetadataService.addWikidata(manifestUrl, data, user.uid);
-
-    // objectMetadataを更新
-    setObjectMetadata(prev => prev ? { ...prev, wikidata: [...(prev?.wikidata || []), data] } : null);
+    if (editObjectWikiIndex !== null) {
+      const newWikidata = (objectMetadata?.wikidata || []).map((w, i) => i === editObjectWikiIndex ? data : w);
+      await objectMetadataService.updateWikidata(manifestUrl, newWikidata, user.uid);
+      setObjectMetadata(prev => prev ? { ...prev, wikidata: newWikidata } : null);
+    } else {
+      await objectMetadataService.addWikidata(manifestUrl, data, user.uid);
+      setObjectMetadata(prev => prev ? { ...prev, wikidata: [...(prev?.wikidata || []), data] } : null);
+    }
 
     // フォームをリセット
     setObjectIRI('');
+    setEditObjectWikiIndex(null);
     setIsObjectWikidataDialogOpen(false);
   };
 
   const saveObjectBibliography = async () => {
     if (!manifestUrl || !user) return;
 
-    const data = {
-      id: uuidv4(),
-      author: objectBibAuthor,
-      title: objectBibTitle,
-      year: objectBibYear,
-      page: objectBibPage,
-      pdf: objectBibPDF,
-    };
-
-    await objectMetadataService.addBibliography(manifestUrl, data, user.uid);
-
-    // objectMetadataを更新
-    setObjectMetadata(prev => prev ? { ...prev, bibliography: [...(prev?.bibliography || []), data] } : null);
+    if (editObjectBibIndex !== null) {
+      const existing = objectMetadata?.bibliography[editObjectBibIndex];
+      const data = {
+        id: existing?.id || uuidv4(),
+        author: objectBibAuthor,
+        title: objectBibTitle,
+        year: objectBibYear,
+        page: objectBibPage,
+        pdf: objectBibPDF,
+      };
+      const newBib = (objectMetadata?.bibliography || []).map((b, i) => i === editObjectBibIndex ? data : b);
+      await objectMetadataService.updateBibliography(manifestUrl, newBib, user.uid);
+      setObjectMetadata(prev => prev ? { ...prev, bibliography: newBib } : null);
+    } else {
+      const data = {
+        id: uuidv4(),
+        author: objectBibAuthor,
+        title: objectBibTitle,
+        year: objectBibYear,
+        page: objectBibPage,
+        pdf: objectBibPDF,
+      };
+      await objectMetadataService.addBibliography(manifestUrl, data, user.uid);
+      setObjectMetadata(prev => prev ? { ...prev, bibliography: [...(prev?.bibliography || []), data] } : null);
+    }
 
     // フォームをリセット
     setObjectBibAuthor('');
@@ -1027,6 +1076,7 @@ const Home: NextPage = () => {
     setObjectBibYear('');
     setObjectBibPage('');
     setObjectBibPDF('');
+    setEditObjectBibIndex(null);
     setIsObjectBibDialogOpen(false);
   };
 
@@ -1062,7 +1112,6 @@ const Home: NextPage = () => {
     }
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const deleteObjectBibliography = async (index: number) => {
     if (!manifestUrl || !user) return;
 
@@ -1381,6 +1430,66 @@ const Home: NextPage = () => {
     }
   };
 
+  // Edit handlers for annotation-level resources
+  const editMedia = (_id: string, index: number) => {
+    if (infoPanelContent?.creator == user?.uid) {
+      setEditMediaIndex(index);
+      setIsMediaDialogOpen(true);
+    } else {
+      alert('You are not the creator of this annotation.');
+    }
+  };
+
+  const editWiki = (_id: string, index: number) => {
+    if (infoPanelContent?.creator == user?.uid) {
+      setEditWikiIndex(index);
+      setIsWikidataDialogOpen(true);
+    } else {
+      alert('You are not the creator of this annotation.');
+    }
+  };
+
+  const editBib = (_id: string, index: number) => {
+    if (infoPanelContent?.creator == user?.uid) {
+      setEditBibIndex(index);
+      setIsBibDialogOpen(true);
+    } else {
+      alert('You are not the creator of this annotation.');
+    }
+  };
+
+  // Edit handlers for object-level resources
+  const editObjectMedia = (index: number) => {
+    const item = objectMetadata?.media[index];
+    if (!item) return;
+    setObjectSource(item.manifestUrl || item.source);
+    setObjectType(item.type);
+    setObjectCaption(item.caption);
+    setEditObjectMediaIndex(index);
+    setIsObjectMediaDialogOpen(true);
+  };
+
+  const editObjectWikidata = (index: number) => {
+    const item = objectMetadata?.wikidata[index];
+    if (!item) return;
+    setObjectWikiType(item.type);
+    setObjectIRI(item.uri);
+    setEditObjectWikiIndex(index);
+    setIsObjectWikidataDialogOpen(true);
+  };
+
+  const editObjectBibliography = (index: number) => {
+    const item = objectMetadata?.bibliography[index];
+    if (!item) return;
+    setObjectBibAuthor(item.author);
+    setObjectBibTitle(item.title);
+    setObjectBibYear(item.year);
+    setObjectBibPage(item.page || '');
+    setObjectBibPDF(item.pdf || '');
+    setEditObjectBibIndex(index);
+    setIsObjectBibDialogOpen(true);
+  };
+
   const handleRDFOpenDialog = () => {
     setIsRDFDialogOpen(true);
   };
@@ -1390,6 +1499,7 @@ const Home: NextPage = () => {
 
   const handleMediaOpenDialog = () => {
     if (infoPanelContent?.creator == user?.uid) {
+      setEditMediaIndex(null);
       setIsMediaDialogOpen(true);
     } else {
       alert('You are not the creator of this annotation.');
@@ -1397,6 +1507,7 @@ const Home: NextPage = () => {
   };
   const handleMediaCloseDialog = () => {
     setIsMediaDialogOpen(false);
+    setEditMediaIndex(null);
   };
   const handleMediaUploadCloseDialog = () => {
     setIsMediaUploadDialogOpen(false);
@@ -1407,6 +1518,7 @@ const Home: NextPage = () => {
 
   const handleBibOpenDialog = () => {
     if (infoPanelContent?.creator == user?.uid) {
+      setEditBibIndex(null);
       setIsBibDialogOpen(true);
     } else {
       alert('You are not the creator of this annotation.');
@@ -1414,6 +1526,7 @@ const Home: NextPage = () => {
   };
   const handleBibCloseDialog = () => {
     setIsBibDialogOpen(false);
+    setEditBibIndex(null);
   };
   const handleBibUploadCloseDialog = () => {
     setIsBibUploadDialogOpen(false);
@@ -1466,6 +1579,7 @@ const Home: NextPage = () => {
 
   const handleWikidataOpenDialog = () => {
     if (infoPanelContent?.creator == user?.uid) {
+      setEditWikiIndex(null);
       setIsWikidataDialogOpen(true);
     } else {
       alert('You are not the creator of this annotation.');
@@ -1473,6 +1587,7 @@ const Home: NextPage = () => {
   };
   const handleWikidataCloseDialog = () => {
     setIsWikidataDialogOpen(false);
+    setEditWikiIndex(null);
   };
   const handleAuthorityUploadCloseDialog = () => {
     setIsAuthorityUploadDialogOpen(false);
@@ -1874,7 +1989,7 @@ const Home: NextPage = () => {
                       <div className="flex-1 overflow-hidden flex flex-col min-h-0">
                         <div className="flex justify-end gap-1.5 mb-3 flex-shrink-0">
                           <button
-                            onClick={() => setIsObjectMediaDialogOpen(true)}
+                            onClick={() => { setEditObjectMediaIndex(null); setObjectSource(''); setObjectCaption(''); setIsObjectMediaDialogOpen(true); }}
                             className="btn-icon btn-icon-sm btn-secondary"
                             title="Add resource"
                           >
@@ -1953,16 +2068,28 @@ const Home: NextPage = () => {
                                           {mediaItem.type === 'iiif' ? 'IIIF' : mediaItem.type === 'video' ? 'YouTube' : mediaItem.type === 'sketchfab' ? 'SketchFab' : 'Image'}
                                         </span>
                                       </div>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          deleteObjectMedia(index);
-                                        }}
-                                        className="text-red-500 hover:text-red-700 transition-colors p-1"
-                                        title="Delete"
-                                      >
-                                        <FaTrashAlt className="w-4 h-4" />
-                                      </button>
+                                      <div className="flex gap-1">
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            editObjectMedia(index);
+                                          }}
+                                          className="text-blue-500 hover:text-blue-700 transition-colors p-1"
+                                          title="Edit"
+                                        >
+                                          <FaPencilAlt className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            deleteObjectMedia(index);
+                                          }}
+                                          className="text-red-500 hover:text-red-700 transition-colors p-1"
+                                          title="Delete"
+                                        >
+                                          <FaTrashAlt className="w-4 h-4" />
+                                        </button>
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
@@ -1980,7 +2107,7 @@ const Home: NextPage = () => {
                       <div className="flex-1 overflow-hidden flex flex-col min-h-0">
                         <div className="flex justify-end gap-1.5 mb-3 flex-shrink-0">
                           <button
-                            onClick={() => setIsObjectWikidataDialogOpen(true)}
+                            onClick={() => { setEditObjectWikiIndex(null); setObjectIRI(''); setIsObjectWikidataDialogOpen(true); }}
                             className="btn-icon btn-icon-sm btn-secondary"
                             title="Add linked data"
                           >
@@ -2031,13 +2158,22 @@ const Home: NextPage = () => {
                                         </span>
                                       )}
                                     </div>
-                                    <button
-                                      onClick={() => deleteObjectWikidata(index)}
-                                      className="text-red-500 hover:text-red-700 transition-colors p-1"
-                                      title="Delete"
-                                    >
-                                      <FaTrashAlt className="w-4 h-4" />
-                                    </button>
+                                    <div className="flex gap-1">
+                                      <button
+                                        onClick={() => editObjectWikidata(index)}
+                                        className="text-blue-500 hover:text-blue-700 transition-colors p-1"
+                                        title="Edit"
+                                      >
+                                        <FaPencilAlt className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        onClick={() => deleteObjectWikidata(index)}
+                                        className="text-red-500 hover:text-red-700 transition-colors p-1"
+                                        title="Delete"
+                                      >
+                                        <FaTrashAlt className="w-4 h-4" />
+                                      </button>
+                                    </div>
                                   </div>
 
                                   {/* Actions */}
@@ -2094,7 +2230,7 @@ const Home: NextPage = () => {
                       <div className="flex-1 overflow-hidden flex flex-col min-h-0">
                         <div className="flex justify-end gap-1.5 mb-3 flex-shrink-0">
                           <button
-                            onClick={() => setIsObjectBibDialogOpen(true)}
+                            onClick={() => { setEditObjectBibIndex(null); setObjectBibAuthor(''); setObjectBibTitle(''); setObjectBibYear(''); setObjectBibPage(''); setObjectBibPDF(''); setIsObjectBibDialogOpen(true); }}
                             className="btn-icon btn-icon-sm btn-secondary"
                             title="Add reference"
                           >
@@ -2112,16 +2248,36 @@ const Home: NextPage = () => {
                           {objectMetadata?.bibliography && objectMetadata.bibliography.length > 0 ? (
                             objectMetadata.bibliography.map((bibItem, index) => (
                               <div key={index} className="p-3 border-b border-[var(--border)] hover:bg-[var(--secondary-bg)] transition-colors">
-                                <p className="text-sm font-medium text-[var(--text-primary)]">{bibItem.title}</p>
-                                <p className="text-xs text-[var(--text-secondary)] mt-1">
-                                  {bibItem.author} ({bibItem.year})
-                                  {bibItem.page && `, p. ${bibItem.page}`}
-                                </p>
-                                {bibItem.pdf && (
-                                  <a href={bibItem.pdf} target="_blank" rel="noopener noreferrer" className="text-xs text-[var(--primary)] hover:underline mt-1 inline-block">
-                                    View PDF
-                                  </a>
-                                )}
+                                <div className="flex items-start justify-between">
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-[var(--text-primary)]">{bibItem.title}</p>
+                                    <p className="text-xs text-[var(--text-secondary)] mt-1">
+                                      {bibItem.author} ({bibItem.year})
+                                      {bibItem.page && `, p. ${bibItem.page}`}
+                                    </p>
+                                    {bibItem.pdf && (
+                                      <a href={bibItem.pdf} target="_blank" rel="noopener noreferrer" className="text-xs text-[var(--primary)] hover:underline mt-1 inline-block">
+                                        View PDF
+                                      </a>
+                                    )}
+                                  </div>
+                                  <div className="flex gap-1 ml-2 flex-shrink-0">
+                                    <button
+                                      onClick={() => editObjectBibliography(index)}
+                                      className="text-blue-500 hover:text-blue-700 transition-colors p-1"
+                                      title="Edit"
+                                    >
+                                      <FaPencilAlt className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => deleteObjectBibliography(index)}
+                                      className="text-red-500 hover:text-red-700 transition-colors p-1"
+                                      title="Delete"
+                                    >
+                                      <FaTrashAlt className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
                               </div>
                             ))
                           ) : (
@@ -2295,18 +2451,32 @@ const Home: NextPage = () => {
                                         {mediaItem.type === 'iiif' ? 'IIIF' : mediaItem.type === 'video' ? 'YouTube' : mediaItem.type === 'sketchfab' ? 'SketchFab' : 'Image'}
                                       </span>
                                     </div>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        if (infoPanelContent?.id) {
-                                          deleteMedia(infoPanelContent.id, index);
-                                        }
-                                      }}
-                                      className="text-red-500 hover:text-red-700 transition-colors p-1"
-                                      title="Delete"
-                                    >
-                                      <FaTrashAlt className="w-4 h-4" />
-                                    </button>
+                                    <div className="flex gap-1">
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (infoPanelContent?.id) {
+                                            editMedia(infoPanelContent.id, index);
+                                          }
+                                        }}
+                                        className="text-blue-500 hover:text-blue-700 transition-colors p-1"
+                                        title="Edit"
+                                      >
+                                        <FaPencilAlt className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (infoPanelContent?.id) {
+                                            deleteMedia(infoPanelContent.id, index);
+                                          }
+                                        }}
+                                        className="text-red-500 hover:text-red-700 transition-colors p-1"
+                                        title="Delete"
+                                      >
+                                        <FaTrashAlt className="w-4 h-4" />
+                                      </button>
+                                    </div>
                                   </div>
                                 </div>
                               </div>
@@ -2373,17 +2543,30 @@ const Home: NextPage = () => {
                                   </span>
                                 )}
                               </div>
-                              <button
-                                onClick={() => {
-                                  if (infoPanelContent?.id) {
-                                    deleteWiki(infoPanelContent.id, index);
-                                  }
-                                }}
-                                className="text-red-500 hover:text-red-700 transition-colors p-1"
-                                title="Delete"
-                              >
-                                <FaTrashAlt className="w-4 h-4" />
-                              </button>
+                              <div className="flex gap-1">
+                                <button
+                                  onClick={() => {
+                                    if (infoPanelContent?.id) {
+                                      editWiki(infoPanelContent.id, index);
+                                    }
+                                  }}
+                                  className="text-blue-500 hover:text-blue-700 transition-colors p-1"
+                                  title="Edit"
+                                >
+                                  <FaPencilAlt className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    if (infoPanelContent?.id) {
+                                      deleteWiki(infoPanelContent.id, index);
+                                    }
+                                  }}
+                                  className="text-red-500 hover:text-red-700 transition-colors p-1"
+                                  title="Delete"
+                                >
+                                  <FaTrashAlt className="w-4 h-4" />
+                                </button>
+                              </div>
                             </div>
 
                             {/* Actions */}
@@ -2469,17 +2652,30 @@ const Home: NextPage = () => {
                                   </p>
                                 </div>
                               </div>
-                              <button
-                                onClick={() => {
-                                  if (infoPanelContent?.id) {
-                                    deleteBib(infoPanelContent.id, index);
-                                  }
-                                }}
-                                className="text-red-500 hover:text-red-700 transition-colors p-1 ml-2"
-                                title="Delete"
-                              >
-                                <FaTrashAlt className="w-4 h-4" />
-                              </button>
+                              <div className="flex gap-1 ml-2">
+                                <button
+                                  onClick={() => {
+                                    if (infoPanelContent?.id) {
+                                      editBib(infoPanelContent.id, index);
+                                    }
+                                  }}
+                                  className="text-blue-500 hover:text-blue-700 transition-colors p-1"
+                                  title="Edit"
+                                >
+                                  <FaPencilAlt className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    if (infoPanelContent?.id) {
+                                      deleteBib(infoPanelContent.id, index);
+                                    }
+                                  }}
+                                  className="text-red-500 hover:text-red-700 transition-colors p-1"
+                                  title="Delete"
+                                >
+                                  <FaTrashAlt className="w-4 h-4" />
+                                </button>
+                              </div>
                             </div>
 
                             {/* Actions */}
@@ -2639,6 +2835,11 @@ const Home: NextPage = () => {
         isOpen={isMediaDialogOpen}
         onClose={handleMediaCloseDialog}
         onSave={(data) => saveMedias(data)}
+        initialSource={editMediaIndex !== null ? (infoPanelContent?.media[editMediaIndex]?.manifestUrl || infoPanelContent?.media[editMediaIndex]?.source || '') : ''}
+        initialType={editMediaIndex !== null ? (infoPanelContent?.media[editMediaIndex]?.type || 'img') : 'img'}
+        initialCaption={editMediaIndex !== null ? (infoPanelContent?.media[editMediaIndex]?.caption || '') : ''}
+        initialRoleType={editMediaIndex !== null ? (infoPanelContent?.media[editMediaIndex]?.roleType || ':ObjectMedia') : ':ObjectMedia'}
+        initialReferenceLevel={editMediaIndex !== null ? (infoPanelContent?.media[editMediaIndex]?.referenceLevel || ':DirectReference') : ':DirectReference'}
       />
 
       {isAuthorityUploadDialogOpen && (
@@ -2667,6 +2868,10 @@ const Home: NextPage = () => {
         isOpen={isWikidataDialogOpen}
         onClose={handleWikidataCloseDialog}
         onSave={(data) => saveWikidata(data)}
+        initialWikiType={editWikiIndex !== null ? (infoPanelContent?.wikidata[editWikiIndex]?.type || 'wikidata') : 'wikidata'}
+        initialUri={editWikiIndex !== null ? (infoPanelContent?.wikidata[editWikiIndex]?.uri || '') : ''}
+        initialRoleType={editWikiIndex !== null ? (infoPanelContent?.wikidata[editWikiIndex]?.roleType || ':ObjectAuthority') : ':ObjectAuthority'}
+        initialReferenceLevel={editWikiIndex !== null ? (infoPanelContent?.wikidata[editWikiIndex]?.referenceLevel || ':DirectReference') : ':DirectReference'}
       />
 
       {isBibUploadDialogOpen && (
@@ -2695,6 +2900,13 @@ const Home: NextPage = () => {
         isOpen={isBibDialogOpen}
         onClose={handleBibCloseDialog}
         onSave={(data) => saveBib(data)}
+        initialAuthor={editBibIndex !== null ? (infoPanelContent?.bibliography[editBibIndex]?.author || '') : ''}
+        initialTitle={editBibIndex !== null ? (infoPanelContent?.bibliography[editBibIndex]?.title || '') : ''}
+        initialYear={editBibIndex !== null ? (infoPanelContent?.bibliography[editBibIndex]?.year || '') : ''}
+        initialPage={editBibIndex !== null ? (infoPanelContent?.bibliography[editBibIndex]?.page || '') : ''}
+        initialPdf={editBibIndex !== null ? (infoPanelContent?.bibliography[editBibIndex]?.pdf || '') : ''}
+        initialRoleType={editBibIndex !== null ? (infoPanelContent?.bibliography[editBibIndex]?.roleType || ':PrimarySource') : ':PrimarySource'}
+        initialReferenceLevel={editBibIndex !== null ? (infoPanelContent?.bibliography[editBibIndex]?.referenceLevel || ':DirectReference') : ':DirectReference'}
       />
 
       <AnnotationListDialog
@@ -2925,7 +3137,7 @@ const Home: NextPage = () => {
         <div className="dialog-overlay" onClick={() => setIsObjectMediaDialogOpen(false)}>
           <div className="dialog w-[500px]" onClick={(e) => e.stopPropagation()}>
             <form className="flex flex-col gap-4">
-              <h2 className="text-xl font-bold text-[var(--text-primary)]">Add Object Media</h2>
+              <h2 className="text-xl font-bold text-[var(--text-primary)]">{editObjectMediaIndex !== null ? 'Edit Object Media' : 'Add Object Media'}</h2>
               <label className="font-bold text-lg">
                 Source URI:
                 <textarea
@@ -2960,7 +3172,7 @@ const Home: NextPage = () => {
                 <button type="button" onClick={saveObjectMedia} className="btn-info">
                   Save
                 </button>
-                <button type="button" onClick={() => setIsObjectMediaDialogOpen(false)} className="btn-primary">
+                <button type="button" onClick={() => { setIsObjectMediaDialogOpen(false); setEditObjectMediaIndex(null); }} className="btn-primary">
                   Close
                 </button>
               </div>
@@ -2973,7 +3185,7 @@ const Home: NextPage = () => {
         <div className="dialog-overlay" onClick={() => setIsObjectWikidataDialogOpen(false)}>
           <div className="dialog w-[500px]" onClick={(e) => e.stopPropagation()}>
             <form className="flex flex-col gap-4">
-              <h2 className="text-xl font-bold text-[var(--text-primary)]">Add Object Linked Data</h2>
+              <h2 className="text-xl font-bold text-[var(--text-primary)]">{editObjectWikiIndex !== null ? 'Edit Object Linked Data' : 'Add Object Linked Data'}</h2>
               <label className="font-bold text-lg">
                 Type:
                 <select
@@ -3001,7 +3213,7 @@ const Home: NextPage = () => {
                 <button type="button" onClick={saveObjectWikidata} className="btn-info">
                   Save
                 </button>
-                <button type="button" onClick={() => setIsObjectWikidataDialogOpen(false)} className="btn-primary">
+                <button type="button" onClick={() => { setIsObjectWikidataDialogOpen(false); setEditObjectWikiIndex(null); }} className="btn-primary">
                   Close
                 </button>
               </div>
@@ -3014,7 +3226,7 @@ const Home: NextPage = () => {
         <div className="dialog-overlay" onClick={() => setIsObjectBibDialogOpen(false)}>
           <div className="dialog w-[500px]" onClick={(e) => e.stopPropagation()}>
             <form className="flex flex-col gap-4">
-              <h2 className="text-xl font-bold text-[var(--text-primary)]">Add Object Reference</h2>
+              <h2 className="text-xl font-bold text-[var(--text-primary)]">{editObjectBibIndex !== null ? 'Edit Object Reference' : 'Add Object Reference'}</h2>
               <label className="font-bold text-lg">
                 Author:
                 <input
@@ -3067,7 +3279,7 @@ const Home: NextPage = () => {
                 <button type="button" onClick={saveObjectBibliography} className="btn-info">
                   Save
                 </button>
-                <button type="button" onClick={() => setIsObjectBibDialogOpen(false)} className="btn-primary">
+                <button type="button" onClick={() => { setIsObjectBibDialogOpen(false); setEditObjectBibIndex(null); }} className="btn-primary">
                   Close
                 </button>
               </div>

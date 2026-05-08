@@ -2,19 +2,17 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import DialogWrapper from './DialogWrapper';
-import type { BibliographyProperty } from '@/types/main';
+import type { BibliographyRoleType, ReferenceLevel } from '@/types/main';
 
-const PROPERTY_OPTIONS: { value: BibliographyProperty; label: string; description: string }[] = [
-  {
-    value: 'crm:P70_documents',
-    label: 'P70 Documents',
-    description: '報告書・記録など、この対象を一次資料として記録・証拠立てている文献',
-  },
-  {
-    value: 'crm:P67_refers_to',
-    label: 'P67 Refers to',
-    description: '論文・書籍など、この対象に言及・参照している二次文献',
-  },
+const ROLE_OPTIONS: { value: BibliographyRoleType; label: string; description: string }[] = [
+  { value: ':PrimarySource', label: 'Primary Source', description: '碑文・遺物を直接記録した一次文献（銘文録・図録・発掘報告書など）' },
+  { value: ':ResearchLiterature', label: 'Research Literature', description: '対象に言及・分析した研究文献（論文・著書など）' },
+  { value: ':SurveyReport', label: 'Survey Report', description: '調査・踏査・保存に関する報告書・レポート' },
+];
+
+const REFERENCE_OPTIONS: { value: ReferenceLevel; label: string; description: string }[] = [
+  { value: ':DirectReference', label: 'Direct（インスタンスレベル）', description: 'このアノテーション対象そのものに直接言及している文献' },
+  { value: ':IndirectReference', label: 'Indirect（カテゴリレベル）', description: '同じカテゴリ・概念を扱うが同一物への直接言及ではない文献' },
 ];
 
 // CrossRef の type フィールドから資料種別ラベルを返す
@@ -138,7 +136,8 @@ export interface BibliographyFormData {
   year: string;
   page: string;
   pdf: string;
-  property: BibliographyProperty;
+  roleType: BibliographyRoleType;
+  referenceLevel: ReferenceLevel;
   containerTitle?: string;
   volume?: string;
   issue?: string;
@@ -156,7 +155,8 @@ interface BibliographyDialogProps {
   initialYear?: string;
   initialPage?: string;
   initialPdf?: string;
-  initialProperty?: BibliographyProperty;
+  initialRoleType?: BibliographyRoleType;
+  initialReferenceLevel?: ReferenceLevel;
 }
 
 const BibliographyDialog: React.FC<BibliographyDialogProps> = ({
@@ -168,7 +168,8 @@ const BibliographyDialog: React.FC<BibliographyDialogProps> = ({
   initialYear = '',
   initialPage = '',
   initialPdf = '',
-  initialProperty = 'crm:P70_documents',
+  initialRoleType = ':PrimarySource',
+  initialReferenceLevel = ':DirectReference',
 }) => {
   const [identifier, setIdentifier] = useState('');
   const [fetchStatus, setFetchStatus] = useState<'idle' | 'loading' | 'success' | 'error' | 'unknown'>('idle');
@@ -180,7 +181,8 @@ const BibliographyDialog: React.FC<BibliographyDialogProps> = ({
   const [year, setYear] = useState(initialYear);
   const [page, setPage] = useState(initialPage);
   const [pdf, setPdf] = useState(initialPdf);
-  const [property, setProperty] = useState<BibliographyProperty>(initialProperty);
+  const [roleType, setRoleType] = useState<BibliographyRoleType>(initialRoleType);
+  const [referenceLevel, setReferenceLevel] = useState<ReferenceLevel>(initialReferenceLevel);
   const [containerTitle, setContainerTitle] = useState('');
   const [volume, setVolume] = useState('');
   const [issue, setIssue] = useState('');
@@ -199,7 +201,8 @@ const BibliographyDialog: React.FC<BibliographyDialogProps> = ({
       setYear(initialYear);
       setPage(initialPage);
       setPdf(initialPdf);
-      setProperty(initialProperty);
+      setRoleType(initialRoleType);
+      setReferenceLevel(initialReferenceLevel);
       setContainerTitle('');
       setVolume('');
       setIssue('');
@@ -207,7 +210,7 @@ const BibliographyDialog: React.FC<BibliographyDialogProps> = ({
       setPublisher('');
       setDoi('');
     }
-  }, [isOpen, initialAuthor, initialTitle, initialYear, initialPage, initialPdf, initialProperty]);
+  }, [isOpen, initialAuthor, initialTitle, initialYear, initialPage, initialPdf, initialRoleType, initialReferenceLevel]);
 
   const handleFetch = useCallback(async () => {
     const type = detectInputType(identifier);
@@ -248,7 +251,7 @@ const BibliographyDialog: React.FC<BibliographyDialogProps> = ({
 
   const handleSave = () => {
     onSave({
-      author, title, year, page, pdf, property,
+      author, title, year, page, pdf, roleType, referenceLevel,
       containerTitle: containerTitle || undefined,
       volume: volume || undefined,
       issue: issue || undefined,
@@ -394,31 +397,60 @@ const BibliographyDialog: React.FC<BibliographyDialogProps> = ({
           />
         </label>
 
-        {/* CIDOC CRM property */}
+        {/* 役割種別 */}
         <div>
-          <p className="font-bold text-lg mb-2">Relationship (CIDOC CRM):</p>
+          <p className="font-bold text-lg mb-2">Role:</p>
           <div className="flex flex-col gap-2">
-            {PROPERTY_OPTIONS.map((opt) => (
+            {ROLE_OPTIONS.map((opt) => (
               <label
                 key={opt.value}
                 className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                  property === opt.value
+                  roleType === opt.value
                     ? 'border-[var(--primary)] bg-blue-50 dark:bg-blue-900/20'
                     : 'border-[var(--border)] hover:bg-[var(--secondary-bg)]'
                 }`}
               >
                 <input
                   type="radio"
-                  name="bibProperty"
+                  name="bibRoleType"
                   value={opt.value}
-                  checked={property === opt.value}
-                  onChange={() => setProperty(opt.value)}
+                  checked={roleType === opt.value}
+                  onChange={() => setRoleType(opt.value)}
                   className="mt-0.5 accent-[var(--primary)]"
                 />
                 <div>
                   <p className="text-sm font-semibold text-[var(--text-primary)]">{opt.label}</p>
                   <p className="text-xs text-[var(--text-secondary)] mt-0.5">{opt.description}</p>
-                  <p className="text-xs text-[var(--text-secondary)] font-mono opacity-60 mt-0.5">{opt.value}</p>
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* 参照レベル */}
+        <div>
+          <p className="font-bold text-lg mb-2">Reference Level:</p>
+          <div className="flex flex-col gap-2">
+            {REFERENCE_OPTIONS.map((opt) => (
+              <label
+                key={opt.value}
+                className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                  referenceLevel === opt.value
+                    ? 'border-[var(--primary)] bg-blue-50 dark:bg-blue-900/20'
+                    : 'border-[var(--border)] hover:bg-[var(--secondary-bg)]'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="bibReferenceLevel"
+                  value={opt.value}
+                  checked={referenceLevel === opt.value}
+                  onChange={() => setReferenceLevel(opt.value)}
+                  className="mt-0.5 accent-[var(--primary)]"
+                />
+                <div>
+                  <p className="text-sm font-semibold text-[var(--text-primary)]">{opt.label}</p>
+                  <p className="text-xs text-[var(--text-secondary)] mt-0.5">{opt.description}</p>
                 </div>
               </label>
             ))}

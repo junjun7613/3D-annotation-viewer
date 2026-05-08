@@ -2,18 +2,45 @@
 
 import { useState, useMemo } from 'react';
 import type { ManifestIndexEntry } from '../hooks/useManifestIndex';
-import type { BibliographyItem, BibliographyProperty } from '@/types/main';
+import type { BibliographyItem, BibliographyRoleType, ReferenceLevel } from '@/types/main';
 
-const CRM_PROPERTIES: { value: BibliographyProperty | 'all'; label: string; description: string }[] = [
+// roleType から CRM プロパティを導出（後方互換）
+function effectiveRoleType(bib: BibliographyItem): BibliographyRoleType {
+  if (bib.roleType) return bib.roleType;
+  if (bib.property === 'crm:P67_refers_to') return ':ResearchLiterature';
+  return ':PrimarySource';
+}
+
+const ROLE_OPTIONS: { value: BibliographyRoleType | 'all'; label: string; description: string }[] = [
   { value: 'all', label: 'すべて', description: '' },
-  { value: 'crm:P70_documents', label: 'P70 Documents', description: '報告書・記録がこの対象を記録している' },
-  { value: 'crm:P67_refers_to', label: 'P67 Refers to', description: '論文・書籍がこの対象に言及している' },
+  { value: ':PrimarySource', label: 'Primary Source', description: '一次資料・報告書' },
+  { value: ':SurveyReport', label: 'Survey Report', description: '調査報告書' },
+  { value: ':ResearchLiterature', label: 'Research Literature', description: '研究論文・書籍' },
 ];
 
-const CRM_BADGE: Record<string, string> = {
-  'crm:P70_documents': 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
-  'crm:P67_refers_to': 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+const ROLE_BADGE: Record<string, string> = {
+  ':PrimarySource': 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+  ':SurveyReport': 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
+  ':ResearchLiterature': 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
 };
+
+const ROLE_LABEL: Record<string, string> = {
+  ':PrimarySource': 'Primary Source',
+  ':SurveyReport': 'Survey Report',
+  ':ResearchLiterature': 'Research Literature',
+};
+
+const REF_LEVEL_BADGE: Record<string, string> = {
+  ':DirectReference': 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
+  ':IndirectReference': 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+};
+
+const REF_LEVEL_LABEL: Record<string, string> = {
+  ':DirectReference': 'Direct',
+  ':IndirectReference': 'Indirect',
+};
+
+type RefFilter = 'all' | ReferenceLevel;
 
 interface BibWithManifests {
   bib: BibliographyItem;
@@ -27,7 +54,8 @@ interface Props {
 
 export default function BibliographySearchPanel({ entries, loading }: Props) {
   const [query, setQuery] = useState('');
-  const [propertyFilter, setPropertyFilter] = useState<BibliographyProperty | 'all'>('all');
+  const [roleFilter, setRoleFilter] = useState<BibliographyRoleType | 'all'>('all');
+  const [refFilter, setRefFilter] = useState<RefFilter>('all');
   const [selectedBibs, setSelectedBibs] = useState<BibliographyItem[]>([]);
 
   const allBibs = useMemo<BibWithManifests[]>(() => {
@@ -47,12 +75,12 @@ export default function BibliographySearchPanel({ entries, loading }: Props) {
 
   const filteredBibs = useMemo<BibWithManifests[]>(() => {
     const q = query.trim().toLowerCase();
-    if (!q && propertyFilter === 'all') return [];
+    if (!q && roleFilter === 'all' && refFilter === 'all') return [];
     return allBibs.filter(({ bib }) => {
-      const propMatch =
-        propertyFilter === 'all' ||
-        (bib.property ?? 'crm:P67_refers_to') === propertyFilter;
-      if (!propMatch) return false;
+      const roleMatch = roleFilter === 'all' || effectiveRoleType(bib) === roleFilter;
+      if (!roleMatch) return false;
+      const refMatch = refFilter === 'all' || (bib.referenceLevel ?? ':DirectReference') === refFilter;
+      if (!refMatch) return false;
       if (!q) return true;
       return (
         bib.author?.toLowerCase().includes(q) ||
@@ -63,9 +91,8 @@ export default function BibliographySearchPanel({ entries, loading }: Props) {
         bib.containerTitle?.toLowerCase().includes(q)
       );
     });
-  }, [query, propertyFilter, allBibs]);
+  }, [query, roleFilter, refFilter, allBibs]);
 
-  // AND: 選択した全書誌を含むマニフェスト
   const resultEntries = useMemo<ManifestIndexEntry[]>(() => {
     if (selectedBibs.length === 0) return [];
     const ids = selectedBibs.map((b) => b.id);
@@ -83,23 +110,20 @@ export default function BibliographySearchPanel({ entries, loading }: Props) {
 
   const isSelected = (id?: string) => selectedBibs.some((s) => s.id === id);
 
-  const propLabel = (prop?: string) =>
-    CRM_PROPERTIES.find((o) => o.value === (prop ?? 'crm:P67_refers_to'))?.label ?? prop ?? '';
-
   return (
     <div className="flex flex-col gap-6">
 
-      {/* CRM property filter */}
+      {/* Role type filter */}
       <div>
-        <p className="text-sm font-semibold text-[var(--text-primary)] mb-2">CIDOC CRM プロパティ</p>
+        <p className="text-sm font-semibold text-[var(--text-primary)] mb-2">役割種別</p>
         <div className="flex flex-wrap gap-2">
-          {CRM_PROPERTIES.map((opt) => (
+          {ROLE_OPTIONS.map((opt) => (
             <button
               key={opt.value}
-              onClick={() => setPropertyFilter(opt.value as BibliographyProperty | 'all')}
+              onClick={() => setRoleFilter(opt.value as BibliographyRoleType | 'all')}
               title={opt.description}
               className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
-                propertyFilter === opt.value
+                roleFilter === opt.value
                   ? 'border-[var(--primary)] bg-blue-50 dark:bg-blue-900/20 text-[var(--primary)] font-medium'
                   : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--secondary-bg)]'
               }`}
@@ -108,11 +132,35 @@ export default function BibliographySearchPanel({ entries, loading }: Props) {
             </button>
           ))}
         </div>
-        {propertyFilter !== 'all' && (
+        {roleFilter !== 'all' && (
           <p className="text-xs text-[var(--text-secondary)] mt-1.5">
-            {CRM_PROPERTIES.find((o) => o.value === propertyFilter)?.description}
+            {ROLE_OPTIONS.find((o) => o.value === roleFilter)?.description}
           </p>
         )}
+      </div>
+
+      {/* Reference level filter */}
+      <div>
+        <p className="text-sm font-semibold text-[var(--text-primary)] mb-2">参照レベル</p>
+        <div className="flex flex-wrap gap-2">
+          {([
+            { value: 'all' as const, label: 'すべて' },
+            { value: ':DirectReference' as const, label: 'Direct（インスタンスレベル）' },
+            { value: ':IndirectReference' as const, label: 'Indirect（カテゴリレベル）' },
+          ]).map(({ value, label }) => (
+            <button
+              key={value}
+              onClick={() => setRefFilter(value)}
+              className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+                refFilter === value
+                  ? 'border-[var(--primary)] bg-blue-50 dark:bg-blue-900/20 text-[var(--primary)] font-medium'
+                  : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--secondary-bg)]'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Text filter */}
@@ -152,13 +200,17 @@ export default function BibliographySearchPanel({ entries, loading }: Props) {
           </div>
           <div className="flex flex-wrap gap-2">
             {selectedBibs.map((bib) => {
-              const prop = bib.property ?? 'crm:P67_refers_to';
+              const role = effectiveRoleType(bib);
+              const ref = bib.referenceLevel ?? ':DirectReference';
               return (
                 <span
                   key={bib.id}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${CRM_BADGE[prop] ?? CRM_BADGE['crm:P67_refers_to']}`}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${ROLE_BADGE[role] ?? ROLE_BADGE[':PrimarySource']}`}
                 >
                   <span className="max-w-[16rem] truncate">{bib.title || '（タイトルなし）'}</span>
+                  <span className={`px-1.5 py-0.5 rounded-full ${REF_LEVEL_BADGE[ref]}`}>
+                    {REF_LEVEL_LABEL[ref] ?? ref}
+                  </span>
                   <button
                     onClick={() => toggleSelection(bib)}
                     className="ml-0.5 leading-none opacity-70 hover:opacity-100"
@@ -177,8 +229,8 @@ export default function BibliographySearchPanel({ entries, loading }: Props) {
       {!loading && (
         <>
           <p className="text-sm text-[var(--text-secondary)]">
-            {!query.trim() && propertyFilter === 'all'
-              ? 'CRM プロパティを選択するか、テキストを入力してください。'
+            {!query.trim() && roleFilter === 'all' && refFilter === 'all'
+              ? '役割種別・参照レベルを選択するか、テキストを入力してください。'
               : filteredBibs.length > 0
               ? `${filteredBibs.length} 件の書誌が見つかりました。`
               : allBibs.length === 0
@@ -188,7 +240,8 @@ export default function BibliographySearchPanel({ entries, loading }: Props) {
 
           <div className="flex flex-col gap-2">
             {filteredBibs.map(({ bib, manifestUrls }) => {
-              const prop = bib.property ?? 'crm:P67_refers_to';
+              const role = effectiveRoleType(bib);
+              const ref = bib.referenceLevel ?? ':DirectReference';
               const selected = isSelected(bib.id);
               return (
                 <button
@@ -217,8 +270,11 @@ export default function BibliographySearchPanel({ entries, loading }: Props) {
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-mono ${CRM_BADGE[prop] ?? CRM_BADGE['crm:P67_refers_to']}`}>
-                      {propLabel(prop)}
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${ROLE_BADGE[role] ?? ROLE_BADGE[':PrimarySource']}`}>
+                      {ROLE_LABEL[role] ?? role}
+                    </span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${REF_LEVEL_BADGE[ref]}`}>
+                      {REF_LEVEL_LABEL[ref] ?? ref}
                     </span>
                     <span className="text-xs text-[var(--text-secondary)]">
                       {manifestUrls.length} 件のオブジェクト

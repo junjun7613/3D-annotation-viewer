@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
+import { FaChevronDown, FaChevronRight } from 'react-icons/fa';
 import type { ManifestIndexEntry } from '../hooks/useManifestIndex';
-import type { WikidataItem } from '@/types/main';
+import type { WikidataItem, AuthorityRoleType, ReferenceLevel } from '@/types/main';
 import ManifestCard from './ManifestCard';
 
 interface WikidataWithManifests {
@@ -15,9 +16,50 @@ interface Props {
   loading: boolean;
 }
 
+const GEO_ALL_TYPES = new Set<AuthorityRoleType>([
+  ':GeographicAuthority',
+  ':DepictedPlace',
+  ':FoundAt',
+  ':ProducedAt',
+  ':OriginatedAt',
+  ':DepictedAt',
+]);
+
+const ROLE_TYPE_LABELS: Record<string, string> = {
+  ':ObjectAuthority': 'Object',
+  ':GeographicAuthority': 'Geographic',
+  ':DepictedPlace': 'Depicted Place',
+  ':FoundAt': 'Found At',
+  ':ProducedAt': 'Produced At',
+  ':OriginatedAt': 'Originated At',
+  ':DepictedAt': 'Depicted At',
+};
+
+const ROLE_TYPE_BADGE: Record<string, string> = {
+  ':ObjectAuthority': 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+  ':GeographicAuthority': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+  ':DepictedPlace': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+  ':FoundAt': 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
+  ':ProducedAt': 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
+  ':OriginatedAt': 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
+  ':DepictedAt': 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
+};
+
+const REF_LEVEL_LABELS: Record<string, string> = {
+  ':DirectReference': 'Direct',
+  ':IndirectReference': 'Indirect',
+};
+
+const REF_LEVEL_BADGE: Record<string, string> = {
+  ':DirectReference': 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
+  ':IndirectReference': 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+};
+
+type RoleFilter = 'all' | ':ObjectAuthority' | 'geo' | AuthorityRoleType;
+type RefFilter = 'all' | ReferenceLevel;
+
 const isQid = (q: string) => /^Q\d+$/i.test(q.trim());
 
-// Wikidata wbsearchentities API でQIDの集合を返す
 async function searchWikidataQids(query: string): Promise<Set<string>> {
   const url = new URL('https://www.wikidata.org/w/api.php');
   url.searchParams.set('action', 'wbsearchentities');
@@ -42,9 +84,11 @@ export default function WikidataSearchPanel({ entries, loading }: Props) {
   const [selectedWikidata, setSelectedWikidata] = useState<WikidataItem[]>([]);
   const [wikidataQids, setWikidataQids] = useState<Set<string> | null>(null);
   const [wikidataSearching, setWikidataSearching] = useState(false);
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>('all');
+  const [refFilter, setRefFilter] = useState<RefFilter>('all');
+  const [geoExpanded, setGeoExpanded] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 全登録エンティティをURIでインデックス化
   const allWikidata = useMemo<WikidataWithManifests[]>(() => {
     const map = new Map<string, WikidataWithManifests>();
     entries.forEach((entry) => {
@@ -60,18 +104,10 @@ export default function WikidataSearchPanel({ entries, loading }: Props) {
     return Array.from(map.values());
   }, [entries]);
 
-  // クエリが変わったらデバウンスしてWikidata APIを叩く
   useEffect(() => {
     const q = query.trim();
-    if (!q) {
-      setWikidataQids(null);
-      return;
-    }
-    if (isQid(q)) {
-      // QID直接入力はAPI不要
-      setWikidataQids(null);
-      return;
-    }
+    if (!q) { setWikidataQids(null); return; }
+    if (isQid(q)) { setWikidataQids(null); return; }
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       setWikidataSearching(true);
@@ -84,39 +120,56 @@ export default function WikidataSearchPanel({ entries, loading }: Props) {
         setWikidataSearching(false);
       }
     }, 400);
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [query]);
 
-  // フィルタ済み候補
+  const matchesRoleFilter = (w: WikidataItem): boolean => {
+    if (roleFilter === 'all') return true;
+    const role = w.roleType ?? ':ObjectAuthority';
+    if (roleFilter === ':ObjectAuthority') return role === ':ObjectAuthority';
+    if (roleFilter === 'geo') return GEO_ALL_TYPES.has(role as AuthorityRoleType);
+    return role === roleFilter;
+  };
+
+  const matchesRefFilter = (w: WikidataItem): boolean => {
+    if (refFilter === 'all') return true;
+    return (w.referenceLevel ?? ':DirectReference') === refFilter;
+  };
+
   const filtered = useMemo<WikidataWithManifests[]>(() => {
     const q = query.trim();
-    if (!q) return [];
+    if (!q && roleFilter === 'all' && refFilter === 'all') return [];
 
-    if (isQid(q)) {
-      // QID直接一致
-      return allWikidata.filter(({ wikidata: w }) => {
-        const qid = w.uri.split('/').pop()?.toUpperCase() ?? '';
-        return qid === q.toUpperCase();
-      });
+    let candidates = allWikidata;
+
+    // テキスト / QID フィルタ
+    if (q) {
+      if (isQid(q)) {
+        candidates = candidates.filter(({ wikidata: w }) => {
+          const qid = w.uri.split('/').pop()?.toUpperCase() ?? '';
+          return qid === q.toUpperCase();
+        });
+      } else if (wikidataQids !== null) {
+        candidates = candidates.filter(({ wikidata: w }) => {
+          const qid = w.uri.split('/').pop() ?? '';
+          return wikidataQids.has(qid);
+        });
+      } else {
+        candidates = candidates.filter(({ wikidata: w }) =>
+          w.label.toLowerCase().includes(q.toLowerCase())
+        );
+      }
     }
 
-    if (wikidataQids === null) {
-      // APIレスポンス待ち or エラー時はローカルラベル一致にフォールバック
-      return allWikidata.filter(({ wikidata: w }) =>
-        w.label.toLowerCase().includes(q.toLowerCase())
-      );
-    }
+    // roleType フィルタ
+    candidates = candidates.filter(({ wikidata: w }) => matchesRoleFilter(w));
 
-    // APIヒットのQIDと登録済みエンティティを照合
-    return allWikidata.filter(({ wikidata: w }) => {
-      const qid = w.uri.split('/').pop() ?? '';
-      return wikidataQids.has(qid);
-    });
-  }, [query, allWikidata, wikidataQids]);
+    // referenceLevel フィルタ
+    candidates = candidates.filter(({ wikidata: w }) => matchesRefFilter(w));
 
-  // AND: 選択した全エンティティを含むマニフェスト
+    return candidates;
+  }, [query, allWikidata, wikidataQids, roleFilter, refFilter]);
+
   const resultEntries = useMemo<ManifestIndexEntry[]>(() => {
     if (selectedWikidata.length === 0) return [];
     const uris = selectedWikidata.map((w) => w.uri);
@@ -134,9 +187,11 @@ export default function WikidataSearchPanel({ entries, loading }: Props) {
 
   const isSelected = (uri: string) => selectedWikidata.some((s) => s.uri === uri);
 
+  const hasActiveFilter = roleFilter !== 'all' || refFilter !== 'all';
+
   const statusMessage = () => {
     const q = query.trim();
-    if (!q) return selectedWikidata.length === 0 ? 'ラベルまたは QID を入力してください。' : null;
+    if (!q && !hasActiveFilter) return selectedWikidata.length === 0 ? 'ラベルまたは QID を入力するか、フィルタを選択してください。' : null;
     if (wikidataSearching) return 'Wikidata を検索中...';
     if (filtered.length > 0) return `${filtered.length} 件のエンティティが見つかりました。`;
     return '条件に一致するエンティティがありません。';
@@ -144,6 +199,109 @@ export default function WikidataSearchPanel({ entries, loading }: Props) {
 
   return (
     <div className="flex flex-col gap-6">
+
+      {/* Role filter */}
+      <div>
+        <p className="text-sm font-semibold text-[var(--text-primary)] mb-2">役割種別</p>
+        <div className="flex flex-col gap-1">
+          {/* Top-level buttons */}
+          <div className="flex flex-wrap gap-2">
+            {(['all', ':ObjectAuthority'] as const).map((val) => (
+              <button
+                key={val}
+                onClick={() => { setRoleFilter(val); setGeoExpanded(false); }}
+                className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+                  roleFilter === val
+                    ? 'border-[var(--primary)] bg-blue-50 dark:bg-blue-900/20 text-[var(--primary)] font-medium'
+                    : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--secondary-bg)]'
+                }`}
+              >
+                {val === 'all' ? 'すべて' : 'Object'}
+              </button>
+            ))}
+
+            {/* Geographic parent button + expand toggle */}
+            <div className={`inline-flex rounded-lg border overflow-hidden transition-colors ${
+              roleFilter === 'geo' || GEO_ALL_TYPES.has(roleFilter as AuthorityRoleType)
+                ? 'border-[var(--primary)]'
+                : 'border-[var(--border)]'
+            }`}>
+              <button
+                onClick={() => setRoleFilter('geo')}
+                className={`px-3 py-1.5 text-sm transition-colors ${
+                  roleFilter === 'geo' || GEO_ALL_TYPES.has(roleFilter as AuthorityRoleType)
+                    ? 'bg-blue-50 dark:bg-blue-900/20 text-[var(--primary)] font-medium'
+                    : 'text-[var(--text-secondary)] hover:bg-[var(--secondary-bg)]'
+                }`}
+              >
+                Geographic
+              </button>
+              <button
+                onClick={() => setGeoExpanded((v) => !v)}
+                className={`px-2 py-1.5 border-l transition-colors ${
+                  roleFilter === 'geo' || GEO_ALL_TYPES.has(roleFilter as AuthorityRoleType)
+                    ? 'border-[var(--primary)] bg-blue-50 dark:bg-blue-900/20 text-[var(--primary)]'
+                    : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--secondary-bg)]'
+                }`}
+                aria-label={geoExpanded ? 'サブタイプを閉じる' : 'サブタイプを開く'}
+              >
+                {geoExpanded ? <FaChevronDown size={11} /> : <FaChevronRight size={11} />}
+              </button>
+            </div>
+          </div>
+
+          {/* Geographic sub-types */}
+          {geoExpanded && (
+            <div className="flex flex-wrap gap-2 pl-4 pt-1">
+              {([
+                { value: ':DepictedPlace' as AuthorityRoleType, label: 'Depicted Place' },
+                { value: ':FoundAt' as AuthorityRoleType, label: 'Found At' },
+                { value: ':ProducedAt' as AuthorityRoleType, label: 'Produced At' },
+                { value: ':OriginatedAt' as AuthorityRoleType, label: 'Originated At' },
+                { value: ':DepictedAt' as AuthorityRoleType, label: 'Depicted At' },
+                { value: ':GeographicAuthority' as AuthorityRoleType, label: 'Geographic (other)' },
+              ]).map(({ value, label }) => (
+                <button
+                  key={value}
+                  onClick={() => setRoleFilter(value)}
+                  className={`px-3 py-1 text-xs rounded-lg border transition-colors ${
+                    roleFilter === value
+                      ? 'border-[var(--primary)] bg-blue-50 dark:bg-blue-900/20 text-[var(--primary)] font-medium'
+                      : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--secondary-bg)]'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Reference level filter */}
+      <div>
+        <p className="text-sm font-semibold text-[var(--text-primary)] mb-2">参照レベル</p>
+        <div className="flex flex-wrap gap-2">
+          {([
+            { value: 'all' as const, label: 'すべて' },
+            { value: ':DirectReference' as const, label: 'Direct（インスタンスレベル）' },
+            { value: ':IndirectReference' as const, label: 'Indirect（カテゴリレベル）' },
+          ]).map(({ value, label }) => (
+            <button
+              key={value}
+              onClick={() => setRefFilter(value)}
+              className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+                refFilter === value
+                  ? 'border-[var(--primary)] bg-blue-50 dark:bg-blue-900/20 text-[var(--primary)] font-medium'
+                  : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--secondary-bg)]'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Search input */}
       <div className="flex gap-2">
         <input
@@ -180,24 +338,34 @@ export default function WikidataSearchPanel({ entries, loading }: Props) {
             </button>
           </div>
           <div className="flex flex-wrap gap-2">
-            {selectedWikidata.map((w) => (
-              <span
-                key={w.uri}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-medium"
-              >
-                {w.thumbnail && (
-                  <img src={w.thumbnail} alt="" className="w-4 h-4 rounded-full object-cover flex-shrink-0" />
-                )}
-                {w.label}
-                <button
-                  onClick={() => toggleSelection(w)}
-                  className="ml-0.5 leading-none opacity-70 hover:opacity-100"
-                  aria-label={`${w.label}を解除`}
+            {selectedWikidata.map((w) => {
+              const role = w.roleType ?? ':ObjectAuthority';
+              const ref = w.referenceLevel ?? ':DirectReference';
+              return (
+                <span
+                  key={w.uri}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-medium"
                 >
-                  ×
-                </button>
-              </span>
-            ))}
+                  {w.thumbnail && (
+                    <img src={w.thumbnail} alt="" className="w-4 h-4 rounded-full object-cover flex-shrink-0" />
+                  )}
+                  {w.label}
+                  <span className={`px-1.5 py-0.5 rounded-full text-xs ${ROLE_TYPE_BADGE[role] ?? ROLE_TYPE_BADGE[':ObjectAuthority']}`}>
+                    {ROLE_TYPE_LABELS[role] ?? role}
+                  </span>
+                  <span className={`px-1.5 py-0.5 rounded-full text-xs ${REF_LEVEL_BADGE[ref]}`}>
+                    {REF_LEVEL_LABELS[ref] ?? ref}
+                  </span>
+                  <button
+                    onClick={() => toggleSelection(w)}
+                    className="ml-0.5 leading-none opacity-70 hover:opacity-100"
+                    aria-label={`${w.label}を解除`}
+                  >
+                    ×
+                  </button>
+                </span>
+              );
+            })}
           </div>
         </div>
       )}
@@ -208,10 +376,11 @@ export default function WikidataSearchPanel({ entries, loading }: Props) {
           {statusMessage() && (
             <p className="text-sm text-[var(--text-secondary)]">{statusMessage()}</p>
           )}
-
           <div className="flex flex-col gap-2">
             {filtered.map(({ wikidata: w, manifestUrls }) => {
               const selected = isSelected(w.uri);
+              const role = w.roleType ?? ':ObjectAuthority';
+              const ref = w.referenceLevel ?? ':DirectReference';
               return (
                 <button
                   key={w.uri}
@@ -234,9 +403,15 @@ export default function WikidataSearchPanel({ entries, loading }: Props) {
                     <p className={`text-sm font-medium ${selected ? 'text-[var(--primary)]' : 'text-[var(--text-primary)] group-hover:text-[var(--primary)]'}`}>
                       {w.label}
                     </p>
-                    <div className="flex gap-2 text-xs text-[var(--text-secondary)] mt-0.5">
-                      {w.type && <span>{w.type}</span>}
-                      <span className="font-mono opacity-60">{w.uri.split('/').pop()}</span>
+                    <div className="flex flex-wrap gap-1.5 text-xs mt-0.5">
+                      {w.type && <span className="text-[var(--text-secondary)]">{w.type}</span>}
+                      <span className="font-mono text-[var(--text-secondary)] opacity-60">{w.uri.split('/').pop()}</span>
+                      <span className={`px-1.5 py-0.5 rounded-full ${ROLE_TYPE_BADGE[role] ?? ROLE_TYPE_BADGE[':ObjectAuthority']}`}>
+                        {ROLE_TYPE_LABELS[role] ?? role}
+                      </span>
+                      <span className={`px-1.5 py-0.5 rounded-full ${REF_LEVEL_BADGE[ref]}`}>
+                        {REF_LEVEL_LABELS[ref] ?? ref}
+                      </span>
                     </div>
                   </div>
                   <span className="text-xs text-[var(--text-secondary)] flex-shrink-0">
