@@ -138,7 +138,7 @@ export default function WikidataSearchPanel({ entries, loading }: Props) {
 
   const filtered = useMemo<WikidataWithManifests[]>(() => {
     const q = query.trim();
-    if (!q && roleFilter === 'all' && refFilter === 'all') return [];
+    if (!q) return [];
 
     let candidates = allWikidata;
 
@@ -187,11 +187,9 @@ export default function WikidataSearchPanel({ entries, loading }: Props) {
 
   const isSelected = (uri: string) => selectedWikidata.some((s) => s.uri === uri);
 
-  const hasActiveFilter = roleFilter !== 'all' || refFilter !== 'all';
-
   const statusMessage = () => {
     const q = query.trim();
-    if (!q && !hasActiveFilter) return selectedWikidata.length === 0 ? 'ラベルまたは QID を入力するか、フィルタを選択してください。' : null;
+    if (!q) return selectedWikidata.length === 0 ? 'ラベルまたは QID を入力してください。' : null;
     if (wikidataSearching) return 'Wikidata を検索中...';
     if (filtered.length > 0) return `${filtered.length} 件のエンティティが見つかりました。`;
     return '条件に一致するエンティティがありません。';

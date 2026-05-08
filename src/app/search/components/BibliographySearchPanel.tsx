@@ -75,13 +75,12 @@ export default function BibliographySearchPanel({ entries, loading }: Props) {
 
   const filteredBibs = useMemo<BibWithManifests[]>(() => {
     const q = query.trim().toLowerCase();
-    if (!q && roleFilter === 'all' && refFilter === 'all') return [];
+    if (!q) return [];
     return allBibs.filter(({ bib }) => {
       const roleMatch = roleFilter === 'all' || effectiveRoleType(bib) === roleFilter;
       if (!roleMatch) return false;
       const refMatch = refFilter === 'all' || (bib.referenceLevel ?? ':DirectReference') === refFilter;
       if (!refMatch) return false;
-      if (!q) return true;
       return (
         bib.author?.toLowerCase().includes(q) ||
         bib.title?.toLowerCase().includes(q) ||
@@ -229,8 +228,8 @@ export default function BibliographySearchPanel({ entries, loading }: Props) {
       {!loading && (
         <>
           <p className="text-sm text-[var(--text-secondary)]">
-            {!query.trim() && roleFilter === 'all' && refFilter === 'all'
-              ? '役割種別・参照レベルを選択するか、テキストを入力してください。'
+            {!query.trim()
+              ? 'テキストを入力してください。'
               : filteredBibs.length > 0
               ? `${filteredBibs.length} 件の書誌が見つかりました。`
               : allBibs.length === 0
