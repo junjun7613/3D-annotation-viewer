@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { auth } from '@/lib/firebase/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
@@ -2004,12 +2005,12 @@ const Home: NextPage = () => {
         <header className="bg-[var(--card-bg)] border-b border-[var(--border)] h-14 px-6 flex justify-between items-center shadow-sm flex-shrink-0">
           <h1 className="m-0 text-lg sm:text-xl font-bold text-[var(--text-primary)]">IIIF 2D Semantic Editor</h1>
           <nav className="flex items-center gap-4">
-            <a href="/" className="text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors text-sm font-medium">
+            <Link href="/" className="text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors text-sm font-medium">
               Home
-            </a>
-            <a href="/about" className="text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors text-sm font-medium">
+            </Link>
+            <Link href="/about" className="text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors text-sm font-medium">
               About
-            </a>
+            </Link>
             <div className="ml-2 border-l border-[var(--border)] pl-4">
               <SignIn />
             </div>
