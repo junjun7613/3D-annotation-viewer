@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { FaChevronDown, FaChevronRight } from 'react-icons/fa';
 import type { ManifestIndexEntry } from '../hooks/useManifestIndex';
-import type { WikidataItem, AuthorityRoleType, ReferenceLevel } from '@/types/main';
+import type { WikidataItem, AuthorityRelationType, DirectAuthorityRelation, ConceptualAuthorityRelation } from '@/types/main';
 import ManifestCard from './ManifestCard';
 
 interface WikidataWithManifests {
@@ -16,47 +16,37 @@ interface Props {
   loading: boolean;
 }
 
-const GEO_ALL_TYPES = new Set<AuthorityRoleType>([
-  ':GeographicAuthority',
-  ':DepictedPlace',
-  ':FoundAt',
-  ':ProducedAt',
-  ':OriginatedAt',
-  ':DepictedAt',
+const DIRECT_TYPES = new Set<DirectAuthorityRelation>([
+  ':identifies',
+  ':depicts_object', ':depicts_person', ':depicts_place', ':depicts_event',
+  ':mentions_person', ':mentions_place', ':mentions_event',
 ]);
 
-const ROLE_TYPE_LABELS: Record<string, string> = {
-  ':ObjectAuthority': 'Object',
-  ':GeographicAuthority': 'Geographic',
-  ':DepictedPlace': 'Depicted Place',
-  ':FoundAt': 'Found At',
-  ':ProducedAt': 'Produced At',
-  ':OriginatedAt': 'Originated At',
-  ':DepictedAt': 'Depicted At',
+const RELATION_LABELS: Record<string, string> = {
+  ':identifies': 'Identifies',
+  ':depicts_object': 'Depicts Object',
+  ':depicts_person': 'Depicts Person',
+  ':depicts_place': 'Depicts Place',
+  ':depicts_event': 'Depicts Event',
+  ':mentions_person': 'Mentions Person',
+  ':mentions_place': 'Mentions Place',
+  ':mentions_event': 'Mentions Event',
+  ':associated_with_period': 'Assoc. Period',
+  ':associated_with_region': 'Assoc. Region',
+  ':associated_with_person': 'Assoc. Person',
+  ':associated_with_culture': 'Assoc. Culture',
+  ':compared_with': 'Compared With',
+  ':related_to_concept': 'Related Concept',
+  ':classified_as': 'Classified As',
+  ':has_type': 'Has Type',
+  ':written_in_language': 'Language',
+  ':uses_script': 'Script',
+  ':created_by': 'Created By',
+  ':discovered_by': 'Discovered By',
+  ':discovered_at': 'Discovered At',
 };
 
-const ROLE_TYPE_BADGE: Record<string, string> = {
-  ':ObjectAuthority': 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-  ':GeographicAuthority': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
-  ':DepictedPlace': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
-  ':FoundAt': 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
-  ':ProducedAt': 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
-  ':OriginatedAt': 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
-  ':DepictedAt': 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
-};
-
-const REF_LEVEL_LABELS: Record<string, string> = {
-  ':DirectReference': 'Direct',
-  ':IndirectReference': 'Indirect',
-};
-
-const REF_LEVEL_BADGE: Record<string, string> = {
-  ':DirectReference': 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
-  ':IndirectReference': 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
-};
-
-type RoleFilter = 'all' | ':ObjectAuthority' | 'geo' | AuthorityRoleType;
-type RefFilter = 'all' | ReferenceLevel;
+type RelationFilter = 'all' | 'direct' | 'conceptual' | AuthorityRelationType;
 
 const isQid = (q: string) => /^Q\d+$/i.test(q.trim());
 
@@ -84,9 +74,8 @@ export default function WikidataSearchPanel({ entries, loading }: Props) {
   const [selectedWikidata, setSelectedWikidata] = useState<WikidataItem[]>([]);
   const [wikidataQids, setWikidataQids] = useState<Set<string> | null>(null);
   const [wikidataSearching, setWikidataSearching] = useState(false);
-  const [roleFilter, setRoleFilter] = useState<RoleFilter>('all');
-  const [refFilter, setRefFilter] = useState<RefFilter>('all');
-  const [geoExpanded, setGeoExpanded] = useState(false);
+  const [relationFilter, setRelationFilter] = useState<RelationFilter>('all');
+  const [conceptualExpanded, setConceptualExpanded] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const allWikidata = useMemo<WikidataWithManifests[]>(() => {
@@ -123,17 +112,13 @@ export default function WikidataSearchPanel({ entries, loading }: Props) {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [query]);
 
-  const matchesRoleFilter = (w: WikidataItem): boolean => {
-    if (roleFilter === 'all') return true;
-    const role = w.roleType ?? ':ObjectAuthority';
-    if (roleFilter === ':ObjectAuthority') return role === ':ObjectAuthority';
-    if (roleFilter === 'geo') return GEO_ALL_TYPES.has(role as AuthorityRoleType);
-    return role === roleFilter;
-  };
-
-  const matchesRefFilter = (w: WikidataItem): boolean => {
-    if (refFilter === 'all') return true;
-    return (w.referenceLevel ?? ':DirectReference') === refFilter;
+  const matchesRelationFilter = (w: WikidataItem): boolean => {
+    if (relationFilter === 'all') return true;
+    const types = w.relationTypes ?? [];
+    if (types.length === 0) return false;
+    if (relationFilter === 'direct') return types.some((t) => DIRECT_TYPES.has(t as DirectAuthorityRelation));
+    if (relationFilter === 'conceptual') return types.some((t) => !DIRECT_TYPES.has(t as DirectAuthorityRelation));
+    return types.includes(relationFilter as AuthorityRelationType);
   };
 
   const filtered = useMemo<WikidataWithManifests[]>(() => {
@@ -142,33 +127,26 @@ export default function WikidataSearchPanel({ entries, loading }: Props) {
 
     let candidates = allWikidata;
 
-    // テキスト / QID フィルタ
-    if (q) {
-      if (isQid(q)) {
-        candidates = candidates.filter(({ wikidata: w }) => {
-          const qid = w.uri.split('/').pop()?.toUpperCase() ?? '';
-          return qid === q.toUpperCase();
-        });
-      } else if (wikidataQids !== null) {
-        candidates = candidates.filter(({ wikidata: w }) => {
-          const qid = w.uri.split('/').pop() ?? '';
-          return wikidataQids.has(qid);
-        });
-      } else {
-        candidates = candidates.filter(({ wikidata: w }) =>
-          w.label.toLowerCase().includes(q.toLowerCase())
-        );
-      }
+    if (isQid(q)) {
+      candidates = candidates.filter(({ wikidata: w }) => {
+        const qid = w.uri.split('/').pop()?.toUpperCase() ?? '';
+        return qid === q.toUpperCase();
+      });
+    } else if (wikidataQids !== null) {
+      candidates = candidates.filter(({ wikidata: w }) => {
+        const qid = w.uri.split('/').pop() ?? '';
+        return wikidataQids.has(qid);
+      });
+    } else {
+      candidates = candidates.filter(({ wikidata: w }) =>
+        w.label.toLowerCase().includes(q.toLowerCase())
+      );
     }
 
-    // roleType フィルタ
-    candidates = candidates.filter(({ wikidata: w }) => matchesRoleFilter(w));
-
-    // referenceLevel フィルタ
-    candidates = candidates.filter(({ wikidata: w }) => matchesRefFilter(w));
+    candidates = candidates.filter(({ wikidata: w }) => matchesRelationFilter(w));
 
     return candidates;
-  }, [query, allWikidata, wikidataQids, roleFilter, refFilter]);
+  }, [query, allWikidata, wikidataQids, relationFilter]);
 
   const resultEntries = useMemo<ManifestIndexEntry[]>(() => {
     if (selectedWikidata.length === 0) return [];
@@ -195,75 +173,84 @@ export default function WikidataSearchPanel({ entries, loading }: Props) {
     return '条件に一致するエンティティがありません。';
   };
 
+  const CONCEPTUAL_OPTIONS: { value: ConceptualAuthorityRelation; label: string }[] = [
+    { value: ':associated_with_period', label: 'Assoc. Period' },
+    { value: ':associated_with_region', label: 'Assoc. Region' },
+    { value: ':associated_with_person', label: 'Assoc. Person' },
+    { value: ':associated_with_culture', label: 'Assoc. Culture' },
+    { value: ':compared_with', label: 'Compared With' },
+    { value: ':related_to_concept', label: 'Related Concept' },
+    { value: ':classified_as', label: 'Classified As' },
+    { value: ':has_type', label: 'Has Type' },
+    { value: ':written_in_language', label: 'Language' },
+    { value: ':uses_script', label: 'Script' },
+    { value: ':created_by', label: 'Created By' },
+    { value: ':discovered_by', label: 'Discovered By' },
+    { value: ':discovered_at', label: 'Discovered At' },
+  ];
+
   return (
     <div className="flex flex-col gap-6">
 
-      {/* Role filter */}
+      {/* Relation filter */}
       <div>
-        <p className="text-sm font-semibold text-[var(--text-primary)] mb-2">役割種別</p>
+        <p className="text-sm font-semibold text-[var(--text-primary)] mb-2">関係種別</p>
         <div className="flex flex-col gap-1">
-          {/* Top-level buttons */}
           <div className="flex flex-wrap gap-2">
-            {(['all', ':ObjectAuthority'] as const).map((val) => (
+            {([
+              { value: 'all' as const, label: 'すべて' },
+              { value: 'direct' as const, label: 'Direct — 直接関連' },
+            ] as { value: RelationFilter; label: string }[]).map(({ value, label }) => (
               <button
-                key={val}
-                onClick={() => { setRoleFilter(val); setGeoExpanded(false); }}
+                key={value}
+                onClick={() => { setRelationFilter(value); setConceptualExpanded(false); }}
                 className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
-                  roleFilter === val
+                  relationFilter === value
                     ? 'border-[var(--primary)] bg-blue-50 dark:bg-blue-900/20 text-[var(--primary)] font-medium'
                     : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--secondary-bg)]'
                 }`}
               >
-                {val === 'all' ? 'すべて' : 'Object'}
+                {label}
               </button>
             ))}
 
-            {/* Geographic parent button + expand toggle */}
+            {/* Conceptual parent + expand */}
             <div className={`inline-flex rounded-lg border overflow-hidden transition-colors ${
-              roleFilter === 'geo' || GEO_ALL_TYPES.has(roleFilter as AuthorityRoleType)
-                ? 'border-[var(--primary)]'
-                : 'border-[var(--border)]'
+              relationFilter === 'conceptual' || CONCEPTUAL_OPTIONS.some((o) => o.value === relationFilter)
+                ? 'border-[var(--primary)]' : 'border-[var(--border)]'
             }`}>
               <button
-                onClick={() => setRoleFilter('geo')}
+                onClick={() => setRelationFilter('conceptual')}
                 className={`px-3 py-1.5 text-sm transition-colors ${
-                  roleFilter === 'geo' || GEO_ALL_TYPES.has(roleFilter as AuthorityRoleType)
+                  relationFilter === 'conceptual' || CONCEPTUAL_OPTIONS.some((o) => o.value === relationFilter)
                     ? 'bg-blue-50 dark:bg-blue-900/20 text-[var(--primary)] font-medium'
                     : 'text-[var(--text-secondary)] hover:bg-[var(--secondary-bg)]'
                 }`}
               >
-                Geographic
+                Conceptual — 概念的関連
               </button>
               <button
-                onClick={() => setGeoExpanded((v) => !v)}
+                onClick={() => setConceptualExpanded((v) => !v)}
                 className={`px-2 py-1.5 border-l transition-colors ${
-                  roleFilter === 'geo' || GEO_ALL_TYPES.has(roleFilter as AuthorityRoleType)
+                  relationFilter === 'conceptual' || CONCEPTUAL_OPTIONS.some((o) => o.value === relationFilter)
                     ? 'border-[var(--primary)] bg-blue-50 dark:bg-blue-900/20 text-[var(--primary)]'
                     : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--secondary-bg)]'
                 }`}
-                aria-label={geoExpanded ? 'サブタイプを閉じる' : 'サブタイプを開く'}
               >
-                {geoExpanded ? <FaChevronDown size={11} /> : <FaChevronRight size={11} />}
+                {conceptualExpanded ? <FaChevronDown size={11} /> : <FaChevronRight size={11} />}
               </button>
             </div>
           </div>
 
-          {/* Geographic sub-types */}
-          {geoExpanded && (
+          {/* Conceptual sub-types */}
+          {conceptualExpanded && (
             <div className="flex flex-wrap gap-2 pl-4 pt-1">
-              {([
-                { value: ':DepictedPlace' as AuthorityRoleType, label: 'Depicted Place' },
-                { value: ':FoundAt' as AuthorityRoleType, label: 'Found At' },
-                { value: ':ProducedAt' as AuthorityRoleType, label: 'Produced At' },
-                { value: ':OriginatedAt' as AuthorityRoleType, label: 'Originated At' },
-                { value: ':DepictedAt' as AuthorityRoleType, label: 'Depicted At' },
-                { value: ':GeographicAuthority' as AuthorityRoleType, label: 'Geographic (other)' },
-              ]).map(({ value, label }) => (
+              {CONCEPTUAL_OPTIONS.map(({ value, label }) => (
                 <button
                   key={value}
-                  onClick={() => setRoleFilter(value)}
+                  onClick={() => setRelationFilter(value)}
                   className={`px-3 py-1 text-xs rounded-lg border transition-colors ${
-                    roleFilter === value
+                    relationFilter === value
                       ? 'border-[var(--primary)] bg-blue-50 dark:bg-blue-900/20 text-[var(--primary)] font-medium'
                       : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--secondary-bg)]'
                   }`}
@@ -273,30 +260,6 @@ export default function WikidataSearchPanel({ entries, loading }: Props) {
               ))}
             </div>
           )}
-        </div>
-      </div>
-
-      {/* Reference level filter */}
-      <div>
-        <p className="text-sm font-semibold text-[var(--text-primary)] mb-2">参照レベル</p>
-        <div className="flex flex-wrap gap-2">
-          {([
-            { value: 'all' as const, label: 'すべて' },
-            { value: ':DirectReference' as const, label: 'Direct（インスタンスレベル）' },
-            { value: ':IndirectReference' as const, label: 'Indirect（カテゴリレベル）' },
-          ]).map(({ value, label }) => (
-            <button
-              key={value}
-              onClick={() => setRefFilter(value)}
-              className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
-                refFilter === value
-                  ? 'border-[var(--primary)] bg-blue-50 dark:bg-blue-900/20 text-[var(--primary)] font-medium'
-                  : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--secondary-bg)]'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
         </div>
       </div>
 
@@ -336,34 +299,36 @@ export default function WikidataSearchPanel({ entries, loading }: Props) {
             </button>
           </div>
           <div className="flex flex-wrap gap-2">
-            {selectedWikidata.map((w) => {
-              const role = w.roleType ?? ':ObjectAuthority';
-              const ref = w.referenceLevel ?? ':DirectReference';
-              return (
-                <span
-                  key={w.uri}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-medium"
-                >
-                  {w.thumbnail && (
-                    <img src={w.thumbnail} alt="" className="w-4 h-4 rounded-full object-cover flex-shrink-0" />
-                  )}
-                  {w.label}
-                  <span className={`px-1.5 py-0.5 rounded-full text-xs ${ROLE_TYPE_BADGE[role] ?? ROLE_TYPE_BADGE[':ObjectAuthority']}`}>
-                    {ROLE_TYPE_LABELS[role] ?? role}
-                  </span>
-                  <span className={`px-1.5 py-0.5 rounded-full text-xs ${REF_LEVEL_BADGE[ref]}`}>
-                    {REF_LEVEL_LABELS[ref] ?? ref}
-                  </span>
-                  <button
-                    onClick={() => toggleSelection(w)}
-                    className="ml-0.5 leading-none opacity-70 hover:opacity-100"
-                    aria-label={`${w.label}を解除`}
+            {selectedWikidata.map((w) => (
+              <span
+                key={w.uri}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-medium"
+              >
+                {w.thumbnail && (
+                  <img src={w.thumbnail} alt="" className="w-4 h-4 rounded-full object-cover flex-shrink-0" />
+                )}
+                {w.label}
+                {(w.relationTypes ?? []).map((t) => (
+                  <span
+                    key={t}
+                    className={`px-1.5 py-0.5 rounded-full text-xs ${
+                      DIRECT_TYPES.has(t as DirectAuthorityRelation)
+                        ? 'bg-blue-200 text-blue-800 dark:bg-blue-800/40 dark:text-blue-200'
+                        : 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
+                    }`}
                   >
-                    ×
-                  </button>
-                </span>
-              );
-            })}
+                    {RELATION_LABELS[t] ?? t}
+                  </span>
+                ))}
+                <button
+                  onClick={() => toggleSelection(w)}
+                  className="ml-0.5 leading-none opacity-70 hover:opacity-100"
+                  aria-label={`${w.label}を解除`}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
           </div>
         </div>
       )}
@@ -377,8 +342,6 @@ export default function WikidataSearchPanel({ entries, loading }: Props) {
           <div className="flex flex-col gap-2">
             {filtered.map(({ wikidata: w, manifestUrls }) => {
               const selected = isSelected(w.uri);
-              const role = w.roleType ?? ':ObjectAuthority';
-              const ref = w.referenceLevel ?? ':DirectReference';
               return (
                 <button
                   key={w.uri}
@@ -404,12 +367,18 @@ export default function WikidataSearchPanel({ entries, loading }: Props) {
                     <div className="flex flex-wrap gap-1.5 text-xs mt-0.5">
                       {w.type && <span className="text-[var(--text-secondary)]">{w.type}</span>}
                       <span className="font-mono text-[var(--text-secondary)] opacity-60">{w.uri.split('/').pop()}</span>
-                      <span className={`px-1.5 py-0.5 rounded-full ${ROLE_TYPE_BADGE[role] ?? ROLE_TYPE_BADGE[':ObjectAuthority']}`}>
-                        {ROLE_TYPE_LABELS[role] ?? role}
-                      </span>
-                      <span className={`px-1.5 py-0.5 rounded-full ${REF_LEVEL_BADGE[ref]}`}>
-                        {REF_LEVEL_LABELS[ref] ?? ref}
-                      </span>
+                      {(w.relationTypes ?? []).map((t) => (
+                        <span
+                          key={t}
+                          className={`px-1.5 py-0.5 rounded-full ${
+                            DIRECT_TYPES.has(t as DirectAuthorityRelation)
+                              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                              : 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
+                          }`}
+                        >
+                          {RELATION_LABELS[t] ?? t}
+                        </span>
+                      ))}
                     </div>
                   </div>
                   <span className="text-xs text-[var(--text-secondary)] flex-shrink-0">

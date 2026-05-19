@@ -43,7 +43,7 @@ import { objectMetadataService } from '@/lib/services/objectMetadata';
 import { buildTurtle } from '@/utils/rdf';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import type { MediaItem, WikidataItem, BibliographyItem, BibliographyProperty, BibliographyRoleType, ReferenceLevel, MediaRoleType, AuthorityRoleType, LocationItem, NewAnnotation } from '@/types/main';
+import type { MediaItem, WikidataItem, BibliographyItem, BibliographyProperty, BibliographyRoleType, BibliographicRelationType, AuthorityRelationType, ReferenceLevel, MediaRoleType, LocationItem, NewAnnotation } from '@/types/main';
 
 import type EditorJS from '@editorjs/editorjs';
 // import { link } from 'fs';
@@ -637,8 +637,8 @@ const Home: NextPage = () => {
     handleMediaUploadCloseDialog();
   };
 
-  const saveWikidata = async (dialogData: { wikiType: string; uri: string; roleType: AuthorityRoleType; referenceLevel: ReferenceLevel }) => {
-    const { wikiType, uri: wikidata, roleType, referenceLevel } = dialogData;
+  const saveWikidata = async (dialogData: { wikiType: string; uri: string; relationTypes: AuthorityRelationType[] }) => {
+    const { wikiType, uri: wikidata, relationTypes } = dialogData;
     let data: WikidataItem = {
       type: '',
       uri: '',
@@ -648,11 +648,10 @@ const Home: NextPage = () => {
       lng: '',
       thumbnail: '',
       property: 'crm:P67_refers_to',
-      roleType,
-      referenceLevel,
+      relationTypes,
     };
     if (wikiType === 'wikidata') {
-      data = { ...await createWikidataItem(wikidata), property: 'crm:P67_refers_to', roleType, referenceLevel };
+      data = { ...await createWikidataItem(wikidata), property: 'crm:P67_refers_to', relationTypes };
     } else if (wikiType === 'geonames') {
       const id = wikidata.split('/').pop();
       const url = `http://api.geonames.org/getJSON?geonameId=${id}&username=${process.env.NEXT_PUBLIC_GEONAMES_USERNAME}`;
@@ -671,8 +670,7 @@ const Home: NextPage = () => {
         lat: lat,
         lng: lng,
         property: 'crm:P67_refers_to',
-        roleType,
-        referenceLevel,
+        relationTypes,
       };
       if (wikipedia) {
         data.wikipedia = wikipedia;
@@ -802,11 +800,11 @@ const Home: NextPage = () => {
 
   const saveBib = async (dialogData: {
     author: string; title: string; year: string; page: string; pdf: string;
-    roleType: BibliographyRoleType; referenceLevel: ReferenceLevel;
+    roleType: BibliographyRoleType; relationTypes: BibliographicRelationType[];
     containerTitle?: string; volume?: string; issue?: string; pages?: string; publisher?: string; doi?: string;
   }) => {
     const { author: bibAuthor, title: bibTitle, year: bibYear, page: bibPage, pdf: bibPDF,
-      roleType, referenceLevel, containerTitle, volume, issue, pages, publisher, doi } = dialogData;
+      roleType, relationTypes, containerTitle, volume, issue, pages, publisher, doi } = dialogData;
     const data: BibliographyItem = {
       id: uuidv4(),
       author: bibAuthor,
@@ -815,7 +813,7 @@ const Home: NextPage = () => {
       page: bibPage,
       pdf: bibPDF,
       roleType,
-      referenceLevel,
+      relationTypes,
       ...(containerTitle && { containerTitle }),
       ...(volume && { volume }),
       ...(issue && { issue }),
@@ -2870,8 +2868,7 @@ const Home: NextPage = () => {
         onSave={(data) => saveWikidata(data)}
         initialWikiType={editWikiIndex !== null ? (infoPanelContent?.wikidata[editWikiIndex]?.type || 'wikidata') : 'wikidata'}
         initialUri={editWikiIndex !== null ? (infoPanelContent?.wikidata[editWikiIndex]?.uri || '') : ''}
-        initialRoleType={editWikiIndex !== null ? (infoPanelContent?.wikidata[editWikiIndex]?.roleType || ':ObjectAuthority') : ':ObjectAuthority'}
-        initialReferenceLevel={editWikiIndex !== null ? (infoPanelContent?.wikidata[editWikiIndex]?.referenceLevel || ':DirectReference') : ':DirectReference'}
+        initialRelationTypes={editWikiIndex !== null ? (infoPanelContent?.wikidata[editWikiIndex]?.relationTypes || []) : []}
       />
 
       {isBibUploadDialogOpen && (
@@ -2906,7 +2903,7 @@ const Home: NextPage = () => {
         initialPage={editBibIndex !== null ? (infoPanelContent?.bibliography[editBibIndex]?.page || '') : ''}
         initialPdf={editBibIndex !== null ? (infoPanelContent?.bibliography[editBibIndex]?.pdf || '') : ''}
         initialRoleType={editBibIndex !== null ? (infoPanelContent?.bibliography[editBibIndex]?.roleType || ':PrimarySource') : ':PrimarySource'}
-        initialReferenceLevel={editBibIndex !== null ? (infoPanelContent?.bibliography[editBibIndex]?.referenceLevel || ':DirectReference') : ':DirectReference'}
+        initialRelationTypes={editBibIndex !== null ? (infoPanelContent?.bibliography[editBibIndex]?.relationTypes || []) : []}
       />
 
       <AnnotationListDialog

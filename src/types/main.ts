@@ -99,15 +99,42 @@ export interface MediaItem {
 
 export type WikidataProperty = 'crm:P67_refers_to';
 
-// 典拠役割種別
-export type AuthorityRoleType =
-  | ':ObjectAuthority'
-  | ':GeographicAuthority'
-  | ':DepictedPlace'
-  | ':FoundAt'
-  | ':ProducedAt'
-  | ':OriginatedAt'
-  | ':DepictedAt';
+// Direct Authority Relations
+export type DirectAuthorityRelation =
+  // identity_relation
+  | ':identifies'
+  // depiction_relation
+  | ':depicts_object'
+  | ':depicts_person'
+  | ':depicts_place'
+  | ':depicts_event'
+  // textual_reference_relation
+  | ':mentions_person'
+  | ':mentions_place'
+  | ':mentions_event';
+
+// Conceptual Authority Relations
+export type ConceptualAuthorityRelation =
+  // contextual_relation
+  | ':associated_with_period'
+  | ':associated_with_region'
+  | ':associated_with_person'
+  | ':associated_with_culture'
+  // conceptual_relation
+  | ':compared_with'
+  | ':related_to_concept'
+  // classification_relation
+  | ':classified_as'
+  | ':has_type'
+  // linguistic_relation
+  | ':written_in_language'
+  | ':uses_script'
+  // event_relation
+  | ':created_by'
+  | ':discovered_by'
+  | ':discovered_at';
+
+export type AuthorityRelationType = DirectAuthorityRelation | ConceptualAuthorityRelation;
 
 export interface WikidataItem {
   type: string; // 'wikidata' | 'geonames'
@@ -118,11 +145,13 @@ export interface WikidataItem {
   lng?: string;
   thumbnail?: string;
   property?: WikidataProperty;
-  roleType?: AuthorityRoleType;    // 未設定時のデフォルト: ':ObjectAuthority'
-  referenceLevel?: ReferenceLevel; // 未設定時のデフォルト: ':DirectReference'
+  relationTypes?: AuthorityRelationType[]; // 接続の性質（multi-label）
+  // 後方互換用（旧データ読み取りのみ）
+  roleType?: string;
+  referenceLevel?: string;
 }
 
-// 書誌役割種別（BibliographyPropertyを置き換え）
+// 書誌役割種別（文書自体のタイプ）
 export type BibliographyRoleType =
   | ':PrimarySource'
   | ':ResearchLiterature'
@@ -133,6 +162,32 @@ export type BibliographyProperty =
   | 'crm:P70_documents'
   | 'crm:P67_refers_to';
 
+// 書誌関係性プロパティ（接続の性質）
+// Direct Bibliographic Relation
+export type DirectBibliographicRelation =
+  | ':mentions'
+  | ':describes'
+  | ':reports'
+  | ':analyzes'
+  | ':catalogues'
+  | ':illustrates'
+  | ':transcribes'
+  | ':translates';
+
+// Conceptual Bibliographic Relation
+export type ConceptualBibliographicRelation =
+  | ':contextualizes'
+  | ':discusses_related_concept'
+  | ':compares_with'
+  | ':provides_typology'
+  | ':relevant_to_period'
+  | ':relevant_to_region'
+  | ':associated_with_person';
+
+export type BibliographicRelationType =
+  | DirectBibliographicRelation
+  | ConceptualBibliographicRelation;
+
 export interface BibliographyItem {
   id: string;
   author: string;
@@ -140,9 +195,10 @@ export interface BibliographyItem {
   year: string;
   page?: string;
   pdf?: string;
-  property?: BibliographyProperty; // 既存データの後方互換用
-  roleType?: BibliographyRoleType;  // 未設定時のデフォルト: ':PrimarySource'
-  referenceLevel?: ReferenceLevel;  // 未設定時のデフォルト: ':DirectReference'
+  property?: BibliographyProperty;      // 既存データの後方互換用
+  roleType?: BibliographyRoleType;      // 文書タイプ（デフォルト: ':PrimarySource'）
+  relationTypes?: BibliographicRelationType[]; // 接続の性質（multi-label）
+  referenceLevel?: ReferenceLevel;      // 後方互換用（新規データはrelationTypesで表現）
   containerTitle?: string;
   volume?: string;
   issue?: string;

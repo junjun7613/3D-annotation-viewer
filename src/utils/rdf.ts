@@ -3,6 +3,136 @@ import type { BibliographyItem, MediaItem, WikidataItem, ObjectMetadata, NewAnno
 
 const parser = EditorJSHtml();
 
+const PREFIXES =
+  '@prefix : <https://www.example.com/vocabulary/> .\n' +
+  '@prefix schema: <https://schema.org/> .\n' +
+  '@prefix dc: <http://purl.org/dc/elements/1.1/> .\n' +
+  '@prefix geo: <http://www.w3.org/2003/01/geo/wgs84_pos#> .\n' +
+  '@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n' +
+  '@prefix owl: <http://www.w3.org/2002/07/owl#> .\n' +
+  '@prefix foaf: <http://xmlns.com/foaf/0.1/> .\n' +
+  '@prefix crm: <http://www.cidoc-crm.org/cidoc-crm/> .\n' +
+  '@prefix oa: <http://www.w3.org/ns/oa#> .\n' +
+  '@prefix prov: <http://www.w3.org/ns/prov#> .\n' +
+  '@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n' +
+  '@prefix bibo: <http://purl.org/ontology/bibo/> .\n' +
+  '@prefix dcterms: <http://purl.org/dc/terms/> .\n' +
+  '@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .\n';
+
+const VOCAB_DEFINITIONS =
+  '\n# -- Vocabulary definitions --\n' +
+  // 典拠データソース種別
+  ':AuthorityData a crm:E55_Type .\n' +
+  ':WikidataAuthority a crm:E55_Type ;\n  rdfs:subClassOf :AuthorityData .\n' +
+  ':GeonamesAuthority a crm:E55_Type ;\n  rdfs:subClassOf :AuthorityData .\n' +
+  // 役割種別の共通上位クラス
+  ':ResourceRoleType a rdfs:Class .\n' +
+  // メディアクラス階層
+  ':MediaFormatType a rdfs:Class .\n' +
+  ':MediaRoleType a rdfs:Class ;\n  rdfs:subClassOf :ResourceRoleType .\n' +
+  'schema:ImageObject rdfs:subClassOf :MediaFormatType .\n' +
+  'schema:VideoObject rdfs:subClassOf :MediaFormatType .\n' +
+  'schema:3DModel rdfs:subClassOf :MediaFormatType .\n' +
+  ':IIIFManifest rdfs:subClassOf :MediaFormatType .\n' +
+  ':ObjectMedia rdfs:subClassOf :MediaRoleType .\n' +
+  ':ExplanatoryMedia rdfs:subClassOf :MediaRoleType .\n' +
+  ':ContextualMedia rdfs:subClassOf :MediaRoleType .\n' +
+  // 書誌クラス階層
+  ':BibliographyRoleType a rdfs:Class ;\n  rdfs:subClassOf :ResourceRoleType .\n' +
+  ':PrimarySource rdfs:subClassOf :BibliographyRoleType .\n' +
+  ':ResearchLiterature rdfs:subClassOf :BibliographyRoleType .\n' +
+  ':SurveyReport rdfs:subClassOf :BibliographyRoleType .\n' +
+  // 書誌関係性プロパティ階層
+  ':BibliographicRelation a rdf:Property .\n' +
+  ':DirectBibliographicRelation rdfs:subPropertyOf :BibliographicRelation .\n' +
+  ':ConceptualBibliographicRelation rdfs:subPropertyOf :BibliographicRelation .\n' +
+  ':mentions rdfs:subPropertyOf :DirectBibliographicRelation .\n' +
+  ':describes rdfs:subPropertyOf :DirectBibliographicRelation .\n' +
+  ':reports rdfs:subPropertyOf :describes .\n' +
+  ':analyzes rdfs:subPropertyOf :describes .\n' +
+  ':catalogues rdfs:subPropertyOf :describes .\n' +
+  ':illustrates rdfs:subPropertyOf :DirectBibliographicRelation .\n' +
+  ':TextualRelation rdfs:subPropertyOf :DirectBibliographicRelation .\n' +
+  ':transcribes rdfs:subPropertyOf :TextualRelation .\n' +
+  ':translates rdfs:subPropertyOf :TextualRelation .\n' +
+  ':contextualizes rdfs:subPropertyOf :ConceptualBibliographicRelation .\n' +
+  ':discusses_related_concept rdfs:subPropertyOf :ConceptualBibliographicRelation .\n' +
+  ':compares_with rdfs:subPropertyOf :ConceptualBibliographicRelation .\n' +
+  ':provides_typology rdfs:subPropertyOf :ConceptualBibliographicRelation .\n' +
+  ':relevant_to_period rdfs:subPropertyOf :ConceptualBibliographicRelation .\n' +
+  ':relevant_to_region rdfs:subPropertyOf :ConceptualBibliographicRelation .\n' +
+  ':associated_with_person rdfs:subPropertyOf :ConceptualBibliographicRelation .\n' +
+  // 典拠関係性プロパティ階層
+  ':AuthorityRelation a rdf:Property .\n' +
+  ':DirectAuthorityRelation rdfs:subPropertyOf :AuthorityRelation .\n' +
+  ':ConceptualAuthorityRelation rdfs:subPropertyOf :AuthorityRelation .\n' +
+  ':identifies rdfs:subPropertyOf :DirectAuthorityRelation .\n' +
+  ':DepictionRelation rdfs:subPropertyOf :DirectAuthorityRelation .\n' +
+  ':depicts_object rdfs:subPropertyOf :DepictionRelation .\n' +
+  ':depicts_person rdfs:subPropertyOf :DepictionRelation .\n' +
+  ':depicts_place rdfs:subPropertyOf :DepictionRelation .\n' +
+  ':depicts_event rdfs:subPropertyOf :DepictionRelation .\n' +
+  ':TextualReferenceRelation rdfs:subPropertyOf :DirectAuthorityRelation .\n' +
+  ':mentions_person rdfs:subPropertyOf :TextualReferenceRelation .\n' +
+  ':mentions_place rdfs:subPropertyOf :TextualReferenceRelation .\n' +
+  ':mentions_event rdfs:subPropertyOf :TextualReferenceRelation .\n' +
+  ':ContextualRelation rdfs:subPropertyOf :ConceptualAuthorityRelation .\n' +
+  ':associated_with_period rdfs:subPropertyOf :ContextualRelation .\n' +
+  ':associated_with_region rdfs:subPropertyOf :ContextualRelation .\n' +
+  ':associated_with_person rdfs:subPropertyOf :ContextualRelation .\n' +
+  ':associated_with_culture rdfs:subPropertyOf :ContextualRelation .\n' +
+  ':ConceptualComparison rdfs:subPropertyOf :ConceptualAuthorityRelation .\n' +
+  ':compared_with rdfs:subPropertyOf :ConceptualComparison .\n' +
+  ':related_to_concept rdfs:subPropertyOf :ConceptualComparison .\n' +
+  ':ClassificationRelation rdfs:subPropertyOf :ConceptualAuthorityRelation .\n' +
+  ':classified_as rdfs:subPropertyOf :ClassificationRelation .\n' +
+  ':has_type rdfs:subPropertyOf :ClassificationRelation .\n' +
+  ':LinguisticRelation rdfs:subPropertyOf :ConceptualAuthorityRelation .\n' +
+  ':written_in_language rdfs:subPropertyOf :LinguisticRelation .\n' +
+  ':uses_script rdfs:subPropertyOf :LinguisticRelation .\n' +
+  ':EventRelation rdfs:subPropertyOf :ConceptualAuthorityRelation .\n' +
+  ':created_by rdfs:subPropertyOf :EventRelation .\n' +
+  ':discovered_by rdfs:subPropertyOf :EventRelation .\n' +
+  ':discovered_at rdfs:subPropertyOf :EventRelation .\n' +
+
+  // -- Provisional mappings to existing vocabularies --
+  // Note: these are approximate; structural differences between this vocabulary
+  // and the target schemas (especially CIDOC-CRM event-centric modeling) mean
+  // some mappings involve semantic simplification.
+
+  // Bibliographic relations
+  '\n# -- Provisional mappings: Bibliographic Relations --\n' +
+  ':mentions rdfs:subPropertyOf schema:mentions .\n' +
+  ':reports rdfs:subPropertyOf crm:P70_documents .\n' +
+  ':catalogues rdfs:subPropertyOf crm:P70_documents .\n' +
+  ':transcribes rdfs:subPropertyOf bibo:transcriptOf .\n' +
+  ':translates rdfs:subPropertyOf crm:P73_has_translation .\n' +
+  ':contextualizes rdfs:subPropertyOf dcterms:relation .\n' +
+  ':relevant_to_period rdfs:subPropertyOf crm:P4_has_time-span .\n' +
+  ':relevant_to_region rdfs:subPropertyOf crm:P7_took_place_at .\n' +
+
+  // Authority relations
+  '\n# -- Provisional mappings: Authority Relations --\n' +
+  ':DepictionRelation rdfs:subPropertyOf crm:P62_depicts .\n' +
+  ':depicts_object rdfs:subPropertyOf crm:P62_depicts .\n' +
+  ':depicts_person rdfs:subPropertyOf crm:P62_depicts .\n' +
+  ':depicts_place rdfs:subPropertyOf crm:P62_depicts .\n' +
+  ':depicts_event rdfs:subPropertyOf crm:P62_depicts .\n' +
+  ':mentions_person rdfs:subPropertyOf schema:mentions .\n' +
+  ':mentions_place rdfs:subPropertyOf schema:mentions .\n' +
+  ':mentions_event rdfs:subPropertyOf schema:mentions .\n' +
+  ':associated_with_period rdfs:subPropertyOf crm:P4_has_time-span .\n' +
+  ':associated_with_region rdfs:subPropertyOf crm:P7_took_place_at .\n' +
+  ':classified_as rdfs:subPropertyOf crm:P2_has_type .\n' +
+  ':has_type rdfs:subPropertyOf crm:P2_has_type .\n' +
+  ':written_in_language rdfs:subPropertyOf crm:P72_has_language .\n' +
+  ':created_by rdfs:subPropertyOf dc:creator .\n' +
+  ':discovered_at rdfs:subPropertyOf crm:P7_took_place_at .\n';
+
+export function buildVocabularyTurtle(): string {
+  return PREFIXES + VOCAB_DEFINITIONS;
+}
+
 export function buildTurtle(
   manifestId: string,
   annotations: NewAnnotation[],
@@ -13,66 +143,15 @@ export function buildTurtle(
   const mediaBase = `${manifestBase}/media`;
   const bibBase = `${manifestBase}/bibliography`;
 
-  let ttl =
-    '@prefix : <https://www.example.com/vocabulary/> .\n' +
-    '@prefix schema: <https://schema.org/> .\n' +
-    '@prefix dc: <http://purl.org/dc/elements/1.1/> .\n' +
-    '@prefix geo: <http://www.w3.org/2003/01/geo/wgs84_pos#> .\n' +
-    '@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n' +
-    '@prefix foaf: <http://xmlns.com/foaf/0.1/> .\n' +
-    '@prefix crm: <http://www.cidoc-crm.org/cidoc-crm/> .\n' +
-    '@prefix oa: <http://www.w3.org/ns/oa#> .\n' +
-    '@prefix prov: <http://www.w3.org/ns/prov#> .\n' +
-    '@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n' +
-    '@prefix bibo: <http://purl.org/ontology/bibo/> .\n' +
-    '@prefix dcterms: <http://purl.org/dc/terms/> .\n';
-
-  // 語彙定義（将来的には別ファイルで公開）
-  ttl += '\n# -- Vocabulary definitions --\n';
-
-  // 典拠データソース種別（crm:P2_has_type の値）
-  ttl += ':AuthorityData a crm:E55_Type .\n';
-  ttl += ':WikidataAuthority a crm:E55_Type ;\n  rdfs:subClassOf :AuthorityData .\n';
-  ttl += ':GeonamesAuthority a crm:E55_Type ;\n  rdfs:subClassOf :AuthorityData .\n';
-
-  // メディアクラス階層
-  ttl += ':MediaFormatType a rdfs:Class .\n';
-  ttl += ':MediaRoleType a rdfs:Class .\n';
-  ttl += 'schema:ImageObject rdfs:subClassOf :MediaFormatType .\n';
-  ttl += 'schema:VideoObject rdfs:subClassOf :MediaFormatType .\n';
-  ttl += 'schema:3DModel rdfs:subClassOf :MediaFormatType .\n';
-  ttl += ':IIIFManifest rdfs:subClassOf :MediaFormatType .\n';
-  ttl += ':ObjectMedia rdfs:subClassOf :MediaRoleType .\n';
-  ttl += ':ExplanatoryMedia rdfs:subClassOf :MediaRoleType .\n';
-  ttl += ':ContextualMedia rdfs:subClassOf :MediaRoleType .\n';
-
-  // 書誌クラス階層
-  ttl += ':BibliographyRoleType a rdfs:Class .\n';
-  ttl += ':PrimarySource rdfs:subClassOf :BibliographyRoleType .\n';
-  ttl += ':ResearchLiterature rdfs:subClassOf :BibliographyRoleType .\n';
-  ttl += ':SurveyReport rdfs:subClassOf :BibliographyRoleType .\n';
-
-  // 典拠役割クラス階層
-  ttl += ':AuthorityRoleType a rdfs:Class .\n';
-  ttl += ':ObjectAuthority rdfs:subClassOf :AuthorityRoleType .\n';
-  ttl += ':GeographicAuthority rdfs:subClassOf :AuthorityRoleType .\n';
-  ttl += ':DepictedPlace rdfs:subClassOf :GeographicAuthority .\n';
-  ttl += ':RelatedPlace rdfs:subClassOf :GeographicAuthority .\n';
-  ttl += ':FoundAt rdfs:subClassOf :RelatedPlace .\n';
-  ttl += ':ProducedAt rdfs:subClassOf :RelatedPlace .\n';
-  ttl += ':OriginatedAt rdfs:subClassOf :RelatedPlace .\n';
-  ttl += ':DepictedAt rdfs:subClassOf :RelatedPlace .\n';
-
-  // 参照レベル
-  ttl += ':DirectReference a crm:E55_Type .\n';
-  ttl += ':IndirectReference a crm:E55_Type .\n';
+  let ttl = PREFIXES;
 
   if (objectMetadata) {
     ttl += `\n<${manifestId}> a :Manifest ;\n`;
     const manifestProps: string[] = [];
 
     (objectMetadata.wikidata ?? []).forEach((item) => {
-      manifestProps.push(`  crm:P67_refers_to <${item.uri}>`);
+      const props = buildAuthorityConnections(item, `<${item.uri}>`);
+      props.forEach((p) => manifestProps.push(p));
     });
     // media・bibliography は各リソース側を主語にするため manifestProps には追加しない
     if (objectMetadata.location) {
@@ -91,12 +170,8 @@ export function buildTurtle(
     // Wikidata entities (object level)
     (objectMetadata.wikidata ?? []).forEach((item: WikidataItem) => {
       const authorityType = item.type === 'geonames' ? ':GeonamesAuthority' : ':WikidataAuthority';
-      const roleType = item.roleType ?? ':ObjectAuthority';
-      const refLevel = item.referenceLevel ?? ':DirectReference';
       const ps: string[] = [];
       ps.push(`  crm:P2_has_type ${authorityType}`);
-      ps.push(`  a ${roleType}`);
-      ps.push(`  :referenceLevel ${refLevel}`);
       ps.push(`  rdfs:label "${item.label}"`);
       if (item.lat && item.lng) {
         ps.push(`  geo:lat "${item.lat}"`);
@@ -130,13 +205,12 @@ export function buildTurtle(
     // Object bibliography（文書が主語）
     (objectMetadata.bibliography ?? []).forEach((item: BibliographyItem) => {
       const roleType = item.roleType ?? ':PrimarySource';
-      const refLevel = item.referenceLevel ?? ':DirectReference';
       ttl += `\n<${bibBase}/object-${item.id}> a crm:E31_Document, ${roleType} ;\n`;
-      ttl += `  :referenceLevel ${refLevel} ;\n`;
       const bibProps = buildBibProps(item);
-      if (bibProps) {
-        ttl += `  crm:P67_refers_to <${manifestId}> ;\n`;
-        ttl += bibProps;
+      const connTriples = buildBibConnections(item, `<${manifestId}>`);
+      if (bibProps || connTriples) {
+        if (connTriples) ttl += connTriples;
+        if (bibProps) ttl += bibProps;
       } else {
         ttl += `  crm:P67_refers_to <${manifestId}> .\n`;
       }
@@ -164,7 +238,7 @@ export function buildTurtle(
         ps.push(`  prov:generatedAtTime "${iso}"^^xsd:dateTime`);
       }
       (ann.wikidata as WikidataItem[] ?? []).forEach((item) => {
-        ps.push(`  crm:P67_refers_to <${item.uri}>`);
+        buildAuthorityConnections(item, `<${item.uri}>`).forEach((p) => ps.push(p));
       });
       // media・bibliography はリソース側を主語にするため annotation triple には追加しない
 
@@ -196,12 +270,8 @@ export function buildTurtle(
       // Annotation Wikidata entity descriptions
       (ann.wikidata as WikidataItem[] ?? []).forEach((item) => {
         const authorityType = item.type === 'geonames' ? ':GeonamesAuthority' : ':WikidataAuthority';
-        const roleType = item.roleType ?? ':ObjectAuthority';
-        const refLevel = item.referenceLevel ?? ':DirectReference';
         const ps: string[] = [];
         ps.push(`  crm:P2_has_type ${authorityType}`);
-        ps.push(`  a ${roleType}`);
-        ps.push(`  :referenceLevel ${refLevel}`);
         ps.push(`  rdfs:label "${item.label}"`);
         if (item.lat && item.lng) {
           ps.push(`  geo:lat "${item.lat}"`);
@@ -216,13 +286,12 @@ export function buildTurtle(
       // Annotation bibliography（文書が主語）
       (ann.bibliography as BibliographyItem[] ?? []).forEach((item) => {
         const roleType = item.roleType ?? ':PrimarySource';
-        const refLevel = item.referenceLevel ?? ':DirectReference';
         ttl += `\n<${bibBase}/${item.id}> a crm:E31_Document, ${roleType} ;\n`;
-        ttl += `  :referenceLevel ${refLevel} ;\n`;
         const bibProps = buildBibProps(item);
-        if (bibProps) {
-          ttl += `  crm:P67_refers_to <${annoBase}/${ann.id}> ;\n`;
-          ttl += bibProps;
+        const connTriples = buildBibConnections(item, `<${annoBase}/${ann.id}>`);
+        if (bibProps || connTriples) {
+          if (connTriples) ttl += connTriples;
+          if (bibProps) ttl += bibProps;
         } else {
           ttl += `  crm:P67_refers_to <${annoBase}/${ann.id}> .\n`;
         }
@@ -255,4 +324,22 @@ function buildBibProps(item: BibliographyItem): string {
   let out = '';
   ps.forEach((p, i) => { out += p + (i === ps.length - 1 ? ' .\n' : ' ;\n'); });
   return out;
+}
+
+// relationTypes を接続プロパティとして出力（後方互換: 未設定時は crm:P67_refers_to）
+function buildBibConnections(item: BibliographyItem, target: string): string {
+  const types = item.relationTypes;
+  if (!types || types.length === 0) {
+    return `  crm:P67_refers_to ${target} ;\n`;
+  }
+  return types.map((t) => `  ${t} ${target} ;\n`).join('');
+}
+
+// authority relationTypes を接続プロパティの文字列配列として返す（後方互換: 未設定時は crm:P67_refers_to）
+function buildAuthorityConnections(item: WikidataItem, target: string): string[] {
+  const types = item.relationTypes;
+  if (!types || types.length === 0) {
+    return [`  crm:P67_refers_to ${target}`];
+  }
+  return types.map((t) => `  ${t} ${target}`);
 }

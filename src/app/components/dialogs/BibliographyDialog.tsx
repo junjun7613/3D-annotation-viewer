@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { FaChevronDown, FaChevronRight } from 'react-icons/fa';
 import DialogWrapper from './DialogWrapper';
-import type { BibliographyRoleType, ReferenceLevel } from '@/types/main';
+import type { BibliographyRoleType, BibliographicRelationType, DirectBibliographicRelation, ConceptualBibliographicRelation } from '@/types/main';
 
 const ROLE_OPTIONS: { value: BibliographyRoleType; label: string; description: string }[] = [
   { value: ':PrimarySource', label: 'Primary Source', description: '碑文・遺物を直接記録した一次文献（銘文録・図録・発掘報告書など）' },
@@ -10,12 +11,35 @@ const ROLE_OPTIONS: { value: BibliographyRoleType; label: string; description: s
   { value: ':SurveyReport', label: 'Survey Report', description: '調査・踏査・保存に関する報告書・レポート' },
 ];
 
-const REFERENCE_OPTIONS: { value: ReferenceLevel; label: string; description: string }[] = [
-  { value: ':DirectReference', label: 'Direct（インスタンスレベル）', description: 'このアノテーション対象そのものに直接言及している文献' },
-  { value: ':IndirectReference', label: 'Indirect（カテゴリレベル）', description: '同じカテゴリ・概念を扱うが同一物への直接言及ではない文献' },
+type RelationOption = { value: DirectBibliographicRelation; label: string; description: string };
+
+const DIRECT_RELATION_OPTIONS: RelationOption[] = [
+  { value: ':mentions', label: 'Mentions', description: '文献中での単なる言及・注参照（最も弱い関係）' },
+  { value: ':describes', label: 'Describes', description: '対象についてある程度詳細な説明を含む' },
+  { value: ':illustrates', label: 'Illustrates', description: '画像・図面・拓本を掲載' },
 ];
 
-// CrossRef の type フィールドから資料種別ラベルを返す
+const DESCRIBES_SUB_OPTIONS: RelationOption[] = [
+  { value: ':reports', label: 'Reports', description: '調査・発見・出土などの一次報告' },
+  { value: ':analyzes', label: 'Analyzes', description: '編年論・様式論・年代測定・社会史的分析などの研究' },
+  { value: ':catalogues', label: 'Catalogues', description: '一覧化・目録化' },
+];
+
+const TEXTUAL_SUB_OPTIONS: RelationOption[] = [
+  { value: ':transcribes', label: 'Transcribes', description: '文字資料の翻刻を掲載' },
+  { value: ':translates', label: 'Translates', description: '文字資料の翻訳を掲載' },
+];
+
+const CONCEPTUAL_RELATION_OPTIONS: { value: ConceptualBibliographicRelation; label: string; description: string }[] = [
+  { value: ':contextualizes', label: 'Contextualizes', description: '対象の文化的・歴史的背景を扱う（比較的ゆるい関係）' },
+  { value: ':discusses_related_concept', label: 'Discusses Related Concept', description: '関連概念を扱う' },
+  { value: ':compares_with', label: 'Compares With', description: '対象と比較される概念や事物を扱う' },
+  { value: ':provides_typology', label: 'Provides Typology', description: '関連する類型学的基盤を提供' },
+  { value: ':relevant_to_period', label: 'Relevant to Period', description: '関連年代や時代区分を扱う' },
+  { value: ':relevant_to_region', label: 'Relevant to Region', description: '関連する場所や地域を扱う' },
+  { value: ':associated_with_person', label: 'Associated with Person', description: '関連する人物や集団を扱う' },
+];
+
 function resourceTypeLabel(type: string): string {
   const map: Record<string, string> = {
     'journal-article': '雑誌論文',
@@ -137,7 +161,7 @@ export interface BibliographyFormData {
   page: string;
   pdf: string;
   roleType: BibliographyRoleType;
-  referenceLevel: ReferenceLevel;
+  relationTypes: BibliographicRelationType[];
   containerTitle?: string;
   volume?: string;
   issue?: string;
@@ -156,7 +180,7 @@ interface BibliographyDialogProps {
   initialPage?: string;
   initialPdf?: string;
   initialRoleType?: BibliographyRoleType;
-  initialReferenceLevel?: ReferenceLevel;
+  initialRelationTypes?: BibliographicRelationType[];
 }
 
 const BibliographyDialog: React.FC<BibliographyDialogProps> = ({
@@ -169,7 +193,7 @@ const BibliographyDialog: React.FC<BibliographyDialogProps> = ({
   initialPage = '',
   initialPdf = '',
   initialRoleType = ':PrimarySource',
-  initialReferenceLevel = ':DirectReference',
+  initialRelationTypes = [],
 }) => {
   const [identifier, setIdentifier] = useState('');
   const [fetchStatus, setFetchStatus] = useState<'idle' | 'loading' | 'success' | 'error' | 'unknown'>('idle');
@@ -182,13 +206,17 @@ const BibliographyDialog: React.FC<BibliographyDialogProps> = ({
   const [page, setPage] = useState(initialPage);
   const [pdf, setPdf] = useState(initialPdf);
   const [roleType, setRoleType] = useState<BibliographyRoleType>(initialRoleType);
-  const [referenceLevel, setReferenceLevel] = useState<ReferenceLevel>(initialReferenceLevel);
+  const [relationTypes, setRelationTypes] = useState<BibliographicRelationType[]>(initialRelationTypes);
   const [containerTitle, setContainerTitle] = useState('');
   const [volume, setVolume] = useState('');
   const [issue, setIssue] = useState('');
   const [pages, setPages] = useState('');
   const [publisher, setPublisher] = useState('');
   const [doi, setDoi] = useState('');
+  const [directExpanded, setDirectExpanded] = useState(true);
+  const [describesExpanded, setDescribesExpanded] = useState(false);
+  const [textualExpanded, setTextualExpanded] = useState(false);
+  const [conceptualExpanded, setConceptualExpanded] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -202,15 +230,31 @@ const BibliographyDialog: React.FC<BibliographyDialogProps> = ({
       setPage(initialPage);
       setPdf(initialPdf);
       setRoleType(initialRoleType);
-      setReferenceLevel(initialReferenceLevel);
+      setRelationTypes(initialRelationTypes);
       setContainerTitle('');
       setVolume('');
       setIssue('');
       setPages('');
       setPublisher('');
       setDoi('');
+      setDirectExpanded(true);
+      setDescribesExpanded(
+        initialRelationTypes.some((t) => DESCRIBES_SUB_OPTIONS.some((o) => o.value === t))
+      );
+      setTextualExpanded(
+        initialRelationTypes.some((t) => TEXTUAL_SUB_OPTIONS.some((o) => o.value === t))
+      );
+      setConceptualExpanded(
+        initialRelationTypes.some((t) => CONCEPTUAL_RELATION_OPTIONS.some((o) => o.value === t))
+      );
     }
-  }, [isOpen, initialAuthor, initialTitle, initialYear, initialPage, initialPdf, initialRoleType, initialReferenceLevel]);
+  }, [isOpen, initialAuthor, initialTitle, initialYear, initialPage, initialPdf, initialRoleType, initialRelationTypes]);
+
+  const toggleRelationType = (val: BibliographicRelationType) => {
+    setRelationTypes((prev) =>
+      prev.includes(val) ? prev.filter((t) => t !== val) : [...prev, val]
+    );
+  };
 
   const handleFetch = useCallback(async () => {
     const type = detectInputType(identifier);
@@ -251,7 +295,7 @@ const BibliographyDialog: React.FC<BibliographyDialogProps> = ({
 
   const handleSave = () => {
     onSave({
-      author, title, year, page, pdf, roleType, referenceLevel,
+      author, title, year, page, pdf, roleType, relationTypes,
       containerTitle: containerTitle || undefined,
       volume: volume || undefined,
       issue: issue || undefined,
@@ -266,8 +310,20 @@ const BibliographyDialog: React.FC<BibliographyDialogProps> = ({
     fetchStatus === 'error' || fetchStatus === 'unknown' ? 'text-red-500' :
     'text-[var(--text-secondary)]';
 
-  // 論文系フィールドを表示するか（手動入力中も常に表示）
-  const showArticleFields = true;
+  const hasDirect = relationTypes.some((t) =>
+    DIRECT_RELATION_OPTIONS.some((o) => o.value === t) ||
+    DESCRIBES_SUB_OPTIONS.some((o) => o.value === t) ||
+    TEXTUAL_SUB_OPTIONS.some((o) => o.value === t)
+  );
+  const hasDescribesSub = relationTypes.some((t) =>
+    DESCRIBES_SUB_OPTIONS.some((o) => o.value === t)
+  );
+  const hasTextualSub = relationTypes.some((t) =>
+    TEXTUAL_SUB_OPTIONS.some((o) => o.value === t)
+  );
+  const hasConceptual = relationTypes.some((t) =>
+    CONCEPTUAL_RELATION_OPTIONS.some((o) => o.value === t)
+  );
 
   return (
     <DialogWrapper isOpen={isOpen} onClose={onClose}>
@@ -315,91 +371,60 @@ const BibliographyDialog: React.FC<BibliographyDialogProps> = ({
         {/* Core fields */}
         <label className="font-bold text-lg">
           Author:
-          <input
-            name="bibAuthor"
-            value={author}
-            onChange={(e) => setAuthor(e.target.value)}
-            className="input-field"
-          />
+          <input name="bibAuthor" value={author} onChange={(e) => setAuthor(e.target.value)} className="input-field" />
         </label>
         <label className="font-bold text-lg">
           Title:
-          <textarea
-            name="bibTitle"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="input-field resize-y min-h-20"
-          />
+          <textarea name="bibTitle" value={title} onChange={(e) => setTitle(e.target.value)} className="input-field resize-y min-h-20" />
         </label>
         <label className="font-bold text-lg">
           Year:
-          <input
-            name="bibYear"
-            value={year}
-            onChange={(e) => setYear(e.target.value)}
-            className="input-field"
-          />
+          <input name="bibYear" value={year} onChange={(e) => setYear(e.target.value)} className="input-field" />
         </label>
 
         {/* Article / chapter fields */}
-        {showArticleFields && (
-          <div className="flex flex-col gap-4 p-3 rounded-lg border border-[var(--border)]">
-            <p className="text-sm font-semibold text-[var(--text-secondary)] -mb-1">論文・章情報（任意）</p>
+        <div className="flex flex-col gap-4 p-3 rounded-lg border border-[var(--border)]">
+          <p className="text-sm font-semibold text-[var(--text-secondary)] -mb-1">論文・章情報（任意）</p>
+          <label className="font-bold text-lg">
+            雑誌名 / 会議録名:
+            <input value={containerTitle} onChange={(e) => setContainerTitle(e.target.value)} className="input-field" />
+          </label>
+          <div className="grid grid-cols-3 gap-3">
             <label className="font-bold text-lg">
-              雑誌名 / 会議録名:
-              <input
-                value={containerTitle}
-                onChange={(e) => setContainerTitle(e.target.value)}
-                className="input-field"
-              />
-            </label>
-            <div className="grid grid-cols-3 gap-3">
-              <label className="font-bold text-lg">
-                Volume:
-                <input value={volume} onChange={(e) => setVolume(e.target.value)} className="input-field" />
-              </label>
-              <label className="font-bold text-lg">
-                Issue:
-                <input value={issue} onChange={(e) => setIssue(e.target.value)} className="input-field" />
-              </label>
-              <label className="font-bold text-lg">
-                Pages:
-                <input value={pages} onChange={(e) => setPages(e.target.value)} className="input-field" placeholder="例: 90-97" />
-              </label>
-            </div>
-            <label className="font-bold text-lg">
-              Publisher:
-              <input value={publisher} onChange={(e) => setPublisher(e.target.value)} className="input-field" />
+              Volume:
+              <input value={volume} onChange={(e) => setVolume(e.target.value)} className="input-field" />
             </label>
             <label className="font-bold text-lg">
-              DOI:
-              <input value={doi} onChange={(e) => setDoi(e.target.value)} className="input-field" placeholder="例: 10.1234/example" />
+              Issue:
+              <input value={issue} onChange={(e) => setIssue(e.target.value)} className="input-field" />
+            </label>
+            <label className="font-bold text-lg">
+              Pages:
+              <input value={pages} onChange={(e) => setPages(e.target.value)} className="input-field" placeholder="例: 90-97" />
             </label>
           </div>
-        )}
+          <label className="font-bold text-lg">
+            Publisher:
+            <input value={publisher} onChange={(e) => setPublisher(e.target.value)} className="input-field" />
+          </label>
+          <label className="font-bold text-lg">
+            DOI:
+            <input value={doi} onChange={(e) => setDoi(e.target.value)} className="input-field" placeholder="例: 10.1234/example" />
+          </label>
+        </div>
 
         <label className="font-bold text-lg">
           Page URL:
-          <input
-            name="bibPage"
-            value={page}
-            onChange={(e) => setPage(e.target.value)}
-            className="input-field"
-          />
+          <input name="bibPage" value={page} onChange={(e) => setPage(e.target.value)} className="input-field" />
         </label>
         <label className="font-bold text-lg">
           PDF:
-          <input
-            name="bibPDF"
-            value={pdf}
-            onChange={(e) => setPdf(e.target.value)}
-            className="input-field"
-          />
+          <input name="bibPDF" value={pdf} onChange={(e) => setPdf(e.target.value)} className="input-field" />
         </label>
 
-        {/* 役割種別 */}
+        {/* 文書タイプ */}
         <div>
-          <p className="font-bold text-lg mb-2">Role:</p>
+          <p className="font-bold text-lg mb-2">Document Type:</p>
           <div className="flex flex-col gap-2">
             {ROLE_OPTIONS.map((opt) => (
               <label
@@ -427,43 +452,200 @@ const BibliographyDialog: React.FC<BibliographyDialogProps> = ({
           </div>
         </div>
 
-        {/* 参照レベル */}
+        {/* 関係性プロパティ */}
         <div>
-          <p className="font-bold text-lg mb-2">Reference Level:</p>
+          <p className="font-bold text-lg mb-2">Relation Type: <span className="text-sm font-normal text-[var(--text-secondary)]">（複数選択可）</span></p>
           <div className="flex flex-col gap-2">
-            {REFERENCE_OPTIONS.map((opt) => (
-              <label
-                key={opt.value}
-                className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                  referenceLevel === opt.value
-                    ? 'border-[var(--primary)] bg-blue-50 dark:bg-blue-900/20'
-                    : 'border-[var(--border)] hover:bg-[var(--secondary-bg)]'
+
+            {/* Direct Bibliographic Relations（アコーディオン） */}
+            <div className={`rounded-lg border transition-colors ${hasDirect ? 'border-[var(--primary)]' : 'border-[var(--border)]'}`}>
+              <button
+                type="button"
+                onClick={() => setDirectExpanded((v) => !v)}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-t-lg transition-colors ${
+                  hasDirect ? 'bg-blue-50 dark:bg-blue-900/20' : 'bg-[var(--secondary-bg)]'
                 }`}
               >
-                <input
-                  type="radio"
-                  name="bibReferenceLevel"
-                  value={opt.value}
-                  checked={referenceLevel === opt.value}
-                  onChange={() => setReferenceLevel(opt.value)}
-                  className="mt-0.5 accent-[var(--primary)]"
-                />
-                <div>
-                  <p className="text-sm font-semibold text-[var(--text-primary)]">{opt.label}</p>
-                  <p className="text-xs text-[var(--text-secondary)] mt-0.5">{opt.description}</p>
+                <p className={`text-xs font-semibold uppercase tracking-wide ${hasDirect ? 'text-[var(--primary)]' : 'text-[var(--text-secondary)]'}`}>
+                  Direct — 直接関連
+                  {hasDirect && <span className="ml-2 normal-case font-normal">（選択中）</span>}
+                </p>
+                {directExpanded ? <FaChevronDown size={11} /> : <FaChevronRight size={11} />}
+              </button>
+              {directExpanded && (
+                <div className="flex flex-col gap-1 p-2 border-t border-[var(--border)]">
+                  {DIRECT_RELATION_OPTIONS.map((opt) => {
+                    const checked = relationTypes.includes(opt.value);
+                    const isDescribes = opt.value === ':describes';
+                    return (
+                      <React.Fragment key={opt.value}>
+                        <label
+                          className={`flex items-start gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
+                            checked ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-[var(--secondary-bg)]'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleRelationType(opt.value)}
+                            className="mt-0.5 accent-[var(--primary)]"
+                          />
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className={`text-sm font-medium ${checked ? 'text-[var(--primary)]' : 'text-[var(--text-primary)]'}`}>
+                                {opt.label}
+                              </p>
+                              {isDescribes && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.preventDefault(); setDescribesExpanded((v) => !v); }}
+                                  className={`flex items-center gap-1 text-xs px-1.5 py-0.5 rounded transition-colors ${
+                                    hasDescribesSub
+                                      ? 'text-[var(--primary)] bg-blue-100 dark:bg-blue-900/30'
+                                      : 'text-[var(--text-secondary)] hover:bg-[var(--border)]'
+                                  }`}
+                                >
+                                  {describesExpanded ? <FaChevronDown size={9} /> : <FaChevronRight size={9} />}
+                                  <span>サブタイプ{hasDescribesSub ? '（選択中）' : ''}</span>
+                                </button>
+                              )}
+                            </div>
+                            <p className="text-xs text-[var(--text-secondary)] mt-0.5">{opt.description}</p>
+                          </div>
+                        </label>
+                        {isDescribes && describesExpanded && (
+                          <div className="flex flex-col gap-1 ml-6 pl-3 border-l-2 border-[var(--border)]">
+                            {DESCRIBES_SUB_OPTIONS.map((sub) => {
+                              const subChecked = relationTypes.includes(sub.value);
+                              return (
+                                <label
+                                  key={sub.value}
+                                  className={`flex items-start gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
+                                    subChecked ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-[var(--secondary-bg)]'
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={subChecked}
+                                    onChange={() => toggleRelationType(sub.value)}
+                                    className="mt-0.5 accent-[var(--primary)]"
+                                  />
+                                  <div>
+                                    <p className={`text-sm font-medium ${subChecked ? 'text-[var(--primary)]' : 'text-[var(--text-primary)]'}`}>
+                                      {sub.label}
+                                    </p>
+                                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">{sub.description}</p>
+                                  </div>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+
+                  {/* Textual Relations グループ見出し */}
+                  <div className="mt-1">
+                    <button
+                      type="button"
+                      onClick={() => setTextualExpanded((v) => !v)}
+                      className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${
+                        hasTextualSub ? 'text-[var(--primary)] bg-blue-100 dark:bg-blue-900/30' : 'text-[var(--text-secondary)] hover:bg-[var(--secondary-bg)]'
+                      }`}
+                    >
+                      <span className="text-xs font-semibold uppercase tracking-wide">
+                        Textual Relations — 文字関連
+                        {hasTextualSub && <span className="ml-2 normal-case font-normal">（選択中）</span>}
+                      </span>
+                      {textualExpanded ? <FaChevronDown size={9} /> : <FaChevronRight size={9} />}
+                    </button>
+                    {textualExpanded && (
+                      <div className="flex flex-col gap-1 mt-1 ml-3 pl-3 border-l-2 border-[var(--border)]">
+                        {TEXTUAL_SUB_OPTIONS.map((sub) => {
+                          const subChecked = relationTypes.includes(sub.value);
+                          return (
+                            <label
+                              key={sub.value}
+                              className={`flex items-start gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
+                                subChecked ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-[var(--secondary-bg)]'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={subChecked}
+                                onChange={() => toggleRelationType(sub.value)}
+                                className="mt-0.5 accent-[var(--primary)]"
+                              />
+                              <div>
+                                <p className={`text-sm font-medium ${subChecked ? 'text-[var(--primary)]' : 'text-[var(--text-primary)]'}`}>
+                                  {sub.label}
+                                </p>
+                                <p className="text-xs text-[var(--text-secondary)] mt-0.5">{sub.description}</p>
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </label>
-            ))}
+              )}
+            </div>
+
+            {/* Conceptual Bibliographic Relations（アコーディオン） */}
+            <div className={`rounded-lg border transition-colors ${hasConceptual ? 'border-[var(--primary)]' : 'border-[var(--border)]'}`}>
+              <button
+                type="button"
+                onClick={() => setConceptualExpanded((v) => !v)}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-t-lg transition-colors ${
+                  hasConceptual ? 'bg-blue-50 dark:bg-blue-900/20' : 'bg-[var(--secondary-bg)]'
+                }`}
+              >
+                <p className={`text-xs font-semibold uppercase tracking-wide ${hasConceptual ? 'text-[var(--primary)]' : 'text-[var(--text-secondary)]'}`}>
+                  Conceptual — 概念的関連
+                  {hasConceptual && <span className="ml-2 normal-case font-normal">（選択中）</span>}
+                </p>
+                {conceptualExpanded ? <FaChevronDown size={11} /> : <FaChevronRight size={11} />}
+              </button>
+              {conceptualExpanded && (
+                <div className="flex flex-col gap-1 p-2 border-t border-[var(--border)]">
+                  {CONCEPTUAL_RELATION_OPTIONS.map((opt) => {
+                    const checked = relationTypes.includes(opt.value);
+                    return (
+                      <label
+                        key={opt.value}
+                        className={`flex items-start gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
+                          checked
+                            ? 'bg-blue-50 dark:bg-blue-900/20'
+                            : 'hover:bg-[var(--secondary-bg)]'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleRelationType(opt.value)}
+                          className="mt-0.5 accent-[var(--primary)]"
+                        />
+                        <div>
+                          <p className={`text-sm font-medium ${checked ? 'text-[var(--primary)]' : 'text-[var(--text-primary)]'}`}>
+                            {opt.label}
+                          </p>
+                          <p className="text-xs text-[var(--text-secondary)] mt-0.5">{opt.description}</p>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
           </div>
         </div>
 
         <div className="flex justify-end gap-3">
-          <button type="button" onClick={handleSave} className="btn-info">
-            Save
-          </button>
-          <button type="button" onClick={onClose} className="btn-primary">
-            Close
-          </button>
+          <button type="button" onClick={handleSave} className="btn-info">Save</button>
+          <button type="button" onClick={onClose} className="btn-primary">Close</button>
         </div>
       </form>
     </DialogWrapper>

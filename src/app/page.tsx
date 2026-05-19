@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import SignIn from '@/app/components/SignIn';
-import { FaCube, FaImage } from 'react-icons/fa';
+import { FaCube, FaImage, FaDownload } from 'react-icons/fa';
 import { PiGraphLight } from 'react-icons/pi';
+import { buildVocabularyTurtle } from '@/utils/rdf';
 
 export default function Home() {
   const router = useRouter();
@@ -17,6 +18,17 @@ export default function Home() {
 
   const openSearch = () => {
     router.push('/search');
+  };
+
+  const downloadVocabulary = () => {
+    const ttl = buildVocabularyTurtle();
+    const blob = new Blob([ttl], { type: 'text/turtle' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'vocabulary.ttl';
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -33,7 +45,7 @@ export default function Home() {
         </nav>
       </header>
 
-      <main className="flex-1 flex flex-col items-center justify-center px-4 py-16">
+      <main className="flex-1 flex flex-col items-center justify-center px-4 py-16 relative">
         <div className="w-full max-w-2xl flex flex-col items-center gap-10">
 
           <div className="text-center">
@@ -89,6 +101,21 @@ export default function Home() {
               <div className="text-center">
                 <p className="font-semibold text-[var(--text-primary)] text-lg">Semantic Search</p>
                 <p className="text-[var(--text-secondary)] text-sm mt-1">Search annotations by semantic relationships</p>
+              </div>
+            </button>
+          </div>
+
+          <div className="w-full border-t border-[var(--border)] pt-8">
+            <button
+              onClick={downloadVocabulary}
+              className="w-full flex items-center justify-center gap-3 p-5 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl hover:border-[var(--primary)] hover:shadow-md transition-all group"
+            >
+              <div className="p-3 bg-emerald-50 dark:bg-emerald-900/30 rounded-full group-hover:bg-emerald-100 transition-colors">
+                <FaDownload className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div className="text-left">
+                <p className="font-semibold text-[var(--text-primary)] text-base">Download Vocabulary</p>
+                <p className="text-[var(--text-secondary)] text-sm mt-0.5">Export the ontology as a Turtle (.ttl) file</p>
               </div>
             </button>
           </div>
