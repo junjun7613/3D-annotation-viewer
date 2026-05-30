@@ -30,6 +30,23 @@ export async function GET(
     } as NewAnnotation;
   });
 
+  // regions コレクションを取得（regionId → selector のマップを構築）
+  const regionIds = [...new Set(
+    annotations.map((a) => (a as unknown as Record<string, unknown>).regionId as string | undefined).filter(Boolean)
+  )] as string[];
+
+  const regionsMap = new Map<string, Record<string, unknown>>();
+  if (regionIds.length > 0) {
+    const regionSnapshots = await Promise.all(
+      regionIds.map((rid) => db.collection('regions').doc(rid).get())
+    );
+    regionSnapshots.forEach((snap) => {
+      if (snap.exists) {
+        regionsMap.set(snap.id, snap.data() as Record<string, unknown>);
+      }
+    });
+  }
+
   // Objectメタデータを取得
   const manifestDocId = createSlug(manifestId);
   const objectMetadataRef = db.collection('manifest_metadata').doc(manifestDocId);
@@ -48,7 +65,7 @@ export async function GET(
 
   const url = new URL(request.url);
   const baseUrl = `${url.protocol}//${url.host}`;
-  const manfiestWithAnnotations = await downloadIIIFManifest(manifestId, annotations, baseUrl, objectMetadata);
+  const manfiestWithAnnotations = await downloadIIIFManifest(manifestId, annotations, baseUrl, objectMetadata, regionsMap);
 
   return NextResponse.json(manfiestWithAnnotations, { headers });
 }

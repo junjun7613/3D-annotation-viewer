@@ -18,7 +18,7 @@ import { PiShareNetwork } from 'react-icons/pi';
 import { IoDocumentTextOutline } from 'react-icons/io5';
 import { LiaMapMarkedSolid } from 'react-icons/lia';
 import { useAtom, useSetAtom } from 'jotai';
-import { infoPanelAtom } from '@/app/atoms/infoPanelAtom';
+import { infoPanelAtom, regionPanelAtom } from '@/app/atoms/infoPanelAtom';
 
 
 import EditorJSHtml from 'editorjs-html';
@@ -39,7 +39,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { OutputData } from '@editorjs/editorjs'; // OutputDataをインポート
 
 import db from '@/lib/firebase/firebase';
-import { deleteDoc, doc, getDoc, getDocs, updateDoc, collection, addDoc, onSnapshot } from 'firebase/firestore';
+import { deleteDoc, doc, getDoc, getDocs, query, where, updateDoc, collection, addDoc, onSnapshot } from 'firebase/firestore';
 import { createWikidataItem } from '@/lib/services/wikidata';
 import { objectMetadataService } from '@/lib/services/objectMetadata';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -62,6 +62,7 @@ import {
   TitleEditDialog,
   AnnotationListDialog,
 } from '@/app/components/dialogs';
+import RegionAnnotationList from '@/app/components/RegionAnnotationList';
 
 const Home: NextPage = () => {
   const editorRef = useRef<EditorJS | null>(null);
@@ -74,6 +75,7 @@ const Home: NextPage = () => {
   // Custom hooks
   const { manifestUrl, handleManifestUrlChange } = useManifestUrl();
   const [infoPanelContent] = useAtom(infoPanelAtom);
+  const [regionPanelContent, setRegionPanelContent] = useAtom(regionPanelAtom);
   const {
     objectMetadata,
     setObjectMetadata,
@@ -199,7 +201,10 @@ const Home: NextPage = () => {
     points: { x: number; y: number }[]; canvasId: string;
   } | null>(null);
   const [pendingTitle, setPendingTitle] = useState('');
+  const [regionNewTitle, setRegionNewTitle] = useState('');
+  const [isRegionNewAnnotationOpen, setIsRegionNewAnnotationOpen] = useState(false);
   const setInfoPanel = useSetAtom(infoPanelAtom);
+  const setRegionPanel = useSetAtom(regionPanelAtom);
 
   //descriptionの情報をstateで管理
   const [desc, setDesc] = useState('');
@@ -243,19 +248,19 @@ const Home: NextPage = () => {
   // (TEI state, handlers, manifest URL useEffect, and object metadata useEffect
   //  are now managed by useManifestUrl, useObjectMetadata, and useTeiLinking hooks)
 
-  // 2D annotations: real-time sync from Firestore
+  // 2D regions: real-time sync from Firestore（マーカーは regions コレクションをソースとする）
   useEffect(() => {
     if (!manifestUrl) return;
-    const unsubscribe = onSnapshot(collection(db, 'test'), (snapshot) => {
+    const unsubscribe = onSnapshot(collection(db, 'regions'), (snapshot) => {
       const list: Annotation2D[] = [];
       snapshot.forEach((docSnap) => {
         const d = docSnap.data();
         if (d.target_manifest !== manifestUrl) return;
-        const sel = d.data?.target?.selector;
+        const sel = d.selector;
         if (sel?.type === '2DRectSelector') {
-          list.push({ kind: 'rect', id: docSnap.id, label: d.data?.body?.label || '', x: sel.x, y: sel.y, width: sel.width, height: sel.height });
+          list.push({ kind: 'rect', id: docSnap.id, label: '', x: sel.x, y: sel.y, width: sel.width, height: sel.height });
         } else if (sel?.type === '2DPolygonSelector') {
-          list.push({ kind: 'polygon', id: docSnap.id, label: d.data?.body?.label || '', points: sel.points });
+          list.push({ kind: 'polygon', id: docSnap.id, label: '', points: sel.points });
         }
       });
       setAnnotations2D(list);
@@ -280,7 +285,19 @@ const Home: NextPage = () => {
     const selector = pendingAnnotation.kind === 'rect'
       ? { type: '2DRectSelector', x: pendingAnnotation.x, y: pendingAnnotation.y, width: pendingAnnotation.width, height: pendingAnnotation.height }
       : { type: '2DPolygonSelector', points: pendingAnnotation.points };
+
+    // 1. 領域ノードを regions コレクションに保存
+    const regionDoc = await addDoc(collection(db, 'regions'), {
+      creator: user?.uid || '',
+      createdAt: Date.now(),
+      target_manifest: manifestUrl,
+      target_canvas: pendingAnnotation.canvasId,
+      selector,
+    });
+
+    // 2. アノテーションに regionId を付与して保存
     await addDoc(collection(db, 'test'), {
+      regionId: regionDoc.id,
       target_manifest: manifestUrl,
       target_canvas: pendingAnnotation.canvasId,
       creator: user?.uid || '',
@@ -299,6 +316,46 @@ const Home: NextPage = () => {
     });
     setPendingAnnotation(null);
     setPendingTitle('');
+  };
+
+  const saveRegionNewAnnotation = async () => {
+    if (!user || !regionNewTitle.trim() || !regionPanelContent) return;
+    const id = uuidv4();
+    const regionDoc = await getDoc(doc(db, 'regions', regionPanelContent.regionId));
+    if (!regionDoc.exists()) return;
+    const regionData = regionDoc.data();
+    const newAnnotation = {
+      regionId: regionPanelContent.regionId,
+      target_manifest: regionData.target_manifest,
+      target_canvas: regionData.target_canvas,
+      creator: user.uid,
+      createdAt: Date.now(),
+      media: [],
+      wikidata: [],
+      bibliography: [],
+      data: {
+        body: {
+          label: regionNewTitle,
+          value: { blocks: [{ type: 'paragraph', id, data: { text: '' } }], time: '', version: '' },
+          type: 'TextualBody',
+        },
+        target: { selector: regionData.selector },
+      },
+    };
+    const docRef = await addDoc(collection(db, 'test'), newAnnotation);
+    const created = {
+      id: docRef.id,
+      creator: user.uid,
+      title: regionNewTitle,
+      description: '',
+      media: [],
+      wikidata: [],
+      bibliography: [],
+    };
+    setRegionPanel(null);
+    setInfoPanel(created);
+    setRegionNewTitle('');
+    setIsRegionNewAnnotationOpen(false);
   };
 
   // description editor関連
@@ -2026,19 +2083,24 @@ const Home: NextPage = () => {
               focusAnnotationId={focusAnnotationId}
               onRectAnnotation={handleRectAnnotation}
               onPolygonAnnotation={handlePolygonAnnotation2D}
-              onAnnotationClick={async (id) => {
-                const docSnap = await getDoc(doc(db, 'test', id));
-                if (!docSnap.exists()) return;
-                const d = docSnap.data();
-                setInfoPanel({
-                  id: docSnap.id,
-                  creator: d.creator || '',
-                  title: d.data?.body?.label || '',
-                  description: d.data?.body?.value || '',
-                  media: d.media || [],
-                  wikidata: d.wikidata || [],
-                  bibliography: d.bibliography || [],
+              onAnnotationClick={async (regionId) => {
+                // id は regions のドキュメントID
+                const snap = await getDocs(query(collection(db, 'test'), where('regionId', '==', regionId)));
+                const anns = snap.docs.map((r) => {
+                  const a = r.data();
+                  return {
+                    id: r.id,
+                    creator: a.creator ?? '',
+                    createdAt: a.createdAt ?? undefined,
+                    title: a.data?.body?.label ?? '',
+                    description: a.data?.body?.value ?? '',
+                    media: a.media ?? [],
+                    wikidata: a.wikidata ?? [],
+                    bibliography: a.bibliography ?? [],
+                  };
                 });
+                setRegionPanel({ regionId, annotations: anns });
+                setInfoPanel(null);
               }}
             />
             {/* Annotation mode toolbar */}
@@ -2119,6 +2181,55 @@ const Home: NextPage = () => {
                 </button>
               </div>
             </div>
+            {/* 領域ノード選択時：アノテーション一覧（この間は詳細パネルを非表示） */}
+            {regionPanelContent ? (
+              <div className="border border-[var(--border)] rounded-xl p-4 mb-3 bg-[var(--card-bg)] flex-shrink-0">
+                <RegionAnnotationList
+                  regionId={regionPanelContent.regionId}
+                  annotations={regionPanelContent.annotations}
+                  onSelect={(ann) => {
+                    setRegionPanelContent(null);
+                    setInfoPanel(ann);
+                  }}
+                  onAddNew={() => {
+                    setRegionNewTitle('');
+                    setIsRegionNewAnnotationOpen(true);
+                  }}
+                />
+                {isRegionNewAnnotationOpen && (
+                  <div className="mt-4 pt-4 border-t border-[var(--border)] flex flex-col gap-3">
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">新規アノテーションを追加</p>
+                    <input
+                      type="text"
+                      value={regionNewTitle}
+                      onChange={(e) => setRegionNewTitle(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
+                      placeholder="タイトルを入力"
+                      className="input-field mb-0"
+                      autoFocus
+                    />
+                    <div className="flex gap-2 justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setIsRegionNewAnnotationOpen(false)}
+                        className="btn-secondary text-sm"
+                      >
+                        キャンセル
+                      </button>
+                      <button
+                        type="button"
+                        onClick={saveRegionNewAnnotation}
+                        disabled={!regionNewTitle.trim()}
+                        className="btn-info text-sm disabled:opacity-50"
+                      >
+                        作成
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+            <>
             <div className="flex gap-3 border-b border-[var(--border)] pb-3 mb-3 flex-shrink-0" style={{ minHeight: '300px', maxHeight: '300px' }}>
               <div className="flex-1 card">
                 <div className="flex items-center justify-between mb-3">
@@ -3034,6 +3145,8 @@ const Home: NextPage = () => {
                 </button>
               </div>
             </div>
+            </>
+            )}
           </div>
         </div>
         <footer className="bg-[var(--card-bg)] border-t border-[var(--border)] py-3 px-6 text-center">

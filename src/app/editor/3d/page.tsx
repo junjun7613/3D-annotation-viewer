@@ -15,7 +15,7 @@ import { PiShareNetwork } from 'react-icons/pi';
 import { IoDocumentTextOutline } from 'react-icons/io5';
 import { LiaMapMarkedSolid } from 'react-icons/lia';
 import { useAtom } from 'jotai';
-import { infoPanelAtom } from '@/app/atoms/infoPanelAtom';
+import { infoPanelAtom, regionPanelAtom } from '@/app/atoms/infoPanelAtom';
 
 //import dynamic from 'next/dynamic';
 
@@ -37,7 +37,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { OutputData } from '@editorjs/editorjs'; // OutputDataをインポート
 
 import db from '@/lib/firebase/firebase';
-import { deleteDoc, doc, getDoc, getDocs, updateDoc, collection } from 'firebase/firestore';
+import { deleteDoc, doc, getDoc, getDocs, updateDoc, addDoc, collection } from 'firebase/firestore';
 import { createWikidataItem } from '@/lib/services/wikidata';
 import { objectMetadataService } from '@/lib/services/objectMetadata';
 import { buildTurtle } from '@/utils/rdf';
@@ -62,6 +62,7 @@ import {
   TitleEditDialog,
   AnnotationListDialog,
 } from '@/app/components/dialogs';
+import RegionAnnotationList from '@/app/components/RegionAnnotationList';
 
 const Home: NextPage = () => {
   const editorRef = useRef<EditorJS | null>(null);
@@ -74,7 +75,8 @@ const Home: NextPage = () => {
 
   // Custom hooks
   const { manifestUrl, handleManifestUrlChange } = useManifestUrl();
-  const [infoPanelContent] = useAtom(infoPanelAtom);
+  const [infoPanelContent, setInfoPanel] = useAtom(infoPanelAtom);
+  const [regionPanelContent, setRegionPanel] = useAtom(regionPanelAtom);
   const {
     objectMetadata,
     setObjectMetadata,
@@ -189,6 +191,10 @@ const Home: NextPage = () => {
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
   const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0, currentLabel: '' });
   const [bulkWikidataLang, setBulkWikidataLang] = useState('ja');
+  // 領域ノードへの新規アノテーション追加用
+  const [regionNewTitle, setRegionNewTitle] = useState('');
+  const [isRegionNewAnnotationOpen, setIsRegionNewAnnotationOpen] = useState(false);
+
   //descriptionの情報をstateで管理
   const [desc, setDesc] = useState('');
   // locationの情報をstateで管理（annotation用）
@@ -1270,6 +1276,48 @@ const Home: NextPage = () => {
   };
   */
 
+  const saveRegionNewAnnotation = async () => {
+    if (!user || !regionNewTitle.trim() || !regionPanelContent) return;
+    const id = uuidv4();
+    // regionId を引き継いでアノテーションのみ作成（regions への保存はスキップ）
+    const regionDoc = await getDoc(doc(db, 'regions', regionPanelContent.regionId));
+    if (!regionDoc.exists()) return;
+    const regionData = regionDoc.data();
+    const newAnnotation = {
+      regionId: regionPanelContent.regionId,
+      target_manifest: regionData.target_manifest,
+      target_canvas: regionData.target_canvas,
+      creator: user.uid,
+      createdAt: Date.now(),
+      media: [],
+      wikidata: [],
+      bibliography: [],
+      data: {
+        body: {
+          label: regionNewTitle,
+          value: { blocks: [{ type: 'paragraph', id, data: { text: '' } }], time: '', version: '' },
+          type: 'TextualBody',
+        },
+        target: { selector: regionData.selector },
+      },
+    };
+    const docRef = await addDoc(collection(db, 'test'), newAnnotation);
+    const created = {
+      id: docRef.id,
+      creator: user.uid,
+      title: regionNewTitle,
+      description: '',
+      media: [],
+      wikidata: [],
+      bibliography: [],
+    };
+    // regionPanel を閉じ、新規作成したアノテーションを詳細表示
+    setRegionPanel(null);
+    setInfoPanel(created);
+    setRegionNewTitle('');
+    setIsRegionNewAnnotationOpen(false);
+  };
+
   const deleteAnnotation = (id: string) => {
     if (infoPanelContent?.creator == user?.uid) {
       const confirmed = confirm('Are you sure you want to delete this annotation?');
@@ -1863,6 +1911,55 @@ const Home: NextPage = () => {
                 </button>
               </div>
             </div>
+            {/* 領域ノード選択時：アノテーション一覧（この間は詳細パネルを非表示） */}
+            {regionPanelContent ? (
+              <div className="border border-[var(--border)] rounded-xl p-4 mb-3 bg-[var(--card-bg)] flex-shrink-0">
+                <RegionAnnotationList
+                  regionId={regionPanelContent.regionId}
+                  annotations={regionPanelContent.annotations}
+                  onSelect={(ann) => {
+                    setRegionPanel(null);
+                    setInfoPanel(ann);
+                  }}
+                  onAddNew={() => {
+                    setRegionNewTitle('');
+                    setIsRegionNewAnnotationOpen(true);
+                  }}
+                />
+                {isRegionNewAnnotationOpen && (
+                  <div className="mt-4 pt-4 border-t border-[var(--border)] flex flex-col gap-3">
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">新規アノテーションを追加</p>
+                    <input
+                      type="text"
+                      value={regionNewTitle}
+                      onChange={(e) => setRegionNewTitle(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
+                      placeholder="タイトルを入力"
+                      className="input-field mb-0"
+                      autoFocus
+                    />
+                    <div className="flex gap-2 justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setIsRegionNewAnnotationOpen(false)}
+                        className="btn-secondary text-sm"
+                      >
+                        キャンセル
+                      </button>
+                      <button
+                        type="button"
+                        onClick={saveRegionNewAnnotation}
+                        disabled={!regionNewTitle.trim()}
+                        className="btn-info text-sm disabled:opacity-50"
+                      >
+                        作成
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+            <>
             <div className="flex gap-3 border-b border-[var(--border)] pb-3 mb-3 flex-shrink-0" style={{ minHeight: '300px', maxHeight: '300px' }}>
               <div className="flex-1 card">
                 <div className="flex items-center justify-between mb-3">
@@ -2778,6 +2875,8 @@ const Home: NextPage = () => {
                 </button>
               </div>
             </div>
+            </>
+            )}
           </div>
         </div>
         <footer className="bg-[var(--card-bg)] border-t border-[var(--border)] py-3 px-6 text-center">

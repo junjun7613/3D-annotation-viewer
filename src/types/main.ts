@@ -35,6 +35,7 @@ export interface NewAnnotation {
   id: string;
   creator: string;
   createdAt?: number;
+  regionId?: string;  // 領域ノードへの参照（新仕様）
   title: string;
   description: string;
   media: MediaItem[];
@@ -62,6 +63,24 @@ export interface NewAnnotation {
         camPos: [number, number, number];
       };
     };
+  };
+}
+
+// 領域ノード — 位置情報のみを持ち、複数アノテーションが参照する
+export interface Region {
+  id: string;
+  creator: string;
+  createdAt?: number;
+  target_manifest: string;
+  target_canvas: string;
+  selector: {
+    type: string;                        // '3DSelector' | 'PolygonSelector' | '2DRectSelector' | '2DPolygonSelector'
+    value?: [number, number, number];    // 3D座標
+    area?: number[];                     // 3Dポリゴン頂点 / 2D座標列
+    camPos?: [number, number, number];   // カメラ位置（3D）
+    x?: number; y?: number;             // 2D矩形
+    width?: number; height?: number;
+    points?: { x: number; y: number }[]; // 2Dポリゴン
   };
 }
 
@@ -215,12 +234,19 @@ export interface LocationItem {
 export interface InfoPanelContent {
   id: string;
   creator: string;
+  createdAt?: number;
   title: string;
   description: string;
   media: MediaItem[];
   wikidata: WikidataItem[];
   bibliography: BibliographyItem[];
   location?: LocationItem;
+}
+
+// 領域ノード選択時のパネル状態（アノテーション一覧モード）
+export interface RegionPanelContent {
+  regionId: string;
+  annotations: InfoPanelContent[];
 }
 
 export interface Annotation3 {

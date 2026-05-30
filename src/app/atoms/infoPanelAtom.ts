@@ -1,8 +1,11 @@
 import { atom } from 'jotai';
 import type { Manifest } from '@iiif/presentation-3';
-import type { Annotation, InfoPanelContent, Annotation3 } from '@/types/main';
+import type { Annotation, InfoPanelContent, RegionPanelContent, Annotation3 } from '@/types/main';
 
 export const infoPanelAtom = atom<InfoPanelContent | null>(null);
+
+// 領域ノード選択時のアノテーション一覧パネル
+export const regionPanelAtom = atom<RegionPanelContent | null>(null);
 
 export const manifestAtom = atom<Manifest | null>(null);
 

@@ -12,9 +12,9 @@ import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer
 import { gsap } from 'gsap';
 
 import db from '@/lib/firebase/firebase';
-import { addDoc, collection, getDocs, query, onSnapshot } from 'firebase/firestore';
+import { addDoc, collection, getDocs, query, where, onSnapshot } from 'firebase/firestore';
 import { useSetAtom } from 'jotai';
-import { infoPanelAtom } from '@/app/atoms/infoPanelAtom';
+import { infoPanelAtom, regionPanelAtom } from '@/app/atoms/infoPanelAtom';
 
 // uuidをインポート
 import { v4 as uuidv4 } from 'uuid';
@@ -60,28 +60,28 @@ interface ThreeCanvasProps {
   onCapture?: (dataUrl: string) => void;
 }
 
-//firebaseからデータを取得する関数
-const getAnnotations = async () => {
-  const annotations: Annotation[] = [];
-  //const q = query(collection(db, 'annotations'));
-  const q = query(collection(db, 'test'));
+// regions コレクションからマーカー用データを取得する関数
+interface RegionDoc {
+  id: string;
+  creator: string;
+  createdAt?: number;
+  target_manifest: string;
+  target_canvas: string;
+  selector: {
+    type: string;
+    value?: [number, number, number];
+    area?: number[];
+    camPos?: [number, number, number];
+  };
+}
+
+const getRegions = async (): Promise<RegionDoc[]> => {
+  const q = query(collection(db, 'regions'));
   const querySnapshot = await getDocs(q);
-
-  querySnapshot.forEach((doc) => {
-    const data = doc.data() as Annotation;
-
-    const annotationWithId = {
-      ...data,
-      id: doc.id,
-      creator: data.creator,
-      media: data.media || [],
-      wikidata: data.wikidata || [],
-      bibliography: data.bibliography || [],
-    };
-    annotations.push(annotationWithId);
-  });
-
-  return annotations;
+  return querySnapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...(doc.data() as Omit<RegionDoc, 'id'>),
+  }));
 };
 
 //const ThreeCanvas = () => {
@@ -103,6 +103,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   const [user] = useAuthState(auth);
   const userRef = useRef(user);
   const setInfoPanel = useSetAtom(infoPanelAtom);
+  const setRegionPanel = useSetAtom(regionPanelAtom);
   const selectedSpriteRef = useRef<THREE.Sprite | null>(null);
   const selectedPolygonRef = useRef<THREE.Mesh | null>(null);
   const infoPanelRef = useRef<CSS2DObject | null>(null);
@@ -395,50 +396,26 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
         }
       );
 
-      const unsubscribe = onSnapshot(q, (querySnapshot) => {
-        const annotations: Annotation[] = [];
-        querySnapshot.forEach((doc) => {
-          const data = doc.data() as Annotation;
-          const annotationWithId = {
-            ...data,
-            id: doc.id,
-            creator: data.creator,
-            media: data.media || [],
-            bibliography: data.bibliography || [],
-          };
-          annotations.push(annotationWithId);
-        });
-        // アノテーションの更新を反映
-        // 必要に応じて、シーンの再描画や他の処理を行う
-        // アノテーションの読み込み
-        getAnnotations()
-          .then((data) => {
-            // manifestにdataを格納
-
-            // 現在のannotationsを削除
-            spritesRef.current.forEach((sprite) => {
-              scene.remove(sprite);
-            });
+      // regions コレクションの変更を監視してマーカーを再生成
+      const regionsQuery = query(collection(db, 'regions'));
+      const unsubscribe = onSnapshot(regionsQuery, () => {
+        getRegions()
+          .then((regions) => {
+            // 現在のマーカーを削除
+            spritesRef.current.forEach((sprite) => scene.remove(sprite));
+            polygonsRef.current.forEach((polygon) => scene.remove(polygon));
 
             const sprites: THREE.Sprite[] = [];
-            const polygons = [];
-            const objects = []; // sprites + polygons
-            //for (let i = 0; i < data.items[0].items[1].items.length; i++) {
-            for (let i = 0; i < data.length; i++) {
-              //const annotation = data.items[0].items[1].items[i];
-              const annotation = data[i];
+            const polygons: THREE.Mesh[] = [];
 
-              // Compare with manifestUrl instead of manifest.id
-              if (annotation.target_manifest === manifestUrl) {
-                const description = annotation.data.body.value ? annotation.data.body.value : '';
+            regions
+              .filter((region) => region.target_manifest === manifestUrl)
+              .forEach((region) => {
+                const sel = region.selector;
 
-                // 3DSelectorの場合の処理
-                if (annotation.data.target.selector.type == '3DSelector') {
-                  // spriteの作成
+                if (sel.type === '3DSelector' && sel.value) {
                   let material: THREE.SpriteMaterial;
-
                   if (compactMarkersRef.current) {
-                    // 小さな赤い枠線のみの円（中は透明）
                     const canvas = document.createElement('canvas');
                     canvas.width = 64;
                     canvas.height = 64;
@@ -451,120 +428,52 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
                       ctx.stroke();
                     }
                     const texture = new THREE.CanvasTexture(canvas);
-                    material = new THREE.SpriteMaterial({
-                      map: texture,
-                      depthTest: false,
-                      transparent: true,
-                      opacity: 1.0,
-                    });
+                    material = new THREE.SpriteMaterial({ map: texture, depthTest: false, transparent: true, opacity: 1.0 });
                   } else {
-                    // 通常のボタン画像
                     const texture = new THREE.TextureLoader().load('/images/button.png');
                     texture.colorSpace = THREE.SRGBColorSpace;
-                    material = new THREE.SpriteMaterial({
-                      map: texture,
-                      depthTest: false,
-                      transparent: true,
-                      opacity: 0.7,
-                    });
+                    material = new THREE.SpriteMaterial({ map: texture, depthTest: false, transparent: true, opacity: 0.7 });
                   }
 
                   const sprite = new THREE.Sprite(material);
-                  sprite.renderOrder = 999; // スプライトのレンダー順序を設定
-
-                  const coordinates = annotation.data.target.selector.value;
-
-                  //coordinatesの各要素を数値化して、spriteの位置を設定
-                  sprite.position.set(
-                    Number(coordinates[0]),
-                    Number(coordinates[1]),
-                    Number(coordinates[2])
+                  sprite.renderOrder = 999;
+                  sprite.position.set(Number(sel.value[0]), Number(sel.value[1]), Number(sel.value[2]));
+                  sprite.scale.set(
+                    compactMarkersRef.current ? 0.05 : 0.1,
+                    compactMarkersRef.current ? 0.05 : 0.1,
+                    0.2
                   );
-
-                  // スプライトのサイズを調整する
-                  sprite.scale.set(compactMarkersRef.current ? 0.05 : 0.1, compactMarkersRef.current ? 0.05 : 0.1, 0.2);
                   sprite.userData = {
-                    id: annotation.id,
-                    creator: annotation.creator,
-                    title: annotation.data.body.label,
-                    description: description,
-                    media: annotation.media,
-                    wikidata: annotation.wikidata,
-                    bibliography: annotation.bibliography,
-                    camPos: annotation.data.target.selector.camPos,
+                    regionId: region.id,
+                    camPos: sel.camPos,
                   };
-
-                  /*
-                  // レイキャスターを使用してスプライトの位置をチェック
-                  const raycaster = new THREE.Raycaster();
-                  raycaster.setFromCamera(new THREE.Vector2(), camera);
-                  const intersects = raycaster.intersectObject(sprite, false);
-
-                  if (intersects.length < 1) {
-                    sprite.visible = true; // オブジェクトの前面にある場合は表示する
-                  } else {
-                    sprite.visible = false; // オブジェクトの裏側にある場合は非表示にする
-                  }
-                  */
-
                   scene.add(sprite);
                   sprites.push(sprite);
-                  objects.push(sprite);
-                } else if (annotation.data.target.selector.type == 'PolygonSelector') {
-                  // polygonの作成
-                  const coordinates = annotation.data.target.selector.area;
 
-                  const vertices = [];
+                } else if (sel.type === 'PolygonSelector' && sel.area) {
+                  const coordinates = sel.area;
+                  const vertices: THREE.Vector3[] = [];
                   for (let i = 0; i < coordinates.length; i += 3) {
-                    vertices.push(
-                      new THREE.Vector3(
-                        Number(coordinates[i]),
-                        Number(coordinates[i + 1]),
-                        Number(coordinates[i + 2])
-                      )
-                    );
+                    vertices.push(new THREE.Vector3(Number(coordinates[i]), Number(coordinates[i + 1]), Number(coordinates[i + 2])));
                   }
-
                   const geometry = new THREE.BufferGeometry();
                   const verticesArray = new Float32Array(vertices.length * 3);
-                  for (let i = 0; i < vertices.length; i++) {
-                    verticesArray[i * 3] = vertices[i].x;
-                    verticesArray[i * 3 + 1] = vertices[i].y;
-                    verticesArray[i * 3 + 2] = vertices[i].z;
-                  }
+                  vertices.forEach((v, i) => { verticesArray[i * 3] = v.x; verticesArray[i * 3 + 1] = v.y; verticesArray[i * 3 + 2] = v.z; });
                   geometry.setAttribute('position', new THREE.BufferAttribute(verticesArray, 3));
-
-                  // 三角形分割: 任意の点数に対応
                   const indices: number[] = [];
-                  const n = vertices.length;
-                  for (let i = 1; i < n - 1; i++) {
-                    indices.push(0, i, i + 1);
-                  }
+                  for (let i = 1; i < vertices.length - 1; i++) indices.push(0, i, i + 1);
                   geometry.setIndex(indices);
-
-                  const material = new THREE.MeshBasicMaterial({
-                    color: 'yellow',
-                    side: THREE.DoubleSide,
-                    transparent: true,
-                    opacity: 0.1,
-                  });
+                  const material = new THREE.MeshBasicMaterial({ color: 'yellow', side: THREE.DoubleSide, transparent: true, opacity: 0.1 });
                   const polygon = new THREE.Mesh(geometry, material);
                   polygon.userData = {
-                    id: annotation.id,
-                    creator: annotation.creator,
-                    title: annotation.data.body.label,
-                    description: description,
-                    media: annotation.media,
-                    wikidata: annotation.wikidata,
-                    bibliography: annotation.bibliography,
-                    camPos: annotation.data.target.selector.camPos,
+                    regionId: region.id,
+                    camPos: sel.camPos,
                   };
                   scene.add(polygon);
                   polygons.push(polygon);
-                  objects.push(polygon);
                 }
-              }
-            }
+              });
+
             spritesRef.current = sprites;
             polygonsRef.current = polygons;
 
@@ -623,98 +532,37 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
                 if (infoPanelRef.current) {
                   scene.remove(infoPanelRef.current);
                 }
-
-                //既存のselectedSpriteRefを削除
                 selectedSpriteRef.current = null;
                 selectedPolygonRef.current = null;
 
-                let id = '';
-                let creator = '';
-                let title = '';
-                let description = '';
-                let media = [];
-                let wikidata = [];
-                let bibliography = [];
+                // マーカーは常に regionId を持つ
+                const regionId = intersectedObject.userData.regionId as string | undefined;
+                if (!regionId) return;
+
+                // regionId に紐づく全アノテーションを取得して regionPanelAtom にセット
+                const q2 = query(collection(db, 'test'), where('regionId', '==', regionId));
+                getDocs(q2).then((snap) => {
+                  const anns = snap.docs.map((d) => {
+                    const a = d.data();
+                    return {
+                      id: d.id,
+                      creator: a.creator ?? '',
+                      createdAt: a.createdAt ?? undefined,
+                      title: a.data?.body?.label ?? '',
+                      description: a.data?.body?.value ?? '',
+                      media: a.media ?? [],
+                      wikidata: a.wikidata ?? [],
+                      bibliography: a.bibliography ?? [],
+                    };
+                  });
+                  setRegionPanel({ regionId, annotations: anns });
+                  setInfoPanel(null);
+                });
 
                 if (intersectedObject instanceof THREE.Sprite) {
-                  // スプライトの場合の処理
-                  id = intersectedObject.userData.id;
-                  creator = intersectedObject.userData.creator;
-                  title = intersectedObject.userData.title;
-                  description = intersectedObject.userData.description;
-                  media = intersectedObject.userData.media;
-                  wikidata = intersectedObject.userData.wikidata;
-                  bibliography = intersectedObject.userData.bibliography;
+                  selectedSpriteRef.current = intersectedObject;
                 } else if (intersectedObject instanceof THREE.Mesh) {
-                  // ポリゴンの場合の処理
-                  id = intersectedObject.userData.id;
-                  creator = intersectedObject.userData.creator;
-                  title = intersectedObject.userData.title;
-                  description = intersectedObject.userData.description;
-                  media = intersectedObject.userData.media;
-                  wikidata = intersectedObject.userData.wikidata;
-                  bibliography = intersectedObject.userData.bibliography;
-                }
-
-                handleInfoPanelContentChange({
-                  id,
-                  creator,
-                  title,
-                  description,
-                  media,
-                  wikidata,
-                  bibliography,
-                });
-                handleAnnotationClick(
-                  id,
-                  creator,
-                  title,
-                  description,
-                  media,
-                  wikidata,
-                  bibliography
-                );
-
-                //if (title && description) {
-                if (title) {
-                  const div = document.createElement('div');
-                  div.className = 'panel';
-                  div.style.backgroundColor = 'rgba(0, 0, 0, 0.2)';
-                  div.style.color = 'white';
-                  div.style.padding = '10px';
-                  div.style.pointerEvents = 'auto'; // クリックを有効にする
-                  div.innerHTML = `<h3 style={{fontWeight: 'bold'}}>${title}</h3>`;
-
-                  const infoPanel = new CSS2DObject(div);
-
-                  if (intersectedObject instanceof THREE.Sprite) {
-                    infoPanel.position.set(
-                      intersectedObject.position.x,
-                      intersectedObject.position.y + 0.02,
-                      intersectedObject.position.z
-                    );
-                  } else if (intersectedObject instanceof THREE.Mesh) {
-                    const mesh = intersectedObject as THREE.Mesh;
-                    const positionAttribute = mesh.geometry.attributes.position;
-                    const vertex = new THREE.Vector3();
-                    vertex.fromBufferAttribute(positionAttribute, 0); // 最初の頂点を取得
-                    infoPanel.position.set(vertex.x, vertex.y, vertex.z);
-                  }
-
-                  scene.add(infoPanel);
-                  infoPanelRef.current = infoPanel;
-
-                  //20秒で情報パネルを削除
-                  setTimeout(() => {
-                    scene.remove(infoPanel);
-                  }, 5000);
-
-                  // spriteの場合にはselectedSpriteRefに選択されたスプライトを格納
-                  if (intersectedObject instanceof THREE.Sprite) {
-                    selectedSpriteRef.current = intersectedObject;
-                  } else if (intersectedObject instanceof THREE.Mesh) {
-                    selectedPolygonRef.current = intersectedObject;
-                  }
+                  selectedPolygonRef.current = intersectedObject;
                 }
               }
             };
@@ -1083,107 +931,58 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
     setAnnotationInputVisible(false);
   };
 
-  const saveAnnotation = () => {
+  const saveAnnotation = async () => {
     if (!user) return;
-    // uuidを生成
     const id = uuidv4();
-    if (annotationModeRef.current) {
-      //alert("Please create a polygon annotation!");
 
-      // Float32Arrayを通常の配列に変換
-      const polygonArray = polygonArea.current ? Array.from(polygonArea.current) : [];
+    // セレクタを種別に応じて構築
+    const selector = annotationModeRef.current
+      ? {
+          type: 'PolygonSelector',
+          area: polygonArea.current ? Array.from(polygonArea.current) : [],
+          camPos: [camPos.current?.x, camPos.current?.y, camPos.current?.z],
+        }
+      : {
+          type: '3DSelector',
+          value: [lookAt.current?.x, lookAt.current?.y, lookAt.current?.z],
+          camPos: [camPos.current?.x, camPos.current?.y, camPos.current?.z],
+        };
 
-      //firebaseにデータを格納
-      const data = {
-        target_manifest: targetManifest.current,
-        target_canvas: tagetCanvas.current,
-        creator: user?.uid,
-        createdAt: Date.now(),
-        media: [],
-        wikidata: [],
-        bibliography: [],
-        data: {
-          body: {
-            label: title,
-            //value: description,
-            //value: '',
-            value: {
-              blocks: [
-                {
-                  type: 'paragraph',
-                  id: id,
-                  data: {
-                    text: '',
-                  },
-                },
-              ],
-              time: '',
-              version: '',
-            },
-            type: 'TextualBody',
+    // 1. 領域ノードを regions コレクションに保存
+    const regionDoc = await addDoc(collection(db, 'regions'), {
+      creator: user.uid,
+      createdAt: Date.now(),
+      target_manifest: targetManifest.current,
+      target_canvas: tagetCanvas.current,
+      selector,
+    });
+
+    // 2. アノテーションを regions の regionId を付与して保存
+    const annotationData = {
+      regionId: regionDoc.id,
+      target_manifest: targetManifest.current,
+      target_canvas: tagetCanvas.current,
+      creator: user.uid,
+      createdAt: Date.now(),
+      media: [],
+      wikidata: [],
+      bibliography: [],
+      data: {
+        body: {
+          label: title,
+          value: {
+            blocks: [{ type: 'paragraph', id, data: { text: '' } }],
+            time: '',
+            version: '',
           },
-          target: {
-            selector: {
-              type: 'PolygonSelector',
-              area: polygonArray,
-              camPos: [camPos.current?.x, camPos.current?.y, camPos.current?.z],
-            },
-          },
+          type: 'TextualBody',
         },
-      };
-      //addDoc(collection(db, 'annotations'), data);
-      addDoc(collection(db, 'test'), data);
+        target: { selector },
+      },
+    };
+    addDoc(collection(db, 'test'), annotationData);
 
-      setAnnotationInputVisible(false);
-      setTitle('');
-      return;
-    } else {
-      //firebaseにデータを格納
-      const data = {
-        target_manifest: targetManifest.current,
-        target_canvas: tagetCanvas.current,
-        creator: user?.uid,
-        createdAt: Date.now(),
-        media: [],
-        wikidata: [],
-        bibliography: [],
-        data: {
-          body: {
-            label: title,
-            //value: description,
-            //value: '',
-            value: {
-              blocks: [
-                {
-                  type: 'paragraph',
-                  id: id,
-                  data: {
-                    text: '',
-                  },
-                },
-              ],
-              time: '',
-              version: '',
-            },
-            type: 'TextualBody',
-          },
-          target: {
-            selector: {
-              type: '3DSelector',
-              value: [lookAt.current?.x, lookAt.current?.y, lookAt.current?.z],
-              camPos: [camPos.current?.x, camPos.current?.y, camPos.current?.z],
-            },
-          },
-        },
-      };
-      //addDoc(collection(db, 'annotations'), data);
-      addDoc(collection(db, 'test'), data);
-
-      setAnnotationInputVisible(false);
-      setTitle('');
-    }
-
-    //titleの値を初期化
+    setAnnotationInputVisible(false);
     setTitle('');
     setDescription('');
   };
@@ -1201,33 +1000,6 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
     }
   }, [annotationsVisible]);
 
-  // Firebaseのリアルタイム更新を監視
-  useEffect(() => {
-    //const q = query(collection(db, 'annotations'));
-    const q = query(collection(db, 'test'));
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const annotations: Annotation[] = [];
-      querySnapshot.forEach((doc) => {
-        const data = doc.data() as Annotation;
-        const annotationWithId = {
-          ...data,
-          id: doc.id,
-          creator: data.creator,
-          media: data.media || [],
-          bibliography: data.bibliography || [],
-          wikidata: data.wikidata || [],
-        };
-        annotations.push(annotationWithId);
-      });
-      // アノテーションの更新を反映
-      // 必要に応じて、シーンの再描画や他の処理を行う
-
-      // ここでシーンの再描画や他の処理を行う
-    });
-
-    // クリーンアップ関数
-    return () => unsubscribe();
-  }, []);
 
   const handleCapture = useCallback(() => {
     if (!rendererRef.current || !onCapture) return;

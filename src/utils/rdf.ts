@@ -228,10 +228,15 @@ export function buildTurtle(
       const ps: string[] = [];
       ps.push(`  rdfs:label "${ann.data?.body?.label ?? ''}"`);
       ps.push(`  schema:description "${html}"`);
-      const target = ann.target_canvas
-        ? `<${ann.target_canvas}>`
-        : `<${ann.target_manifest}>`;
-      ps.push(`  oa:hasTarget ${target}`);
+
+      // regionId があれば oa:SpecificResource を経由、なければ従来通り直接参照
+      const regionId = (ann as unknown as Record<string, unknown>).regionId as string | undefined;
+      if (regionId) {
+        ps.push(`  oa:hasTarget <${annoBase}/region/${regionId}>`);
+      } else {
+        const target = ann.target_canvas ? `<${ann.target_canvas}>` : `<${ann.target_manifest}>`;
+        ps.push(`  oa:hasTarget ${target}`);
+      }
       if (ann.creator) ps.push(`  prov:wasAttributedTo <urn:uid:${ann.creator}>`);
       if (ann.createdAt) {
         const iso = new Date(ann.createdAt).toISOString();
@@ -246,6 +251,24 @@ export function buildTurtle(
         ps.forEach((p, i) => { ttl += p + (i < ps.length - 1 ? ' ;\n' : ' .\n'); });
       } else {
         ttl += '.\n';
+      }
+
+      // oa:SpecificResource（領域ノード）の出力
+      if (regionId) {
+        const regionUri = `${annoBase}/region/${regionId}`;
+        const source = ann.target_canvas ? `<${ann.target_canvas}>` : `<${ann.target_manifest}>`;
+        const sel = (ann as unknown as Record<string, unknown>).data as { target?: { selector?: Record<string, unknown> } } | undefined;
+        const selector = sel?.target?.selector;
+        ttl += `\n<${regionUri}> a oa:SpecificResource ;\n`;
+        ttl += `  oa:hasSource ${source} ;\n`;
+        if (selector) {
+          const selectorUri = `${regionUri}/selector`;
+          ttl += `  oa:hasSelector <${selectorUri}> .\n`;
+          ttl += `\n<${selectorUri}> a oa:FragmentSelector ;\n`;
+          ttl += `  rdf:value "${JSON.stringify(selector).replace(/"/g, '\\"')}" .\n`;
+        } else {
+          ttl += `  oa:hasSource ${source} .\n`;
+        }
       }
 
       // Annotation media（メディアが主語）

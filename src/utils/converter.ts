@@ -259,10 +259,25 @@ function convertAnnotationToIIIF(
   newUrl: string,
   baseUrl: string,
   manifestLabel: string,
-  manifestUrl: string
+  manifestUrl: string,
+  regionsMap?: Map<string, Record<string, unknown>>
 ): { annotation: IIIFAnnotation; geoFeatures: GeoFeature[] } {
   const html = parser.parse(doc.data.body.value);
   const descriptionHtml = Array.isArray(html) ? html.join('') : String(html);
+
+  const regionId = (doc as unknown as Record<string, unknown>).regionId as string | undefined;
+  const regionData = regionId ? regionsMap?.get(regionId) : undefined;
+  const selector = regionData
+    ? (regionData.selector as typeof doc.data.target.selector)
+    : doc.data.target.selector;
+  const targetId = regionId ? `${newUrl}/region/${regionId}` : undefined;
+
+  const target: Record<string, unknown> = {
+    type: 'SpecificResource',
+    source: [{ id: doc.target_canvas, type: 'Scene' }],
+    selector: [convertSelectorToIIIF3D(selector)],
+  };
+  if (targetId) target.id = targetId;
 
   const annotation: IIIFAnnotation = {
     id: `${newUrl}/annotation/${doc.id}`,
@@ -273,14 +288,7 @@ function convertAnnotationToIIIF(
       label: doc.data.body.label,
       type: doc.data.body.type,
     },
-    target: {
-      type: 'SpecificResource',
-      source: [{ id: doc.target_canvas, type: 'Scene' }],
-      selector: [convertSelectorToIIIF3D(doc.data.target.selector)],
-      // 元のFirebase保存形式に戻す場合は以下を使用:
-      // source: doc.target_canvas,
-      // selector: doc.data.target.selector,
-    },
+    target,
   };
 
   // seeAlsoを構築
@@ -453,7 +461,8 @@ export const downloadIIIFManifest = async (
   manifestUrl: string,
   firebaseDocuments: NewAnnotation[],
   baseUrl: string,
-  objectMetadata?: ObjectMetadata | null
+  objectMetadata?: ObjectMetadata | null,
+  regionsMap?: Map<string, Record<string, unknown>>
 ) => {
   const newUrl = manifestUrl.split('/').slice(0, -1).join('/');
 
@@ -474,7 +483,8 @@ export const downloadIIIFManifest = async (
       newUrl,
       baseUrl,
       manifestLabel,
-      manifestUrl
+      manifestUrl,
+      regionsMap
     );
     annotations.push(annotation);
     allGeoFeatures.push(...geoFeatures);
