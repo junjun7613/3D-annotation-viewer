@@ -19,36 +19,6 @@ import { infoPanelAtom, regionPanelAtom } from '@/app/atoms/infoPanelAtom';
 // uuidをインポート
 import { v4 as uuidv4 } from 'uuid';
 
-//firebaseのデータを格納するための型
-interface Annotation {
-  id: string;
-  creator: string;
-  title: string;
-  description: string;
-  media: [];
-  wikidata: [];
-  bibliography: [];
-  position: {
-    x: number;
-    y: number;
-    z: number;
-  };
-  target_manifest?: string;
-  data: {
-    body: {
-      value: string;
-      label: string;
-    };
-    target: {
-      selector: {
-        type: string;
-        value: [number, number, number]; // valueプロパティを追加
-        area: [number, number, number]; // areaプロパティを追加
-        camPos: [number, number, number]; // camPosプロパティを追加
-      };
-    };
-  };
-}
 
 interface ThreeCanvasProps {
   annotationsVisible: boolean;
@@ -131,26 +101,9 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
 
   const [isProgressVisible, setIsProgressVisible] = useState(true);
 
-  const [, /*infoPanelContent*/ setInfoPanelContent] = useState({
-    title: '',
-    description: '',
-    id: '',
-  });
 
   const targetManifest = useRef<string | null>(null);
   const tagetCanvas = useRef<string | null>(null);
-
-  const handleInfoPanelContentChange = (content: {
-    id: string;
-    creator: string;
-    title: string;
-    description: string;
-    media: [];
-    wikidata: [];
-    bibliography: [];
-  }) => {
-    setInfoPanelContent(content);
-  };
 
   const handleAnnotationClick = useCallback(
     (
@@ -275,11 +228,6 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   }, [user]);
 
   useEffect(() => {
-    //const q = query(collection(db, 'annotations'));
-    const q = query(collection(db, 'test'));
-
-    // ここでシーンの再描画や他の処理を行う
-
     // canvas要素を取得
     const canvas = document.getElementById('canvas') as HTMLCanvasElement;
 
