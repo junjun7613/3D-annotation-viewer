@@ -82,10 +82,6 @@ const Home: NextPage = () => {
   const {
     objectMetadata,
     setObjectMetadata,
-    objectLocationLat,
-    setObjectLocationLat,
-    objectLocationLng,
-    setObjectLocationLng,
     savedTeiOriginal,
     savedTeiLineMappings,
   } = useObjectMetadata(manifestUrl);
@@ -125,7 +121,6 @@ const Home: NextPage = () => {
 
   const [, /*editorData*/ setEditorData] = useState<OutputData | undefined>();
   const [infoTab, setInfoTab] = useState<'resources' | 'linkedData' | 'references' | 'location'>('resources');
-  const [objectTab, setObjectTab] = useState<'resources' | 'linkedData' | 'references' | 'location'>('resources');
 
   interface MediaItem {
     id: string;
@@ -892,22 +887,6 @@ const Home: NextPage = () => {
   };
 
   // Object用の保存関数群
-  const saveObjectLocation = async () => {
-    if (!manifestUrl || !user) return;
-
-    const data = {
-      lat: objectLocationLat,
-      lng: objectLocationLng,
-    };
-
-    await objectMetadataService.updateLocation(manifestUrl, data, user.uid);
-
-    // objectMetadataを更新
-    setObjectMetadata(prev => prev ? { ...prev, location: data } : null);
-
-    alert('Location saved successfully!');
-  };
-
   const saveObjectMedia = async () => {
     if (!manifestUrl || !user) return;
 
@@ -1099,54 +1078,6 @@ const Home: NextPage = () => {
     setObjectBibPDF('');
     setEditObjectBibIndex(null);
     setIsObjectBibDialogOpen(false);
-  };
-
-  const deleteObjectWikidata = async (index: number) => {
-    if (!manifestUrl || !user) return;
-
-    const confirmed = confirm('Are you sure you want to delete this Wikidata item?');
-    if (confirmed) {
-      await objectAnnotationService.deleteWikidata(manifestUrl, index, user.uid);
-
-      // objectMetadataを更新
-      setObjectMetadata(prev => {
-        if (!prev) return null;
-        const newWikidata = prev.wikidata.filter((_, i) => i !== index);
-        return { ...prev, wikidata: newWikidata };
-      });
-    }
-  };
-
-  const deleteObjectMedia = async (index: number) => {
-    if (!manifestUrl || !user) return;
-
-    const confirmed = confirm('Are you sure you want to delete this media item?');
-    if (confirmed) {
-      await objectAnnotationService.deleteMedia(manifestUrl, index, user.uid);
-
-      // objectMetadataを更新
-      setObjectMetadata(prev => {
-        if (!prev) return null;
-        const newMedia = prev.media.filter((_, i) => i !== index);
-        return { ...prev, media: newMedia };
-      });
-    }
-  };
-
-  const deleteObjectBibliography = async (index: number) => {
-    if (!manifestUrl || !user) return;
-
-    const confirmed = confirm('Are you sure you want to delete this reference?');
-    if (confirmed) {
-      await objectAnnotationService.deleteBibliography(manifestUrl, index, user.uid);
-
-      // objectMetadataを更新
-      setObjectMetadata(prev => {
-        if (!prev) return null;
-        const newBibliography = prev.bibliography.filter((_, i) => i !== index);
-        return { ...prev, bibliography: newBibliography };
-      });
-    }
   };
 
   const saveBibUpload = async () => {
@@ -1565,38 +1496,6 @@ const Home: NextPage = () => {
     } else {
       alert('You are not the creator of this annotation.');
     }
-  };
-
-  // Edit handlers for object-level resources
-  const editObjectMedia = (index: number) => {
-    const item = objectMetadata?.media[index];
-    if (!item) return;
-    setObjectSource(item.manifestUrl || item.source);
-    setObjectType(item.type);
-    setObjectCaption(item.caption);
-    setEditObjectMediaIndex(index);
-    setIsObjectMediaDialogOpen(true);
-  };
-
-  const editObjectWikidata = (index: number) => {
-    const item = objectMetadata?.wikidata[index];
-    if (!item) return;
-    setObjectWikiType(item.type);
-    setObjectIRI(item.uri);
-    setEditObjectWikiIndex(index);
-    setIsObjectWikidataDialogOpen(true);
-  };
-
-  const editObjectBibliography = (index: number) => {
-    const item = objectMetadata?.bibliography[index];
-    if (!item) return;
-    setObjectBibAuthor(item.author);
-    setObjectBibTitle(item.title);
-    setObjectBibYear(item.year);
-    setObjectBibPage(item.page || '');
-    setObjectBibPDF(item.pdf || '');
-    setEditObjectBibIndex(index);
-    setIsObjectBibDialogOpen(true);
   };
 
   const handleRDFOpenDialog = () => {

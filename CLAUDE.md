@@ -196,12 +196,11 @@ Object Annotation / Region Annotation のどちらも **同一の 4 タブ構成
 
 ### クリーンアップ候補（動作には影響なし）
 
-メタタブ廃止に伴い、以下のコードが未使用化している。削除可能だが、ローカル RDF プレビュー機能との依存関係を確認してから対応する。
+メタタブ廃止に伴い lint エラーになっていた未使用シンボルは削除済み（`saveObjectLocation`, `deleteObject*`, `editObject*`, `objectTab` state, `setObjectLocationLat/Lng` 構造分割）。以下は state 読み取りや JSX 参照により lint を通っているが実質未使用：
 
-- `saveObjectMedia` / `saveObjectWikidata` / `saveObjectBibliography` / `deleteObjectMedia` / `deleteObjectWikidata` / `deleteObjectBibliography`（旧 Object タブ専用ハンドラ）
-- Object 専用ダイアログ state (`isObjectMediaDialogOpen` 等) と関連入力 state (`objectSource`, `objectIRI`, `objectBibAuthor` 等)
-- `objectTab` state（旧 Object タブ内の sub-tab 切替）
-- `useObjectMetadata` の media / wikidata / bibliography マージロジック（ローカル RDF プレビューが依存）
+- Object 専用ダイアログ (`isObjectMediaDialogOpen`, `isObjectWikidataDialogOpen`, `isObjectBibDialogOpen` 等) と関連入力 state (`objectSource`, `objectIRI`, `objectBibAuthor` 等) — ダイアログ自体を開く導線が無いため到達不可
+- Object 専用保存ハンドラ (`saveObjectMedia`, `saveObjectWikidata`, `saveObjectBibliography`) — 上記ダイアログ内でのみ参照される
+- `useObjectMetadata` の media / wikidata / bibliography マージロジック — ローカル RDF プレビューが依存しているため要注意
 
 ---
 
