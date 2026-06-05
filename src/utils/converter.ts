@@ -223,61 +223,96 @@ function buildSeeAlsoItems(doc: NewAnnotation, manifestBase: string): Record<str
   return seeAlsoItems;
 }
 
-// Firebase保存形式のセレクターをIIIF 3D Draft仕様形式に変換する
-// 元データ構造: { type: '3DSelector'|'PolygonSelector', value: [x,y,z], area: [x,y,z], camPos: [x,y,z] }
-// 仕様参照: https://iiif.github.io/3d/temp-draft-4.html
-function convertSelectorToIIIF3D(selector: {
-  type: string;
-  value: [number, number, number];
-  area?: [number, number, number];
-  camPos?: [number, number, number];
-}): Record<string, unknown> {
-  if (selector.type === '3DSelector') {
+// Firebase保存形式のセレクターをIIIF仕様形式に変換する
+// 3D: IIIF 3D Draft仕様 https://iiif.github.io/3d/temp-draft-4.html
+// 2D: Web Annotation Data Model (FragmentSelector / SvgSelector)
+function convertSelectorToIIIF(selector: Record<string, unknown>): Record<string, unknown> {
+  const type = selector.type as string;
+
+  // --- 3D ---
+  if (type === '3DSelector') {
+    const value = selector.value as [number, number, number];
+    return { type: 'PointSelector', x: value[0], y: value[1], z: value[2] };
+  }
+  if (type === 'PolygonSelector') {
+    const area = (selector.area ?? selector.value) as number[];
+    // 頂点群を WKT POLYGONZ 形式に変換
+    const points: string[] = [];
+    for (let i = 0; i + 2 < area.length; i += 3) {
+      points.push(`${area[i]} ${area[i + 1]} ${area[i + 2]}`);
+    }
+    // 閉じる（最初の点を末尾に繰り返す）
+    if (points.length > 0) points.push(points[0]);
+    return { type: 'PolygonZSelector', value: `POLYGONZ((${points.join(', ')}))` };
+  }
+
+  // --- 2D ---
+  if (type === '2DRectSelector') {
+    const { x, y, width, height } = selector as { x: number; y: number; width: number; height: number };
+    // xywh= は正規化座標（0–1）を pixel に変換しない — viewer 側で解釈
     return {
-      type: 'PointSelector',
-      x: selector.value[0],
-      y: selector.value[1],
-      z: selector.value[2],
+      type: 'FragmentSelector',
+      conformsTo: 'http://www.w3.org/TR/media-frags/',
+      value: `xywh=percent:${Math.round(x * 100)},${Math.round(y * 100)},${Math.round(width * 100)},${Math.round(height * 100)}`,
     };
   }
-  if (selector.type === 'PolygonSelector') {
-    // PolygonZSelector: area を WKT POLYGONZ 形式で表現
-    // area は頂点群として [x,y,z] の繰り返しを想定
-    const coords = selector.area ?? selector.value;
+  if (type === '2DPolygonSelector') {
+    const points = selector.points as { x: number; y: number }[];
+    const svgPoints = points.map((p) => `${(p.x * 100).toFixed(2)}%,${(p.y * 100).toFixed(2)}%`).join(' ');
     return {
-      type: 'PolygonZSelector',
-      value: `POLYGONZ((${coords[0]} ${coords[1]} ${coords[2]}))`,
+      type: 'SvgSelector',
+      value: `<svg><polygon points="${svgPoints}" /></svg>`,
     };
   }
-  // 未知のタイプはそのまま返す
-  return selector as unknown as Record<string, unknown>;
+
+  return selector;
+}
+
+// sourceの type を selector 種別から決定
+function sourceTypeFromSelector(selectorType: string): string {
+  if (selectorType === '3DSelector' || selectorType === 'PolygonSelector') return 'Scene';
+  return 'Canvas';
 }
 
 // アノテーションをIIIF形式に変換する関数
+// seenRegionIds: 同一 regionId の2つ目以降はセレクタを省略して id 参照のみにする
 function convertAnnotationToIIIF(
   doc: NewAnnotation,
   newUrl: string,
   baseUrl: string,
   manifestLabel: string,
   manifestUrl: string,
-  regionsMap?: Map<string, Record<string, unknown>>
+  regionsMap?: Map<string, Record<string, unknown>>,
+  seenRegionIds?: Set<string>
 ): { annotation: IIIFAnnotation; geoFeatures: GeoFeature[] } {
   const html = parser.parse(doc.data.body.value);
   const descriptionHtml = Array.isArray(html) ? html.join('') : String(html);
 
   const regionId = (doc as unknown as Record<string, unknown>).regionId as string | undefined;
   const regionData = regionId ? regionsMap?.get(regionId) : undefined;
-  const selector = regionData
-    ? (regionData.selector as typeof doc.data.target.selector)
-    : doc.data.target.selector;
+  const rawSelector = regionData
+    ? (regionData.selector as Record<string, unknown>)
+    : (doc.data.target.selector as unknown as Record<string, unknown>);
   const targetId = regionId ? `${newUrl}/region/${regionId}` : undefined;
 
-  const target: Record<string, unknown> = {
-    type: 'SpecificResource',
-    source: [{ id: doc.target_canvas, type: 'Scene' }],
-    selector: [convertSelectorToIIIF3D(selector)],
-  };
-  if (targetId) target.id = targetId;
+  // 同一 regionId の初出かどうか
+  const isFirstOccurrence = regionId ? !seenRegionIds?.has(regionId) : true;
+  if (regionId && seenRegionIds && isFirstOccurrence) seenRegionIds.add(regionId);
+
+  let target: Record<string, unknown>;
+  if (targetId && !isFirstOccurrence) {
+    // 2つ目以降：id 参照のみ（セレクタ・source の重複を避ける）
+    target = { id: targetId, type: 'SpecificResource' };
+  } else {
+    const selectorType = rawSelector.type as string;
+    const sourceType = sourceTypeFromSelector(selectorType);
+    target = {
+      type: 'SpecificResource',
+      source: [{ id: doc.target_canvas, type: sourceType }],
+      selector: [convertSelectorToIIIF(rawSelector)],
+    };
+    if (targetId) target.id = targetId;
+  }
 
   const annotation: IIIFAnnotation = {
     id: `${newUrl}/annotation/${doc.id}`,
@@ -476,6 +511,7 @@ export const downloadIIIFManifest = async (
   // アノテーションとGeo featuresを変換
   const annotations: IIIFAnnotation[] = [];
   const allGeoFeatures: GeoFeature[] = [];
+  const seenRegionIds = new Set<string>();
 
   firebaseDocuments.forEach((doc) => {
     const { annotation, geoFeatures } = convertAnnotationToIIIF(
@@ -484,7 +520,8 @@ export const downloadIIIFManifest = async (
       baseUrl,
       manifestLabel,
       manifestUrl,
-      regionsMap
+      regionsMap,
+      seenRegionIds
     );
     annotations.push(annotation);
     allGeoFeatures.push(...geoFeatures);

@@ -1,0 +1,396 @@
+{
+  "relationHierarchy": [
+    {
+      "id": "direct",
+      "label": "Direct Relation",
+      "description": "対象そのものに関する直接的証拠",
+      "children": [
+        {
+          "id": "direct.bibliographic",
+          "label": "Bibliographic Direct Relation",
+          "resourceType": "bibliography",
+          "children": [
+            {
+              "id": "biblio.mentions",
+              "label": "mentions",
+              "desc": "文献中で対象に言及している。",
+              "examples": [
+                "論文A ──mentions──▶ 土器A",
+                "研究ノート ──mentions──▶ 石碑B"
+              ]
+            },
+            {
+              "id": "biblio.describes",
+              "label": "describes",
+              "desc": "対象について一定の詳細さをもって説明している。",
+              "examples": [
+                "遺跡報告書 ──describes──▶ 石碑A"
+              ]
+            },
+            {
+              "id": "biblio.reports",
+              "label": "reports",
+              "desc": "対象の発見・調査・出土等を一次的に報告する。",
+              "examples": [
+                "発掘報告書 ──reports──▶ 遺構B"
+              ]
+            },
+            {
+              "id": "biblio.analyzes",
+              "label": "analyzes",
+              "desc": "対象を研究主題として分析する。",
+              "examples": [
+                "研究論文 ──analyzes──▶ 仏像A"
+              ]
+            },
+            {
+              "id": "biblio.catalogues",
+              "label": "catalogues",
+              "desc": "対象を目録化・一覧化する。",
+              "examples": [
+                "収蔵品目録 ──catalogues──▶ 土器A"
+              ]
+            },
+            {
+              "id": "biblio.illustrates",
+              "label": "illustrates",
+              "desc": "対象の画像・図版・拓本等を掲載する。",
+              "examples": [
+                "図録 ──illustrates──▶ 石碑A"
+              ]
+            },
+            {
+              "id": "biblio.transcribes",
+              "label": "transcribes",
+              "desc": "対象に含まれる文字情報の翻刻を提供する。",
+              "examples": [
+                "碑文研究 ──transcribes──▶ 碑文A"
+              ]
+            },
+            {
+              "id": "biblio.translates",
+              "label": "translates",
+              "desc": "対象に含まれる文字情報の翻訳を提供する。",
+              "examples": [
+                "碑文研究 ──translates──▶ 碑文A"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "direct.authority",
+          "label": "Authority Direct Relation",
+          "resourceType": "authority",
+          "children": [
+            {
+              "id": "authority.identifies",
+              "label": "identifies",
+              "desc": "対象と典拠エンティティが実質的に同一である。",
+              "examples": [
+                "石碑画像 ──identifies──▶ Wikidata上の石碑個体",
+                "仏像3Dモデル ──identifies──▶ 博物館収蔵品URI"
+              ]
+            },
+            {
+              "id": "authority.depicts",
+              "label": "depicts",
+              "desc": "対象が典拠エンティティを視覚的に表象している。",
+              "examples": [
+                "仏像 ──depicts──▶ 阿弥陀如来",
+                "浮世絵 ──depicts──▶ 富士山",
+                "図屏風 ──depicts──▶ 大坂の陣"
+              ]
+            },
+            {
+              "id": "authority.mentions",
+              "label": "mentions",
+              "desc": "対象中に典拠エンティティへの言及が存在する。",
+              "examples": [
+                "碑文 ──mentions──▶ 聖武天皇",
+                "古文書 ──mentions──▶ 奈良",
+                "銘文 ──mentions──▶ 東大寺"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "direct.media",
+          "label": "Media Direct Relation",
+          "resourceType": "media",
+          "children": [
+            {
+              "id": "media.depicts",
+              "label": "depicts",
+              "desc": "メディアが対象そのものを表象している。",
+              "examples": [
+                "写真 ──depicts──▶ 土器A",
+                "3Dモデル ──depicts──▶ 石碑A"
+              ]
+            },
+            {
+              "id": "media.depicts_part",
+              "label": "depicts_part",
+              "desc": "メディアが対象の一部分のみを表象している。",
+              "examples": [
+                "拡大写真 ──depicts_part──▶ 碑文の文字部分",
+                "写真 ──depicts_part──▶ 土器の口縁部"
+              ]
+            },
+            {
+              "id": "media.documents",
+              "label": "documents",
+              "desc": "対象を記録するために作成されたメディア。",
+              "examples": [
+                "調査写真 ──documents──▶ 遺物A",
+                "発掘写真 ──documents──▶ 遺構B"
+              ]
+            },
+            {
+              "id": "media.measures",
+              "label": "measures",
+              "desc": "対象の計測結果を表すメディア。",
+              "examples": [
+                "SfMモデル ──measures──▶ 建築A",
+                "点群データ ──measures──▶ 仏像B"
+              ]
+            },
+            {
+              "id": "media.reproduces",
+              "label": "reproduces",
+              "desc": "対象の複製・転写・写しを提供する。",
+              "examples": [
+                "拓本 ──reproduces──▶ 石碑A",
+                "複製画像 ──reproduces──▶ 絵画B"
+              ]
+            },
+            {
+              "id": "media.illustrates",
+              "label": "illustrates",
+              "desc": "対象を図示する資料。",
+              "examples": [
+                "実測図 ──illustrates──▶ 土器A",
+                "立面図 ──illustrates──▶ 建築B"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "conceptual",
+      "label": "Conceptual Relation",
+      "description": "対象理解のための文脈的・解釈的関係",
+      "children": [
+        {
+          "id": "conceptual.bibliographic",
+          "label": "Bibliographic Conceptual Relation",
+          "resourceType": "bibliography",
+          "children": [
+            {
+              "id": "biblio.contextualizes",
+              "label": "contextualizes",
+              "desc": "文献が、対象理解のための背景情報・文脈情報を提供する。",
+              "examples": [],
+              "children": [
+                {
+                  "id": "biblio.concept_contextualization",
+                  "label": "concept_contextualization",
+                  "desc": "文献が、対象理解に関わる概念的背景を提供する。",
+                  "examples": [
+                    "「王権儀礼に関する研究」論文A ──concept_contextualization──▶ 神器A"
+                  ]
+                },
+                {
+                  "id": "biblio.period_contextualization",
+                  "label": "period_contextualization",
+                  "desc": "文献が対象理解に関わる時代的背景を提供する。",
+                  "examples": [
+                    "「奈良時代の王権と祭祀」論文A ──period_contextualization──▶ 神器A",
+                    "「平安前期彫刻史」論文B ──period_contextualization──▶ 仏像B"
+                  ]
+                },
+                {
+                  "id": "biblio.region_contextualization",
+                  "label": "region_contextualization",
+                  "desc": "文献が対象理解に関わる地域的背景を提供する。",
+                  "examples": [
+                    "「近畿地方における須恵器生産」論文A ──region_contextualization──▶ 土器A",
+                    "「東アジア碑文化の展開」論文B ──region_contextualization──▶ 石碑B"
+                  ]
+                },
+                {
+                  "id": "biblio.person_contextualization",
+                  "label": "person_contextualization",
+                  "desc": "文献が対象理解に関わる人物・集団についての背景情報を提供する。",
+                  "examples": [
+                    "「運慶研究」論文A──person_contextualization──▶仏像A",
+                    "「東大寺僧団の歴史」論文B ──person_contextualization──▶ 寺院B"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "biblio.compares_with",
+              "label": "compares_with",
+              "desc": "文献が対象との比較資料を提供する。",
+              "examples": [
+                "「東海地方出土土器との比較研究」論文A ──compares_with──▶ 土器A"
+              ]
+            },
+            {
+              "id": "biblio.provides_typology",
+              "label": "provides_typology",
+              "desc": "文献が対象理解に必要な類型学的・分類学的基盤を提供する。",
+              "examples": [
+                "「須恵器編年研究」論文A──provides_typology──▶土器A",
+                "「平安彫刻様式分類」論文B ──provides_typology──▶ 仏像B"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "conceptual.authority",
+          "label": "Authority Conceptual Relation",
+          "resourceType": "authority",
+          "children": [
+            {
+              "id": "authority.associated_with",
+              "label": "associated_with",
+              "desc": "対象が、人物・地域・時代・文化・概念などの典拠エンティティと概念的に関連する。",
+              "examples": [
+                "土器A ──associated_with──▶ 奈良時代",
+                "仏像B ──associated_with──▶ 天台宗",
+                "石碑C ──associated_with──▶ 東大寺"
+              ]
+            },
+            {
+              "id": "authority.classified_as",
+              "label": "classified_as",
+              "desc": "対象を既存の分類体系上のカテゴリへ位置付ける。",
+              "examples": [
+                "土器A ──classified_as──▶ 須恵器",
+                "石碑B ──classified_as──▶ 墓碑",
+                "仏像C ──classified_as──▶ 如来像"
+              ]
+            },
+            {
+              "id": "authority.has_type",
+              "label": "has_type",
+              "desc": "対象の種別・形態・タイプを示す。",
+              "examples": [
+                "遺物A ──has_type──▶ 壺",
+                "建築B ──has_type──▶ 五重塔",
+                "文書C ──has_type──▶ 勅書"
+              ]
+            },
+            {
+              "id": "authority.written_in_language",
+              "label": "written_in_language",
+              "desc": "対象に使用されている言語を示す。",
+              "examples": []
+            },
+            {
+              "id": "authority.uses_script",
+              "label": "uses_script",
+              "desc": "対象に使用されている文字体系を示す。",
+              "examples": []
+            },
+            {
+              "id": "authority.created_by",
+              "label": "created_by",
+              "desc": "対象の制作者・作者・建立者・発願者などを示す。",
+              "examples": []
+            },
+            {
+              "id": "authority.discovered_by",
+              "label": "discovered_by",
+              "desc": "対象の発見者・発掘者・調査主体を示す。",
+              "examples": []
+            },
+            {
+              "id": "authority.discovered_at",
+              "label": "discovered_at",
+              "desc": "対象の発見場所・出土地を示す。",
+              "examples": []
+            }
+          ]
+        },
+        {
+          "id": "conceptual.media",
+          "label": "Media Conceptual Relation",
+          "resourceType": "media",
+          "children": [
+            {
+              "id": "media.contextualizes",
+              "label": "contextualizes",
+              "desc": "対象理解のための背景情報・文脈情報を提供するメディア。",
+              "examples": [],
+              "children": [
+                {
+                  "id": "media.concept_contextualization",
+                  "label": "concept_contextualization",
+                  "desc": "対象理解に関わる概念的背景を提供するメディア。",
+                  "examples": [
+                    "書体解説図 ──concept_contextualization──▶ 碑文A",
+                    "印相解説図 ──concept_contextualization──▶ 仏像B",
+                    "王権儀礼解説図 ──concept_contextualization──▶ 王墓C"
+                  ]
+                },
+                {
+                  "id": "media.period_contextualization",
+                  "label": "period_contextualization",
+                  "desc": "対象理解のための時代的背景を提供するメディア。",
+                  "examples": [
+                    "奈良時代年表 ──period_contextualization──▶ 石碑A",
+                    "時代変遷図 ──period_contextualization──▶ 仏像B",
+                    "編年チャート ──period_contextualization──▶ 土器C"
+                  ]
+                },
+                {
+                  "id": "media.region_contextualization",
+                  "label": "region_contextualization",
+                  "desc": "対象理解のための地理的・地域的背景を提供するメディア。",
+                  "examples": [
+                    "分布図 ──region_contextualization──▶ 土器A",
+                    "広域地図 ──region_contextualization──▶ 遺跡B",
+                    "交易ルート図 ──region_contextualization──▶ 遺物C"
+                  ]
+                },
+                {
+                  "id": "media.person_contextualization",
+                  "label": "person_contextualization",
+                  "desc": "対象理解のための人物・集団に関する背景情報を提供するメディア。",
+                  "examples": [
+                    "系譜図 ──person_contextualization──▶ 仏像A",
+                    "人物関係図 ──person_contextualization──▶ 碑文B",
+                    "僧団組織図 ──person_contextualization──▶ 寺院C"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "media.compares_with",
+              "label": "compares_with",
+              "desc": "対象との比較資料として利用されるメディア。",
+              "examples": [
+                "類例土器写真 ──compares_with──▶ 土器A",
+                "他地域石碑画像 ──compares_with──▶ 石碑B",
+                "比較対象仏像3Dモデル ──compares_with──▶ 仏像C"
+              ]
+            },
+            {
+              "id": "media.illustrates_typology",
+              "label": "illustrates_typology",
+              "desc": "対象理解のための類型学的・分類学的基盤を提供するメディア。",
+              "examples": [
+                "型式分類図 ──provides_typology──▶ 土器A",
+                "様式分類図 ──provides_typology──▶ 仏像B",
+                "碑形分類図 ──provides_typology──▶ 石碑C"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

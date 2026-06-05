@@ -17,31 +17,39 @@ interface Props {
 }
 
 const DIRECT_TYPES = new Set<DirectAuthorityRelation>([
+  ':mentions', ':depicts',
   ':identifies',
   ':depicts_object', ':depicts_person', ':depicts_place', ':depicts_event',
   ':mentions_person', ':mentions_place', ':mentions_event',
 ]);
 
 const RELATION_LABELS: Record<string, string> = {
+  // Generic Direct
+  ':mentions': 'Mentions',
+  ':depicts':  'Depicts',
+  // Authority Direct
   ':identifies': 'Identifies',
   ':depicts_object': 'Depicts Object',
   ':depicts_person': 'Depicts Person',
-  ':depicts_place': 'Depicts Place',
-  ':depicts_event': 'Depicts Event',
+  ':depicts_place':  'Depicts Place',
+  ':depicts_event':  'Depicts Event',
   ':mentions_person': 'Mentions Person',
-  ':mentions_place': 'Mentions Place',
-  ':mentions_event': 'Mentions Event',
-  ':associated_with_period': 'Assoc. Period',
-  ':associated_with_region': 'Assoc. Region',
-  ':associated_with_person': 'Assoc. Person',
+  ':mentions_place':  'Mentions Place',
+  ':mentions_event':  'Mentions Event',
+  // Generic Conceptual
+  ':contextualizes':    'Contextualizes',
+  ':compares_with':     'Compares With',
+  ':related_to_concept':'Related Concept',
+  // Authority Conceptual
+  ':associated_with_period':  'Assoc. Period',
+  ':associated_with_region':  'Assoc. Region',
+  ':associated_with_person':  'Assoc. Person',
   ':associated_with_culture': 'Assoc. Culture',
-  ':compared_with': 'Compared With',
-  ':related_to_concept': 'Related Concept',
   ':classified_as': 'Classified As',
-  ':has_type': 'Has Type',
+  ':has_type':      'Has Type',
   ':written_in_language': 'Language',
-  ':uses_script': 'Script',
-  ':created_by': 'Created By',
+  ':uses_script':   'Script',
+  ':created_by':    'Created By',
   ':discovered_by': 'Discovered By',
   ':discovered_at': 'Discovered At',
 };
@@ -174,16 +182,17 @@ export default function WikidataSearchPanel({ entries, loading }: Props) {
   };
 
   const CONCEPTUAL_OPTIONS: { value: ConceptualAuthorityRelation; label: string }[] = [
-    { value: ':associated_with_period', label: 'Assoc. Period' },
-    { value: ':associated_with_region', label: 'Assoc. Region' },
-    { value: ':associated_with_person', label: 'Assoc. Person' },
-    { value: ':associated_with_culture', label: 'Assoc. Culture' },
-    { value: ':compared_with', label: 'Compared With' },
+    { value: ':contextualizes',    label: 'Contextualizes' },
+    { value: ':compares_with',     label: 'Compares With' },
     { value: ':related_to_concept', label: 'Related Concept' },
+    { value: ':associated_with_period',  label: 'Assoc. Period' },
+    { value: ':associated_with_region',  label: 'Assoc. Region' },
+    { value: ':associated_with_person',  label: 'Assoc. Person' },
+    { value: ':associated_with_culture', label: 'Assoc. Culture' },
     { value: ':classified_as', label: 'Classified As' },
-    { value: ':has_type', label: 'Has Type' },
+    { value: ':has_type',      label: 'Has Type' },
     { value: ':written_in_language', label: 'Language' },
-    { value: ':uses_script', label: 'Script' },
+    { value: ':uses_script',   label: 'Script' },
     { value: ':created_by', label: 'Created By' },
     { value: ':discovered_by', label: 'Discovered By' },
     { value: ':discovered_at', label: 'Discovered At' },

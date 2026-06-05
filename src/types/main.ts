@@ -1,6 +1,16 @@
 import type { Vector3 } from 'three';
 import type { OutputData } from '@editorjs/editorjs';
 
+// relation-hierarchy.json のノード型
+export interface RelationNode {
+  id: string;
+  label: string;
+  desc?: string;
+  examples?: string[];
+  resourceType?: 'bibliography' | 'authority' | 'media';
+  children?: RelationNode[];
+}
+
 export interface Annotation {
   id: string;
   creator: string;
@@ -31,11 +41,24 @@ export interface Annotation {
   };
 }
 
+// アノテーション間のメタ関係性
+export type AnnotationRelationType = 'supports' | 'challenges' | 'supplements';
+
+export interface AnnotationRelation {
+  annotationId: string;           // 関係先アノテーションID
+  relation: AnnotationRelationType;
+  comment?: string;               // 関係付けの補足説明
+  createdBy?: string;             // 付与者 UID
+  createdAt?: number;             // 付与日時（ms）
+}
+
 export interface NewAnnotation {
   id: string;
   creator: string;
   createdAt?: number;
-  regionId?: string;  // 領域ノードへの参照（新仕様）
+  regionId?: string;              // 領域ノードへの参照（部分領域アノテーション）
+  isObjectLevel?: boolean;        // オブジェクト全体を対象とするアノテーション
+  relatedAnnotations?: AnnotationRelation[]; // アノテーション間関係
   title: string;
   description: string;
   media: MediaItem[];
@@ -112,48 +135,87 @@ export interface MediaItem {
   caption: string;
   manifestUrl?: string;
   canvasId?: string;
-  roleType?: MediaRoleType;       // 未設定時のデフォルト: ':ObjectMedia'
-  referenceLevel?: ReferenceLevel; // 未設定時のデフォルト: ':DirectReference'
+  relationTypes?: MediaRelationType[]; // 接続の性質（CHAO §6）
+  addedBy?: string;      // E13: 付与者 UID
+  addedAt?: number;      // E13: 付与日時（ms）
+  addedComment?: string; // 付与者コメント（crm:P3_has_note）
+  // 後方互換用（旧データ読み取りのみ）
+  roleType?: MediaRoleType;
+  referenceLevel?: ReferenceLevel;
 }
+
+// Media 関係性プロパティ（JSON relation-hierarchy.json の media ノードに対応）
+export type MediaDirectRelation =
+  | ':depicts'
+  | ':depicts_part'
+  | ':documents'
+  | ':measures'
+  | ':reproduces'
+  | ':illustrates';
+
+export type MediaConceptualRelation =
+  | ':contextualizes'
+  | ':concept_contextualization'
+  | ':period_contextualization'
+  | ':region_contextualization'
+  | ':person_contextualization'
+  | ':compares_with'
+  | ':illustrates_typology';
+
+export type MediaRelationType = MediaDirectRelation | MediaConceptualRelation;
 
 export type WikidataProperty = 'crm:P67_refers_to';
 
-// Direct Authority Relations
+// Direct Authority Relations（JSON の direct.authority ノードに対応）
 export type DirectAuthorityRelation =
   // identity_relation
   | ':identifies'
-  // depiction_relation
+  // representation_relation
+  | ':depicts'
+  // reference_relation
+  | ':mentions'
+  // 後方互換用（旧データ読み取りのみ）
   | ':depicts_object'
   | ':depicts_person'
   | ':depicts_place'
   | ':depicts_event'
-  // textual_reference_relation
   | ':mentions_person'
   | ':mentions_place'
   | ':mentions_event';
 
-// Conceptual Authority Relations
+// Conceptual Authority Relations（JSON の conceptual.authority ノードに対応）
 export type ConceptualAuthorityRelation =
-  // contextual_relation
+  | ':associated_with'
+  | ':classified_as'
+  | ':has_type'
+  | ':written_in_language'
+  | ':uses_script'
+  | ':created_by'
+  | ':discovered_by'
+  | ':discovered_at'
+  // 後方互換用（旧データ読み取りのみ）
   | ':associated_with_period'
   | ':associated_with_region'
   | ':associated_with_person'
   | ':associated_with_culture'
-  // conceptual_relation
-  | ':compared_with'
-  | ':related_to_concept'
-  // classification_relation
-  | ':classified_as'
-  | ':has_type'
-  // linguistic_relation
-  | ':written_in_language'
-  | ':uses_script'
-  // event_relation
-  | ':created_by'
-  | ':discovered_by'
-  | ':discovered_at';
+  | ':contextualizes'
+  | ':compares_with'
+  | ':related_to_concept';
 
 export type AuthorityRelationType = DirectAuthorityRelation | ConceptualAuthorityRelation;
+
+// CHAO §7 Authority Entity Model — こちら側で統制するカテゴリ
+export type AuthorityEntityType =
+  | ':Person'
+  | ':Place'
+  | ':Event'
+  | ':Object'
+  | ':Period'
+  | ':Region'
+  | ':Culture'
+  | ':Language'
+  | ':Script'
+  | ':Concept';
 
 export interface WikidataItem {
   type: string; // 'wikidata' | 'geonames'
@@ -164,7 +226,11 @@ export interface WikidataItem {
   lng?: string;
   thumbnail?: string;
   property?: WikidataProperty;
+  entityType?: AuthorityEntityType;        // CHAO §7 エンティティ種別
   relationTypes?: AuthorityRelationType[]; // 接続の性質（multi-label）
+  addedBy?: string;      // E13: 付与者 UID
+  addedAt?: number;      // E13: 付与日時（ms）
+  addedComment?: string; // 付与者コメント（crm:P3_has_note）
   // 後方互換用（旧データ読み取りのみ）
   roleType?: string;
   referenceLevel?: string;
@@ -181,8 +247,8 @@ export type BibliographyProperty =
   | 'crm:P70_documents'
   | 'crm:P67_refers_to';
 
-// 書誌関係性プロパティ（接続の性質）
-// Direct Bibliographic Relation
+// 書誌関係性プロパティ（JSON の bibliography ノードに対応）
+// Direct
 export type DirectBibliographicRelation =
   | ':mentions'
   | ':describes'
@@ -193,15 +259,25 @@ export type DirectBibliographicRelation =
   | ':transcribes'
   | ':translates';
 
-// Conceptual Bibliographic Relation
+// Conceptual
 export type ConceptualBibliographicRelation =
   | ':contextualizes'
-  | ':discusses_related_concept'
+  | ':concept_contextualization'
+  | ':period_contextualization'
+  | ':region_contextualization'
+  | ':person_contextualization'
   | ':compares_with'
   | ':provides_typology'
+  // 後方互換用（旧データ読み取りのみ）
+  | ':discusses_related_concept'
   | ':relevant_to_period'
   | ':relevant_to_region'
-  | ':associated_with_person';
+  | ':relevant_to_person'
+  | ':associated_with_period'
+  | ':associated_with_region'
+  | ':associated_with_person'
+  | ':associated_with_culture'
+  | ':related_to_concept';
 
 export type BibliographicRelationType =
   | DirectBibliographicRelation
@@ -217,6 +293,9 @@ export interface BibliographyItem {
   property?: BibliographyProperty;      // 既存データの後方互換用
   roleType?: BibliographyRoleType;      // 文書タイプ（デフォルト: ':PrimarySource'）
   relationTypes?: BibliographicRelationType[]; // 接続の性質（multi-label）
+  addedBy?: string;      // E13: 付与者 UID
+  addedAt?: number;      // E13: 付与日時（ms）
+  addedComment?: string; // 付与者コメント（crm:P3_has_note）
   referenceLevel?: ReferenceLevel;      // 後方互換用（新規データはrelationTypesで表現）
   containerTitle?: string;
   volume?: string;
@@ -241,6 +320,7 @@ export interface InfoPanelContent {
   wikidata: WikidataItem[];
   bibliography: BibliographyItem[];
   location?: LocationItem;
+  relatedAnnotations?: AnnotationRelation[];
 }
 
 // 領域ノード選択時のパネル状態（アノテーション一覧モード）

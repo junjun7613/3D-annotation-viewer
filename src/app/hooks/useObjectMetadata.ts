@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { objectMetadataService } from '@/lib/services/objectMetadata';
+import { objectMetadataService, objectAnnotationService } from '@/lib/services/objectMetadata';
 import type { ObjectMetadata } from '@/types/main';
 
 interface ManifestMeta { thumbnail: string | null; label: string | null; }
@@ -50,15 +50,33 @@ export function useObjectMetadata(manifestUrl: string) {
   useEffect(() => {
     const fetchObjectMetadata = async () => {
       if (!manifestUrl) return;
+
+      // manifest_metadata から location / thumbnail / label / TEI を取得
       const metadata = await objectMetadataService.getObjectMetadata(manifestUrl);
-      setObjectMetadata(metadata);
-      if (metadata?.location) {
-        setObjectLocationLat(metadata.location.lat || '');
-        setObjectLocationLng(metadata.location.lng || '');
+
+      // objectAnnotationService から media / wikidata / bibliography を取得
+      // 複数アノテーションがある場合は最初のものを表示用として使用
+      const objAnns = await objectAnnotationService.getAll(manifestUrl);
+      const firstAnn = objAnns[0] as Record<string, unknown> | undefined;
+
+      const mergedMetadata: typeof metadata = metadata
+        ? {
+            ...metadata,
+            media:        (firstAnn?.media        as typeof metadata.media)        ?? [],
+            wikidata:     (firstAnn?.wikidata      as typeof metadata.wikidata)     ?? [],
+            bibliography: (firstAnn?.bibliography  as typeof metadata.bibliography) ?? [],
+          }
+        : null;
+
+      setObjectMetadata(mergedMetadata);
+      if (mergedMetadata?.location) {
+        setObjectLocationLat(mergedMetadata.location.lat || '');
+        setObjectLocationLng(mergedMetadata.location.lng || '');
       } else {
         setObjectLocationLat('');
         setObjectLocationLng('');
       }
+
       // thumbnail_url または manifest_label が未保存なら取得して保存
       if (metadata && (!metadata.thumbnail_url || !metadata.manifest_label)) {
         const { thumbnail, label } = await fetchManifestMeta(manifestUrl);

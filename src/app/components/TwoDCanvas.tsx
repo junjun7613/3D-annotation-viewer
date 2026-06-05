@@ -25,6 +25,7 @@ interface TwoDCanvasProps {
   onRectAnnotation?: (x: number, y: number, width: number, height: number, canvasId: string) => void;
   onPolygonAnnotation?: (points: { x: number; y: number }[], canvasId: string) => void;
   onAnnotationClick?: (id: string) => void;
+  onObjectClick?: () => void;
 }
 
 export default function TwoDCanvas({
@@ -36,6 +37,7 @@ export default function TwoDCanvas({
   onRectAnnotation,
   onPolygonAnnotation,
   onAnnotationClick,
+  onObjectClick,
 }: TwoDCanvasProps) {
   const viewerRef = useRef<OpenSeadragon.Viewer | null>(null);
   const osdContainerRef = useRef<HTMLDivElement>(null);
@@ -54,9 +56,11 @@ export default function TwoDCanvas({
   const annotationModeRef = useRef(annotationMode);
   const onRectAnnotationRef = useRef(onRectAnnotation);
   const onPolygonAnnotationRef = useRef(onPolygonAnnotation);
+  const onObjectClickRef = useRef(onObjectClick);
   useEffect(() => { annotationModeRef.current = annotationMode; }, [annotationMode]);
   useEffect(() => { onRectAnnotationRef.current = onRectAnnotation; }, [onRectAnnotation]);
   useEffect(() => { onPolygonAnnotationRef.current = onPolygonAnnotation; }, [onPolygonAnnotation]);
+  useEffect(() => { onObjectClickRef.current = onObjectClick; }, [onObjectClick]);
 
   // Reset in-progress state when mode changes
   useEffect(() => {
@@ -144,8 +148,13 @@ export default function TwoDCanvas({
     });
 
     // --- Polygon mode: click to add vertex, double-click to close ---
+    // None mode: quick click on empty area → object-level select
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     viewer.addHandler('canvas-click', (event: any) => {
+      if (annotationModeRef.current === 'none') {
+        if (event.quick) onObjectClickRef.current?.();
+        return;
+      }
       if (annotationModeRef.current !== 'polygon' || !event.quick) return;
       const norm = toNorm(viewer, event.position);
       if (!norm) return;
@@ -242,7 +251,7 @@ export default function TwoDCanvas({
           'border-radius:2px', 'cursor:pointer', 'pointer-events:all', 'box-sizing:border-box',
         ].join(';');
         el.title = anno.label;
-        el.addEventListener('click', () => onAnnotationClick?.(anno.id));
+        el.addEventListener('click', (e) => { e.stopPropagation(); onAnnotationClick?.(anno.id); });
         overlayRef.current?.appendChild(el);
 
       } else if (anno.kind === 'polygon' && anno.points && anno.points.length >= 3) {
@@ -260,7 +269,7 @@ export default function TwoDCanvas({
         poly.setAttribute('stroke-width', '2');
         poly.style.pointerEvents = 'all';
         poly.style.cursor = 'pointer';
-        poly.addEventListener('click', () => onAnnotationClick?.(anno.id));
+        poly.addEventListener('click', (e) => { e.stopPropagation(); onAnnotationClick?.(anno.id); });
         svg.appendChild(poly);
         overlayRef.current?.appendChild(svg);
       }

@@ -22,20 +22,30 @@ export async function GET(
     db.collection('manifest_metadata').doc(createSlug(manifestId)).get(),
   ]);
 
-  const annotations = annotationsSnap.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  })) as NewAnnotation[];
+  const allDocs = annotationsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
+  // isObjectLevel アノテーションと通常アノテーションを分離
+  const objectLevelDocs = allDocs.filter((d) => (d as Record<string, unknown>).isObjectLevel);
+  const annotations = allDocs.filter((d) => !(d as Record<string, unknown>).isObjectLevel) as NewAnnotation[];
+
+  // objectMetadata: manifest_metadata の location + isObjectLevel アノテーションのリソースをマージ
   let objectMetadata: ObjectMetadata | null = null;
+  const metaBase: Partial<ObjectMetadata> = {};
   if (objectMetadataDoc.exists) {
     const d = objectMetadataDoc.data()!;
+    metaBase.location = d.location;
+  }
+  if (objectLevelDocs.length > 0 || objectMetadataDoc.exists) {
+    // 全 isObjectLevel アノテーションのリソースをマージ
+    const mergedMedia = objectLevelDocs.flatMap((d) => (d as Record<string, unknown>).media as ObjectMetadata['media'] ?? []);
+    const mergedWikidata = objectLevelDocs.flatMap((d) => (d as Record<string, unknown>).wikidata as ObjectMetadata['wikidata'] ?? []);
+    const mergedBibliography = objectLevelDocs.flatMap((d) => (d as Record<string, unknown>).bibliography as ObjectMetadata['bibliography'] ?? []);
     objectMetadata = {
       manifest_url: manifestId,
-      media: d.media ?? [],
-      wikidata: d.wikidata ?? [],
-      bibliography: d.bibliography ?? [],
-      location: d.location,
+      media: mergedMedia,
+      wikidata: mergedWikidata,
+      bibliography: mergedBibliography,
+      location: metaBase.location,
     };
   }
 

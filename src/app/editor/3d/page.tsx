@@ -15,7 +15,7 @@ import { PiShareNetwork } from 'react-icons/pi';
 import { IoDocumentTextOutline } from 'react-icons/io5';
 import { LiaMapMarkedSolid } from 'react-icons/lia';
 import { useAtom } from 'jotai';
-import { infoPanelAtom, regionPanelAtom } from '@/app/atoms/infoPanelAtom';
+import { infoPanelAtom, regionPanelAtom, objectAnnotationListAtom, objectAnnotationPanelOpenAtom } from '@/app/atoms/infoPanelAtom';
 
 //import dynamic from 'next/dynamic';
 
@@ -39,11 +39,11 @@ import { OutputData } from '@editorjs/editorjs'; // OutputDataをインポート
 import db from '@/lib/firebase/firebase';
 import { deleteDoc, doc, getDoc, getDocs, updateDoc, addDoc, collection } from 'firebase/firestore';
 import { createWikidataItem } from '@/lib/services/wikidata';
-import { objectMetadataService } from '@/lib/services/objectMetadata';
+import { objectMetadataService, objectAnnotationService } from '@/lib/services/objectMetadata';
 import { buildTurtle } from '@/utils/rdf';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import type { MediaItem, WikidataItem, BibliographyItem, BibliographyProperty, BibliographyRoleType, BibliographicRelationType, AuthorityRelationType, ReferenceLevel, MediaRoleType, LocationItem, NewAnnotation } from '@/types/main';
+import type { MediaItem, WikidataItem, BibliographyItem, BibliographyProperty, BibliographyRoleType, BibliographicRelationType, AuthorityRelationType, AuthorityEntityType, MediaRelationType, ReferenceLevel, MediaRoleType, LocationItem, NewAnnotation } from '@/types/main';
 
 import type EditorJS from '@editorjs/editorjs';
 // import { link } from 'fs';
@@ -77,6 +77,8 @@ const Home: NextPage = () => {
   const { manifestUrl, handleManifestUrlChange } = useManifestUrl();
   const [infoPanelContent, setInfoPanel] = useAtom(infoPanelAtom);
   const [regionPanelContent, setRegionPanel] = useAtom(regionPanelAtom);
+  const [objectAnnotationList, setObjectAnnotationList] = useAtom(objectAnnotationListAtom);
+  const [objectAnnotationPanelOpen, setObjectAnnotationPanelOpen] = useAtom(objectAnnotationPanelOpenAtom);
   const {
     objectMetadata,
     setObjectMetadata,
@@ -122,7 +124,6 @@ const Home: NextPage = () => {
   // infoPanelContentという連想配列を作成
 
   const [, /*editorData*/ setEditorData] = useState<OutputData | undefined>();
-  const [metaTab, setMetaTab] = useState<'object' | 'annotation'>('annotation');
   const [infoTab, setInfoTab] = useState<'resources' | 'linkedData' | 'references' | 'location'>('resources');
   const [objectTab, setObjectTab] = useState<'resources' | 'linkedData' | 'references' | 'location'>('resources');
 
@@ -427,8 +428,8 @@ const Home: NextPage = () => {
     }
   };
 
-  const saveMedias = async (dialogData: { source: string; type: string; caption: string; roleType: MediaRoleType; referenceLevel: ReferenceLevel }) => {
-    const { source, type, caption, roleType, referenceLevel } = dialogData;
+  const saveMedias = async (dialogData: { source: string; type: string; caption: string; relationTypes: MediaRelationType[]; addedComment: string }) => {
+    const { source, type, caption, relationTypes, addedComment } = dialogData;
     const data: {
       id: string;
       source: string;
@@ -436,15 +437,19 @@ const Home: NextPage = () => {
       caption: string;
       manifestUrl?: string;
       canvasId?: string;
-      roleType: MediaRoleType;
-      referenceLevel: ReferenceLevel;
+      relationTypes: MediaRelationType[];
+      addedBy?: string;
+      addedAt?: number;
+      addedComment: string;
     } = {
       id: uuidv4(),
       source: source,
       type: type,
       caption: caption,
-      roleType,
-      referenceLevel,
+      relationTypes,
+      addedBy: user?.uid,
+      addedAt: Date.now(),
+      addedComment,
     };
 
     // If type is IIIF, fetch manifest and extract first canvas image
@@ -643,8 +648,9 @@ const Home: NextPage = () => {
     handleMediaUploadCloseDialog();
   };
 
-  const saveWikidata = async (dialogData: { wikiType: string; uri: string; relationTypes: AuthorityRelationType[] }) => {
-    const { wikiType, uri: wikidata, relationTypes } = dialogData;
+  const saveWikidata = async (dialogData: { wikiType: string; uri: string; entityType: AuthorityEntityType | null; relationTypes: AuthorityRelationType[]; addedComment: string }) => {
+    const { wikiType, uri: wikidata, entityType, relationTypes, addedComment } = dialogData;
+    const now = Date.now();
     let data: WikidataItem = {
       type: '',
       uri: '',
@@ -654,10 +660,14 @@ const Home: NextPage = () => {
       lng: '',
       thumbnail: '',
       property: 'crm:P67_refers_to',
+      entityType: entityType ?? undefined,
       relationTypes,
+      addedBy: user?.uid,
+      addedAt: now,
+      addedComment,
     };
     if (wikiType === 'wikidata') {
-      data = { ...await createWikidataItem(wikidata), property: 'crm:P67_refers_to', relationTypes };
+      data = { ...await createWikidataItem(wikidata), property: 'crm:P67_refers_to', entityType: entityType ?? undefined, relationTypes, addedBy: user?.uid, addedAt: now, addedComment };
     } else if (wikiType === 'geonames') {
       const id = wikidata.split('/').pop();
       const url = `http://api.geonames.org/getJSON?geonameId=${id}&username=${process.env.NEXT_PUBLIC_GEONAMES_USERNAME}`;
@@ -676,7 +686,11 @@ const Home: NextPage = () => {
         lat: lat,
         lng: lng,
         property: 'crm:P67_refers_to',
+        entityType: entityType ?? undefined,
         relationTypes,
+        addedBy: user?.uid,
+        addedAt: now,
+        addedComment,
       };
       if (wikipedia) {
         data.wikipedia = wikipedia;
@@ -806,11 +820,11 @@ const Home: NextPage = () => {
 
   const saveBib = async (dialogData: {
     author: string; title: string; year: string; page: string; pdf: string;
-    roleType: BibliographyRoleType; relationTypes: BibliographicRelationType[];
+    roleType: BibliographyRoleType; relationTypes: BibliographicRelationType[]; addedComment: string;
     containerTitle?: string; volume?: string; issue?: string; pages?: string; publisher?: string; doi?: string;
   }) => {
     const { author: bibAuthor, title: bibTitle, year: bibYear, page: bibPage, pdf: bibPDF,
-      roleType, relationTypes, containerTitle, volume, issue, pages, publisher, doi } = dialogData;
+      roleType, relationTypes, addedComment, containerTitle, volume, issue, pages, publisher, doi } = dialogData;
     const data: BibliographyItem = {
       id: uuidv4(),
       author: bibAuthor,
@@ -820,6 +834,9 @@ const Home: NextPage = () => {
       pdf: bibPDF,
       roleType,
       relationTypes,
+      addedBy: user?.uid,
+      addedAt: Date.now(),
+      addedComment,
       ...(containerTitle && { containerTitle }),
       ...(volume && { volume }),
       ...(issue && { issue }),
@@ -1010,11 +1027,11 @@ const Home: NextPage = () => {
       if (existing) {
         const updatedItem = { ...existing, ...data, id: existing.id };
         const newMedia = (objectMetadata?.media || []).map((m, i) => i === editObjectMediaIndex ? updatedItem : m);
-        await objectMetadataService.updateMedia(manifestUrl, newMedia, user.uid);
+        await objectAnnotationService.updateMedia(manifestUrl, newMedia, user.uid);
         setObjectMetadata(prev => prev ? { ...prev, media: newMedia } : null);
       }
     } else {
-      await objectMetadataService.addMedia(manifestUrl, data, user.uid);
+      await objectAnnotationService.addMedia(manifestUrl, data, user.uid);
       setObjectMetadata(prev => prev ? { ...prev, media: [...(prev?.media || []), data] } : null);
     }
 
@@ -1032,10 +1049,10 @@ const Home: NextPage = () => {
 
     if (editObjectWikiIndex !== null) {
       const newWikidata = (objectMetadata?.wikidata || []).map((w, i) => i === editObjectWikiIndex ? data : w);
-      await objectMetadataService.updateWikidata(manifestUrl, newWikidata, user.uid);
+      await objectAnnotationService.updateWikidata(manifestUrl, newWikidata, user.uid);
       setObjectMetadata(prev => prev ? { ...prev, wikidata: newWikidata } : null);
     } else {
-      await objectMetadataService.addWikidata(manifestUrl, data, user.uid);
+      await objectAnnotationService.addWikidata(manifestUrl, data, user.uid);
       setObjectMetadata(prev => prev ? { ...prev, wikidata: [...(prev?.wikidata || []), data] } : null);
     }
 
@@ -1059,7 +1076,7 @@ const Home: NextPage = () => {
         pdf: objectBibPDF,
       };
       const newBib = (objectMetadata?.bibliography || []).map((b, i) => i === editObjectBibIndex ? data : b);
-      await objectMetadataService.updateBibliography(manifestUrl, newBib, user.uid);
+      await objectAnnotationService.updateBibliography(manifestUrl, newBib, user.uid);
       setObjectMetadata(prev => prev ? { ...prev, bibliography: newBib } : null);
     } else {
       const data = {
@@ -1070,7 +1087,7 @@ const Home: NextPage = () => {
         page: objectBibPage,
         pdf: objectBibPDF,
       };
-      await objectMetadataService.addBibliography(manifestUrl, data, user.uid);
+      await objectAnnotationService.addBibliography(manifestUrl, data, user.uid);
       setObjectMetadata(prev => prev ? { ...prev, bibliography: [...(prev?.bibliography || []), data] } : null);
     }
 
@@ -1089,7 +1106,7 @@ const Home: NextPage = () => {
 
     const confirmed = confirm('Are you sure you want to delete this Wikidata item?');
     if (confirmed) {
-      await objectMetadataService.deleteWikidata(manifestUrl, index, user.uid);
+      await objectAnnotationService.deleteWikidata(manifestUrl, index, user.uid);
 
       // objectMetadataを更新
       setObjectMetadata(prev => {
@@ -1105,7 +1122,7 @@ const Home: NextPage = () => {
 
     const confirmed = confirm('Are you sure you want to delete this media item?');
     if (confirmed) {
-      await objectMetadataService.deleteMedia(manifestUrl, index, user.uid);
+      await objectAnnotationService.deleteMedia(manifestUrl, index, user.uid);
 
       // objectMetadataを更新
       setObjectMetadata(prev => {
@@ -1121,7 +1138,7 @@ const Home: NextPage = () => {
 
     const confirmed = confirm('Are you sure you want to delete this reference?');
     if (confirmed) {
-      await objectMetadataService.deleteBibliography(manifestUrl, index, user.uid);
+      await objectAnnotationService.deleteBibliography(manifestUrl, index, user.uid);
 
       // objectMetadataを更新
       setObjectMetadata(prev => {
@@ -1276,6 +1293,35 @@ const Home: NextPage = () => {
   };
   */
 
+  // オブジェクトレベルアノテーション一覧をリフレッシュ
+  const refreshObjectAnnotations = async () => {
+    if (!manifestUrl) return;
+    const anns = await objectAnnotationService.getAll(manifestUrl);
+    setObjectAnnotationList(anns.map((a) => ({
+      id: (a as Record<string, unknown>).docId as string,
+      creator: (a as Record<string, unknown>).creator as string ?? '',
+      createdAt: (a as Record<string, unknown>).createdAt as number | undefined,
+      title: ((a as Record<string, unknown>).data as Record<string, unknown>)?.body
+        ? (((a as Record<string, unknown>).data as Record<string, unknown>).body as Record<string, unknown>).label as string ?? ''
+        : '',
+      description: '',
+      media: (a as Record<string, unknown>).media as import('@/types/main').MediaItem[] ?? [],
+      wikidata: (a as Record<string, unknown>).wikidata as import('@/types/main').WikidataItem[] ?? [],
+      bibliography: (a as Record<string, unknown>).bibliography as import('@/types/main').BibliographyItem[] ?? [],
+    })));
+  };
+
+  // manifest 変更時にオブジェクトアノテーション一覧を取得
+  useEffect(() => {
+    if (manifestUrl) refreshObjectAnnotations();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [manifestUrl]);
+
+  // 領域パネル表示中はオブジェクトレベルパネルを閉じる
+  useEffect(() => {
+    if (regionPanelContent) setObjectAnnotationPanelOpen(false);
+  }, [regionPanelContent, setObjectAnnotationPanelOpen]);
+
   const saveRegionNewAnnotation = async () => {
     if (!user || !regionNewTitle.trim() || !regionPanelContent) return;
     const id = uuidv4();
@@ -1316,6 +1362,23 @@ const Home: NextPage = () => {
     setInfoPanel(created);
     setRegionNewTitle('');
     setIsRegionNewAnnotationOpen(false);
+  };
+
+  const saveAnnotationRelation = async (fromId: string, relation: import('@/types/main').AnnotationRelation) => {
+    if (!user) return;
+    const docRef = doc(db, 'test', fromId);
+    const docSnap = await getDoc(docRef);
+    if (!docSnap.exists()) return;
+    const existing = (docSnap.data().relatedAnnotations ?? []) as import('@/types/main').AnnotationRelation[];
+    const newRelation = { ...relation, createdBy: user.uid, createdAt: Date.now() };
+    await updateDoc(docRef, { relatedAnnotations: [...existing, newRelation] });
+    // regionPanelContent の一覧を更新
+    if (regionPanelContent) {
+      const updatedAnns = regionPanelContent.annotations.map((a) =>
+        a.id === fromId ? { ...a } : a
+      );
+      setRegionPanel({ ...regionPanelContent, annotations: updatedAnns });
+    }
   };
 
   const deleteAnnotation = (id: string) => {
@@ -1833,6 +1896,11 @@ const Home: NextPage = () => {
                 await objectMetadataService.updateThumbnailUrl(manifestUrl, dataUrl);
                 alert('サムネイルを保存しました。');
               }}
+              onObjectClick={() => {
+                setRegionPanel(null);
+                setInfoPanel(null);
+                setObjectAnnotationPanelOpen(true);
+              }}
             />
             {/* Annotation mode toolbar */}
             <div className="absolute top-4 left-4 z-[100] flex flex-col gap-1">
@@ -1919,12 +1987,20 @@ const Home: NextPage = () => {
                   annotations={regionPanelContent.annotations}
                   onSelect={(ann) => {
                     setRegionPanel(null);
+                    setObjectAnnotationPanelOpen(false);
                     setInfoPanel(ann);
                   }}
                   onAddNew={() => {
                     setRegionNewTitle('');
                     setIsRegionNewAnnotationOpen(true);
                   }}
+                  onAddRelation={saveAnnotationRelation}
+                  existingRelations={Object.fromEntries(
+                    regionPanelContent.annotations.map((a) => [
+                      a.id,
+                      a.relatedAnnotations ?? [],
+                    ])
+                  )}
                 />
                 {isRegionNewAnnotationOpen && (
                   <div className="mt-4 pt-4 border-t border-[var(--border)] flex flex-col gap-3">
@@ -1957,6 +2033,80 @@ const Home: NextPage = () => {
                     </div>
                   </div>
                 )}
+              </div>
+            ) : objectAnnotationPanelOpen ? (
+              /* オブジェクト全体クリック時：アノテーション一覧を全面表示 */
+              <div className="border border-[var(--border)] rounded-xl p-4 mb-3 bg-[var(--card-bg)] flex-shrink-0">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide">
+                    Object Annotations（{objectAnnotationList.length}件）
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setObjectAnnotationPanelOpen(false)}
+                    className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+                  >
+                    閉じる
+                  </button>
+                </div>
+                {objectAnnotationList.length === 0 ? (
+                  <p className="text-sm text-[var(--text-secondary)] py-2">アノテーションがありません。</p>
+                ) : (
+                  <div className="flex flex-col gap-1.5">
+                    {objectAnnotationList.map((ann) => (
+                      <button
+                        key={ann.id}
+                        onClick={() => {
+                          setObjectAnnotationPanelOpen(false);
+                          setInfoPanel(ann);
+                        }}
+                        className="w-full text-left flex flex-col gap-1 p-3 rounded-lg border border-[var(--border)] hover:border-[var(--primary)] hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors group"
+                      >
+                        <p className="text-sm font-medium text-[var(--text-primary)] group-hover:text-[var(--primary)] truncate">
+                          {ann.title || '（タイトルなし）'}
+                        </p>
+                        <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+                          <span>{ann.creator}</span>
+                          {ann.createdAt && (
+                            <>
+                              <span className="opacity-40">·</span>
+                              <span>{new Date(ann.createdAt).toLocaleDateString('ja-JP', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                            </>
+                          )}
+                        </div>
+                        <div className="flex gap-1.5 text-xs">
+                          {ann.wikidata.length > 0 && (
+                            <span className="px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                              Linked Data: {ann.wikidata.length}
+                            </span>
+                          )}
+                          {ann.bibliography.length > 0 && (
+                            <span className="px-1.5 py-0.5 rounded-full bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300">
+                              Bibliography: {ann.bibliography.length}
+                            </span>
+                          )}
+                          {ann.media.length > 0 && (
+                            <span className="px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+                              Media: {ann.media.length}
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!user || !manifestUrl) return;
+                    const { getOrCreateObjectAnnotation } = await import('@/lib/services/objectMetadata');
+                    await getOrCreateObjectAnnotation(manifestUrl, user.uid);
+                    await refreshObjectAnnotations();
+                  }}
+                  className="mt-2 w-full text-xs text-[var(--primary)] hover:opacity-80 transition-opacity text-left py-1"
+                >
+                  + 新規アノテーションを追加
+                </button>
               </div>
             ) : (
             <>
@@ -2007,417 +2157,8 @@ const Home: NextPage = () => {
             </div>
             <div className="flex-1 overflow-hidden flex flex-col">
               <div className="card flex-1 overflow-hidden flex flex-col">
-                {/* Meta-level Tab Navigation: Object/Annotation */}
 
-                <div className="flex gap-1 mb-2 border-b-2 border-[var(--border)] flex-shrink-0">
-                  <button
-                    className={`px-3 py-1.5 text-sm font-bold transition-colors ${
-                      metaTab === 'object'
-                        ? 'text-[var(--primary)] border-b-2 border-[var(--primary)] -mb-[2px]'
-                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                    }`}
-                    onClick={() => setMetaTab('object')}
-                  >
-                    Object
-                  </button>
-                  <button
-                    className={`px-3 py-1.5 text-sm font-bold transition-colors ${
-                      metaTab === 'annotation'
-                        ? 'text-[var(--primary)] border-b-2 border-[var(--primary)] -mb-[2px]'
-                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                    }`}
-                    onClick={() => setMetaTab('annotation')}
-                  >
-                    Annotation
-                  </button>
-                </div>
-
-                {/* Object Tab Content */}
-                {metaTab === 'object' && (
-                  <div className="flex-1 overflow-hidden flex flex-col">
-                    {/* Sub-level Tab Navigation: Resources/Linked Data/References/Location */}
-                    <div className="flex gap-1 mb-2 border-b border-[var(--border)] flex-shrink-0">
-                      <button
-                        className={`px-3 py-1.5 text-sm font-medium transition-colors ${
-                          objectTab === 'resources'
-                            ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]'
-                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                        }`}
-                        onClick={() => setObjectTab('resources')}
-                      >
-                        Resources
-                      </button>
-                      <button
-                        className={`px-3 py-1.5 text-sm font-medium transition-colors ${
-                          objectTab === 'linkedData'
-                            ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]'
-                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                        }`}
-                        onClick={() => setObjectTab('linkedData')}
-                      >
-                        Linked Data
-                      </button>
-                      <button
-                        className={`px-3 py-1.5 text-sm font-medium transition-colors ${
-                          objectTab === 'references'
-                            ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]'
-                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                        }`}
-                        onClick={() => setObjectTab('references')}
-                      >
-                        References
-                      </button>
-                      <button
-                        className={`px-3 py-1.5 text-sm font-medium transition-colors ${
-                          objectTab === 'location'
-                            ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]'
-                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                        }`}
-                        onClick={() => setObjectTab('location')}
-                      >
-                        Location
-                      </button>
-                    </div>
-
-                    {/* Resources Tab */}
-                    {objectTab === 'resources' && (
-                      <div className="flex-1 overflow-hidden flex flex-col min-h-0">
-                        <div className="flex justify-end gap-1.5 mb-3 flex-shrink-0">
-                          <button
-                            onClick={() => { setEditObjectMediaIndex(null); setObjectSource(''); setObjectCaption(''); setIsObjectMediaDialogOpen(true); }}
-                            className="btn-icon btn-icon-sm btn-secondary"
-                            title="Add resource"
-                          >
-                            <img src="/images/queue.png" alt="Add" className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => setIsObjectMediaUploadDialogOpen(true)}
-                            className="btn-icon btn-icon-sm btn-secondary"
-                            title="Upload CSV"
-                          >
-                            <FaUpload className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                        <div className="overflow-y-auto" style={{ height: '220px' }}>
-                          <div className="flex flex-wrap gap-3">
-                            {objectMetadata?.media && objectMetadata.media.length > 0 ? (
-                              objectMetadata.media.map((mediaItem, index) => (
-                                <div key={index} className="bg-[var(--card-bg)] border border-[var(--border)] rounded-lg overflow-hidden hover:shadow-md transition-shadow" style={{ width: 'calc(33.333% - 8px)' }}>
-                                  {/* Thumbnail */}
-                                  <div className="relative w-full h-32 bg-gray-100 cursor-pointer" onClick={() => {
-                                    if (mediaItem.type === 'img') {
-                                      setSelectedImage({
-                                        source: mediaItem.source,
-                                        caption: mediaItem.caption,
-                                        index: index,
-                                      });
-                                    } else if (mediaItem.type === 'video') {
-                                      setSelectedVideo({
-                                        source: `https://www.youtube.com/embed/${mediaItem.source.split('/')[3]}`,
-                                        caption: mediaItem.caption,
-                                        index: index,
-                                      });
-                                    } else if (mediaItem.type === 'iiif' && mediaItem.manifestUrl) {
-                                      setSelectedIIIF({
-                                        manifestUrl: mediaItem.manifestUrl,
-                                        caption: mediaItem.caption,
-                                        index: index,
-                                      });
-                                    } else if (mediaItem.type === 'sketchfab' && mediaItem.canvasId) {
-                                      setSelectedSketchFab({
-                                        modelId: mediaItem.canvasId,
-                                        caption: mediaItem.caption,
-                                        index: index,
-                                      });
-                                    }
-                                  }}>
-                                    {mediaItem.type === 'img' && (
-                                      <img src={mediaItem.source} alt={mediaItem.caption || 'Resource'} className="w-full h-full object-cover" />
-                                    )}
-                                    {mediaItem.type === 'video' && (
-                                      <img
-                                        src={`https://img.youtube.com/vi/${mediaItem.source.split('/')[3].split('?')[0]}/default.jpg`}
-                                        alt={mediaItem.caption || 'Resource'}
-                                        className="w-full h-full object-cover"
-                                      />
-                                    )}
-                                    {mediaItem.type === 'iiif' && (
-                                      <img src={mediaItem.source} alt={mediaItem.caption || 'Resource'} className="w-full h-full object-cover" />
-                                    )}
-                                    {mediaItem.type === 'sketchfab' && (
-                                      <img src={mediaItem.source} alt={mediaItem.caption || 'Resource'} className="w-full h-full object-cover" />
-                                    )}
-                                  </div>
-
-                                  {/* Caption and Type Badge */}
-                                  <div className="p-3">
-                                    <div className="flex items-start justify-between mb-2">
-                                      <div className="flex-1">
-                                        <p className="text-sm font-medium text-[var(--text-primary)] line-clamp-2">{mediaItem.caption}</p>
-                                        <span className={`inline-block px-2 py-1 text-xs font-medium rounded mt-1 ${
-                                          mediaItem.type === 'iiif' ? 'bg-purple-100 text-purple-700' :
-                                          mediaItem.type === 'video' ? 'bg-red-100 text-red-700' :
-                                          mediaItem.type === 'sketchfab' ? 'bg-green-100 text-green-700' :
-                                          'bg-blue-100 text-blue-700'
-                                        }`}>
-                                          {mediaItem.type === 'iiif' ? 'IIIF' : mediaItem.type === 'video' ? 'YouTube' : mediaItem.type === 'sketchfab' ? 'SketchFab' : 'Image'}
-                                        </span>
-                                      </div>
-                                      <div className="flex gap-1">
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            editObjectMedia(index);
-                                          }}
-                                          className="text-blue-500 hover:text-blue-700 transition-colors p-1"
-                                          title="Edit"
-                                        >
-                                          <FaPencilAlt className="w-3.5 h-3.5" />
-                                        </button>
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            deleteObjectMedia(index);
-                                          }}
-                                          className="text-red-500 hover:text-red-700 transition-colors p-1"
-                                          title="Delete"
-                                        >
-                                          <FaTrashAlt className="w-4 h-4" />
-                                        </button>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))
-                            ) : (
-                              <p className="col-span-2 text-center text-sm text-[var(--text-secondary)] mt-4">No resources available</p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Linked Data Tab */}
-                    {objectTab === 'linkedData' && (
-                      <div className="flex-1 overflow-hidden flex flex-col min-h-0">
-                        <div className="flex justify-end gap-1.5 mb-3 flex-shrink-0">
-                          <button
-                            onClick={() => { setEditObjectWikiIndex(null); setObjectIRI(''); setIsObjectWikidataDialogOpen(true); }}
-                            className="btn-icon btn-icon-sm btn-secondary"
-                            title="Add linked data"
-                          >
-                            <img src="/images/queue.png" alt="Add" className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => setIsObjectAuthorityUploadDialogOpen(true)}
-                            className="btn-icon btn-icon-sm btn-secondary"
-                            title="Upload CSV"
-                          >
-                            <FaUpload className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                        <div className="overflow-y-auto" style={{ height: '220px' }}>
-                          <div className="flex flex-wrap gap-3">
-                            {objectMetadata?.wikidata && objectMetadata.wikidata.length > 0 ? (
-                              objectMetadata.wikidata.map((wikiItem, index) => (
-                                <div key={index} className="bg-[var(--card-bg)] border border-[var(--border)] rounded-lg p-3 hover:shadow-md transition-shadow" style={{ width: 'calc(33.333% - 8px)' }}>
-                                  {/* Thumbnail Image */}
-                                  {wikiItem.thumbnail && (
-                                    <div className="mb-2 -mx-3 -mt-3">
-                                      <img
-                                        src={wikiItem.thumbnail}
-                                        alt={wikiItem.label}
-                                        className="w-full h-24 object-cover rounded-t-lg"
-                                        onError={(e) => {
-                                          (e.target as HTMLImageElement).style.display = 'none';
-                                        }}
-                                      />
-                                    </div>
-                                  )}
-                                  {/* Header with Label and Type Badge */}
-                                  <div className="flex items-start justify-between mb-2">
-                                    <div className="flex-1">
-                                      <h4 className="text-base font-semibold text-[var(--text-primary)] mb-1">
-                                        {wikiItem.label}
-                                      </h4>
-                                      <span className={`inline-block px-2 py-1 text-xs font-medium rounded ${
-                                        wikiItem.type === 'wikidata'
-                                          ? 'bg-blue-100 text-blue-700'
-                                          : 'bg-green-100 text-green-700'
-                                      }`}>
-                                        {wikiItem.type === 'wikidata' ? 'Wikidata' : 'GeoNames'}
-                                      </span>
-                                      {wikiItem.lat && wikiItem.lng && (
-                                        <span className="ml-2 text-xs text-[var(--text-secondary)]">
-                                          {Math.abs(parseFloat(wikiItem.lat)).toFixed(2)}°{parseFloat(wikiItem.lat) >= 0 ? 'N' : 'S'}, {Math.abs(parseFloat(wikiItem.lng)).toFixed(2)}°{parseFloat(wikiItem.lng) >= 0 ? 'E' : 'W'}
-                                        </span>
-                                      )}
-                                    </div>
-                                    <div className="flex gap-1">
-                                      <button
-                                        onClick={() => editObjectWikidata(index)}
-                                        className="text-blue-500 hover:text-blue-700 transition-colors p-1"
-                                        title="Edit"
-                                      >
-                                        <FaPencilAlt className="w-3.5 h-3.5" />
-                                      </button>
-                                      <button
-                                        onClick={() => deleteObjectWikidata(index)}
-                                        className="text-red-500 hover:text-red-700 transition-colors p-1"
-                                        title="Delete"
-                                      >
-                                        <FaTrashAlt className="w-4 h-4" />
-                                      </button>
-                                    </div>
-                                  </div>
-
-                                  {/* Actions */}
-                                  <div className="flex gap-2 pt-2 border-t border-gray-100">
-                                    <a
-                                      href={wikiItem.uri}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
-                                      title="View on external site"
-                                    >
-                                      <PiShareNetwork className="w-4 h-4" />
-                                      View
-                                    </a>
-                                    {wikiItem.wikipedia && (
-                                      <a
-                                        href={wikiItem.wikipedia}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
-                                        title="View on Wikipedia"
-                                      >
-                                        <IoDocumentTextOutline className="w-4 h-4" />
-                                        Wikipedia
-                                      </a>
-                                    )}
-                                    {wikiItem.lat && wikiItem.lng && (
-                                      <button
-                                        onClick={() => {
-                                          if (wikiItem.lat !== undefined && wikiItem.lng !== undefined) {
-                                            ShowMap(wikiItem.lat, wikiItem.lng);
-                                          }
-                                        }}
-                                        className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-green-600 hover:text-green-800 hover:bg-green-50 rounded transition-colors"
-                                        title="Show on map"
-                                      >
-                                        <LiaMapMarkedSolid className="w-4 h-4" />
-                                        Map
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
-                              ))
-                            ) : (
-                              <p className="col-span-2 text-center text-sm text-[var(--text-secondary)] mt-4">No linked data available</p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* References Tab */}
-                    {objectTab === 'references' && (
-                      <div className="flex-1 overflow-hidden flex flex-col min-h-0">
-                        <div className="flex justify-end gap-1.5 mb-3 flex-shrink-0">
-                          <button
-                            onClick={() => { setEditObjectBibIndex(null); setObjectBibAuthor(''); setObjectBibTitle(''); setObjectBibYear(''); setObjectBibPage(''); setObjectBibPDF(''); setIsObjectBibDialogOpen(true); }}
-                            className="btn-icon btn-icon-sm btn-secondary"
-                            title="Add reference"
-                          >
-                            <img src="/images/queue.png" alt="Add" className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => setIsObjectBibUploadDialogOpen(true)}
-                            className="btn-icon btn-icon-sm btn-secondary"
-                            title="Upload CSV"
-                          >
-                            <FaUpload className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                        <div className="overflow-y-auto" style={{ height: '220px' }}>
-                          {objectMetadata?.bibliography && objectMetadata.bibliography.length > 0 ? (
-                            objectMetadata.bibliography.map((bibItem, index) => (
-                              <div key={index} className="p-3 border-b border-[var(--border)] hover:bg-[var(--secondary-bg)] transition-colors">
-                                <div className="flex items-start justify-between">
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-[var(--text-primary)]">{bibItem.title}</p>
-                                    <p className="text-xs text-[var(--text-secondary)] mt-1">
-                                      {bibItem.author} ({bibItem.year})
-                                      {bibItem.page && `, p. ${bibItem.page}`}
-                                    </p>
-                                    {bibItem.pdf && (
-                                      <a href={bibItem.pdf} target="_blank" rel="noopener noreferrer" className="text-xs text-[var(--primary)] hover:underline mt-1 inline-block">
-                                        View PDF
-                                      </a>
-                                    )}
-                                  </div>
-                                  <div className="flex gap-1 ml-2 flex-shrink-0">
-                                    <button
-                                      onClick={() => editObjectBibliography(index)}
-                                      className="text-blue-500 hover:text-blue-700 transition-colors p-1"
-                                      title="Edit"
-                                    >
-                                      <FaPencilAlt className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button
-                                      onClick={() => deleteObjectBibliography(index)}
-                                      className="text-red-500 hover:text-red-700 transition-colors p-1"
-                                      title="Delete"
-                                    >
-                                      <FaTrashAlt className="w-3.5 h-3.5" />
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            ))
-                          ) : (
-                            <p className="text-center text-sm text-[var(--text-secondary)] mt-4">No references available</p>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Location Tab */}
-                    {objectTab === 'location' && (
-                      <div className="flex-1 overflow-hidden flex flex-col min-h-0">
-                        <div className="mb-3 flex-shrink-0">
-                          <label className="block text-sm font-medium mb-2 text-[var(--text-primary)]">Latitude</label>
-                          <input
-                            type="text"
-                            value={objectLocationLat}
-                            onChange={(e) => setObjectLocationLat(e.target.value)}
-                            placeholder="Enter latitude"
-                            className="input-field w-full"
-                          />
-                        </div>
-                        <div className="mb-3 flex-shrink-0">
-                          <label className="block text-sm font-medium mb-2 text-[var(--text-primary)]">Longitude</label>
-                          <input
-                            type="text"
-                            value={objectLocationLng}
-                            onChange={(e) => setObjectLocationLng(e.target.value)}
-                            placeholder="Enter longitude"
-                            className="input-field w-full"
-                          />
-                        </div>
-                        <div className="flex justify-end">
-                          <button onClick={saveObjectLocation} className="btn-primary">
-                            Save Location
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Annotation Tab Content */}
-                {metaTab === 'annotation' && (
-                  <div className="flex-1 overflow-hidden flex flex-col">
+                <div className="flex-1 overflow-hidden flex flex-col">
                     {/* Sub-level Tab Navigation: Resources/Linked Data/References */}
                     <div className="flex gap-1 mb-2 border-b border-[var(--border)] flex-shrink-0">
                       <button
@@ -2858,7 +2599,6 @@ const Home: NextPage = () => {
                   </div>
                 )}
                   </div>
-                )}
               </div>
               <div className="flex gap-3 mt-3 flex-shrink-0">
                 <button
@@ -2935,8 +2675,7 @@ const Home: NextPage = () => {
         initialSource={editMediaIndex !== null ? (infoPanelContent?.media[editMediaIndex]?.manifestUrl || infoPanelContent?.media[editMediaIndex]?.source || '') : ''}
         initialType={editMediaIndex !== null ? (infoPanelContent?.media[editMediaIndex]?.type || 'img') : 'img'}
         initialCaption={editMediaIndex !== null ? (infoPanelContent?.media[editMediaIndex]?.caption || '') : ''}
-        initialRoleType={editMediaIndex !== null ? (infoPanelContent?.media[editMediaIndex]?.roleType || ':ObjectMedia') : ':ObjectMedia'}
-        initialReferenceLevel={editMediaIndex !== null ? (infoPanelContent?.media[editMediaIndex]?.referenceLevel || ':DirectReference') : ':DirectReference'}
+        initialRelationTypes={editMediaIndex !== null ? (infoPanelContent?.media[editMediaIndex]?.relationTypes || []) : []}
       />
 
       {isAuthorityUploadDialogOpen && (
@@ -2967,6 +2706,7 @@ const Home: NextPage = () => {
         onSave={(data) => saveWikidata(data)}
         initialWikiType={editWikiIndex !== null ? (infoPanelContent?.wikidata[editWikiIndex]?.type || 'wikidata') : 'wikidata'}
         initialUri={editWikiIndex !== null ? (infoPanelContent?.wikidata[editWikiIndex]?.uri || '') : ''}
+        initialEntityType={editWikiIndex !== null ? (infoPanelContent?.wikidata[editWikiIndex]?.entityType ?? null) : null}
         initialRelationTypes={editWikiIndex !== null ? (infoPanelContent?.wikidata[editWikiIndex]?.relationTypes || []) : []}
       />
 

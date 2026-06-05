@@ -28,6 +28,7 @@ interface ThreeCanvasProps {
   compactMarkers?: boolean;
   focusAnnotationId?: string | null;
   onCapture?: (dataUrl: string) => void;
+  onObjectClick?: () => void; // マーカー以外をクリックしたとき（オブジェクト全体選択）
 }
 
 // regions コレクションからマーカー用データを取得する関数
@@ -63,6 +64,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   compactMarkers = false,
   focusAnnotationId = null,
   onCapture,
+  onObjectClick,
 }) => {
   //const canvasRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -98,6 +100,8 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   const tempLinesRef = useRef<THREE.Line[]>([]); // 一時的な線の表示
   const annotationModeRef = useRef<boolean>(annotationMode);
   const compactMarkersRef = useRef<boolean>(compactMarkers);
+  const onObjectClickRef = useRef<(() => void) | undefined>(onObjectClick);
+  useEffect(() => { onObjectClickRef.current = onObjectClick; }, [onObjectClick]);
 
   const [isProgressVisible, setIsProgressVisible] = useState(true);
 
@@ -430,6 +434,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
             const mouse = new THREE.Vector2();
 
             const onMouseClick = (event: MouseEvent) => {
+              if (event.target !== renderer.domElement) return;
               // マウスの位置を正規化
               const rect = renderer.domElement.getBoundingClientRect();
               mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -501,6 +506,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
                       media: a.media ?? [],
                       wikidata: a.wikidata ?? [],
                       bibliography: a.bibliography ?? [],
+                      relatedAnnotations: a.relatedAnnotations ?? [],
                     };
                   });
                   setRegionPanel({ regionId, annotations: anns });
@@ -512,10 +518,14 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
                 } else if (intersectedObject instanceof THREE.Mesh) {
                   selectedPolygonRef.current = intersectedObject;
                 }
+              } else {
+                // マーカー以外をクリック → オブジェクト全体選択
+                onObjectClickRef.current?.();
               }
             };
 
             const onMouseDblClick = (event: MouseEvent) => {
+              if (event.target !== renderer.domElement) return;
               // マウスの位置を正規化
               const rect = renderer.domElement.getBoundingClientRect();
               mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;

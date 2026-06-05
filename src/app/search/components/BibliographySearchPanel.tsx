@@ -31,24 +31,34 @@ const ROLE_LABEL: Record<string, string> = {
 };
 
 const DIRECT_RELATION_OPTIONS: { value: DirectBibliographicRelation; label: string }[] = [
-  { value: ':mentions', label: 'Mentions' },
-  { value: ':describes', label: 'Describes' },
-  { value: ':reports', label: 'Reports' },
-  { value: ':analyzes', label: 'Analyzes' },
-  { value: ':catalogues', label: 'Catalogues' },
+  // Generic Direct（Bib○）
+  { value: ':mentions',    label: 'Mentions' },
   { value: ':illustrates', label: 'Illustrates' },
+  // Bibliographic Direct
+  { value: ':describes',   label: 'Describes' },
+  { value: ':reports',     label: 'Reports' },
+  { value: ':analyzes',    label: 'Analyzes' },
+  { value: ':catalogues',  label: 'Catalogues' },
   { value: ':transcribes', label: 'Transcribes' },
-  { value: ':translates', label: 'Translates' },
+  { value: ':translates',  label: 'Translates' },
 ];
 
 const CONCEPTUAL_RELATION_OPTIONS: { value: ConceptualBibliographicRelation; label: string }[] = [
-  { value: ':contextualizes', label: 'Contextualizes' },
+  // Generic Conceptual（Bib○）
+  { value: ':contextualizes',    label: 'Contextualizes' },
+  { value: ':compares_with',     label: 'Compares With' },
+  { value: ':related_to_concept', label: 'Related to Concept' },
+  // Bibliographic Conceptual
   { value: ':discusses_related_concept', label: 'Discusses Related Concept' },
-  { value: ':compares_with', label: 'Compares With' },
-  { value: ':provides_typology', label: 'Provides Typology' },
-  { value: ':relevant_to_period', label: 'Relevant to Period' },
-  { value: ':relevant_to_region', label: 'Relevant to Region' },
-  { value: ':associated_with_person', label: 'Associated with Person' },
+  { value: ':provides_typology',         label: 'Provides Typology' },
+  // Authority Conceptual（Bib○）
+  { value: ':associated_with_period',   label: 'Assoc. Period' },
+  { value: ':associated_with_region',   label: 'Assoc. Region' },
+  { value: ':associated_with_person',   label: 'Assoc. Person' },
+  { value: ':associated_with_culture',  label: 'Assoc. Culture' },
+  // 後方互換（旧データ表示のみ）
+  { value: ':relevant_to_period', label: 'Relevant to Period (旧)' },
+  { value: ':relevant_to_region', label: 'Relevant to Region (旧)' },
 ];
 
 const RELATION_BADGE: Record<string, string> = {
