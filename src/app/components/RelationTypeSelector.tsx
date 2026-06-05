@@ -35,10 +35,9 @@ function TopGroup({ node, selected, toggle, suggested }: {
   suggested?: Set<string>;
 }) {
   const resourceGroup = node.children?.[0];
-  if (!resourceGroup) return null;
-
-  const hasActive = hasSelectedInTree(resourceGroup, selected);
+  const hasActive = resourceGroup ? hasSelectedInTree(resourceGroup, selected) : false;
   const [expanded, setExpanded] = useState(hasActive);
+  if (!resourceGroup) return null;
 
   return (
     <div className={`rounded-lg border transition-colors ${hasActive ? 'border-[var(--primary)]' : 'border-[var(--border)]'}`}>
