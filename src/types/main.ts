@@ -1,5 +1,4 @@
 import type { Vector3 } from 'three';
-import type { OutputData } from '@editorjs/editorjs';
 
 // relation-hierarchy.json のノード型
 export interface RelationNode {
@@ -74,7 +73,7 @@ export interface NewAnnotation {
   target_canvas: string;
   data: {
     body: {
-      value: OutputData;
+      value: string;     // Markdown 文字列（CommonMark）
       label: string;
       type: string;
     };
@@ -337,14 +336,20 @@ export interface Annotation3 {
   targetPosition: Vector3;
 }
 
-export interface TeiLineMapping {
-  lineNumber: string;
-  lineText: string;
-  annotationId: string | null;
+/**
+ * TEI 要素 ↔ 領域ノードの紐付け。
+ * elementId は対象要素の `xml:id`、ただし lb は xml:id を持たないことが多いため `lb#<@n>` を採用する。
+ * elementType は TEI のタグ名（例: 'lb' | 'persName' | 'placeName' | 'w' | ...）。
+ */
+export interface TeiElementMapping {
+  elementId: string;
+  elementType: string;
+  label: string;       // 表示用の短いラベル（行テキスト、要素テキスト等）
+  regionId: string | null;
 }
 
-export interface TeiLineMappingMap {
-  [lineNumber: string]: TeiLineMapping;
+export interface TeiElementMappingMap {
+  [elementId: string]: TeiElementMapping;
 }
 
 export interface ObjectMetadata {
@@ -359,5 +364,5 @@ export interface ObjectMetadata {
   updatedAt?: number;
   tei_original?: string;
   tei_sourcedoc?: string;
-  tei_line_mappings?: TeiLineMappingMap;
+  tei_element_mappings?: TeiElementMappingMap;
 }

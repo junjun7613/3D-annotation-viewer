@@ -246,12 +246,12 @@ export const objectMetadataService = {
     }
   },
 
-  // TEIデータを保存（元XML・行マッピング、オプションでsourceDoc XML）
+  // TEIデータを保存（元XML・要素マッピング、オプションでsourceDoc XML）
   saveTei: async (
     manifestUrl: string,
     teiOriginal: string,
     teiSourcedoc: string | null,
-    teiLineMappings: import('@/types/main').TeiLineMappingMap,
+    teiElementMappings: import('@/types/main').TeiElementMappingMap,
     userId: string
   ): Promise<void> => {
     const docId = encodeManifestUrl(manifestUrl);
@@ -259,7 +259,7 @@ export const objectMetadataService = {
     const docSnap = await getDoc(docRef);
     const base = {
       tei_original: teiOriginal,
-      tei_line_mappings: teiLineMappings,
+      tei_element_mappings: teiElementMappings,
       lastUpdatedBy: userId,
       updatedAt: Date.now(),
     };
@@ -279,7 +279,7 @@ export const objectMetadataService = {
     await updateDoc(docRef, {
       tei_original: deleteField(),
       tei_sourcedoc: deleteField(),
-      tei_line_mappings: deleteField(),
+      tei_element_mappings: deleteField(),
       lastUpdatedBy: userId,
       updatedAt: Date.now(),
     });

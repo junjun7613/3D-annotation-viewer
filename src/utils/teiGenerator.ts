@@ -5,9 +5,8 @@
  * <sourceDoc> スキーマに沿った TEI/EpiDoc XML を生成するユーティリティ。
  */
 
-export interface AnnotationCoords {
+export interface RegionCoords {
   id: string;
-  label: string;
   /** 3D座標 [x, y, z] (selector.value) */
   position: [number, number, number];
   /** 3D範囲 [x, y, z] (selector.area) */
@@ -16,21 +15,28 @@ export interface AnnotationCoords {
   camPos: [number, number, number];
 }
 
-export interface TeiLineMapping {
-  lineNumber: string;
-  lineText: string;
-  annotationId: string | null;
+export interface TeiElementMapping {
+  elementId: string;
+  elementType: string;
+  label: string;
+  regionId: string | null;
 }
 
-export interface TeiLineMappingMap {
-  [lineNumber: string]: TeiLineMapping;
+export interface TeiElementMappingMap {
+  [elementId: string]: TeiElementMapping;
 }
 
 export interface GenerateTeiOptions {
   originalXml: string;
-  lineMappings: TeiLineMappingMap;
-  annotationCoords: Record<string, AnnotationCoords>;
+  elementMappings: TeiElementMappingMap;
+  regionCoords: Record<string, RegionCoords>;
   modelUrl: string;
+}
+
+/** lb 要素の elementId は `lb#<@n>` 形式。@n を返す */
+function lbElementIdToN(elementId: string): string | null {
+  if (!elementId.startsWith('lb#')) return null;
+  return elementId.slice('lb#'.length);
 }
 
 function escapeXml(str: string): string {
@@ -45,11 +51,13 @@ function escapeXml(str: string): string {
 /**
  * <lb n="N"> 単位で行を分割し、各行を <zone> で包んだXML文字列を返す。
  * Option 2 (ポリゴン/点アプローチ): 座標がある行には @points を付与。
+ * elementMappings のうち elementType='lb' のものだけが zone の対象。
+ * lb 以外の要素マッピングは sourceDoc には反映されず、本文側の corresp 付与で扱う。
  */
 function buildZones(
   xmlDoc: Document,
-  lineMappings: TeiLineMappingMap,
-  annotationCoords: Record<string, AnnotationCoords>
+  elementMappings: TeiElementMappingMap,
+  regionCoords: Record<string, RegionCoords>
 ): string {
   const ab = xmlDoc.querySelector('div[type="edition"] ab');
   if (!ab) return '';
@@ -57,6 +65,14 @@ function buildZones(
   const serializer = new XMLSerializer();
   const serializeNode = (node: Node): string =>
     serializer.serializeToString(node).replace(/ xmlns(?::\w+)?="[^"]*"/g, '');
+
+  // lb の @n → mapping を引きやすくする
+  const lbMappingByN: Record<string, TeiElementMapping> = {};
+  for (const m of Object.values(elementMappings)) {
+    if (m.elementType !== 'lb') continue;
+    const n = lbElementIdToN(m.elementId);
+    if (n) lbMappingByN[n] = m;
+  }
 
   // ab の子ノードを <lb> で行単位にグループ化
   const groups: { n: string | null; nodes: Node[] }[] = [];
@@ -83,8 +99,8 @@ function buildZones(
       continue;
     }
 
-    const mapping = lineMappings[n];
-    const coords = mapping?.annotationId ? annotationCoords[mapping.annotationId] : undefined;
+    const mapping = lbMappingByN[n];
+    const coords = mapping?.regionId ? regionCoords[mapping.regionId] : undefined;
 
     let pointsAttr = '';
     let correspAttr = '';
@@ -98,7 +114,7 @@ function buildZones(
         [cx - ax, cy + ay, cz + az],
       ];
       pointsAttr = ` points="${pts.map((p) => p.map((v) => +v.toFixed(4)).join(',')).join(' ')}"`;
-      correspAttr = ` corresp="#${escapeXml(mapping.annotationId!)}"`;
+      correspAttr = ` corresp="#${escapeXml(mapping.regionId!)}"`;
     }
 
     result += `        <zone type="line" n="${escapeXml(n)}"${pointsAttr}${correspAttr}>\n`;
@@ -111,7 +127,7 @@ function buildZones(
 }
 
 export function generateSourceDocTei(options: GenerateTeiOptions): string {
-  const { originalXml, lineMappings, annotationCoords, modelUrl } = options;
+  const { originalXml, elementMappings, regionCoords, modelUrl } = options;
 
   const parser = new DOMParser();
   const xmlDoc = parser.parseFromString(originalXml, 'application/xml');
@@ -129,7 +145,7 @@ export function generateSourceDocTei(options: GenerateTeiOptions): string {
   const textEl = xmlDoc.querySelector('text');
   const textXml = textEl ? stripNs(serializer.serializeToString(textEl)) : '';
 
-  const zones = buildZones(xmlDoc, lineMappings, annotationCoords);
+  const zones = buildZones(xmlDoc, elementMappings, regionCoords);
 
   const teiEl = xmlDoc.querySelector('TEI');
   const teiAttrs = teiEl

@@ -7,6 +7,9 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three-stdlib';
 import { GLTFLoader } from 'three-stdlib';
 import { DRACOLoader } from 'three-stdlib';
+import { OBJLoader } from 'three-stdlib';
+import { FBXLoader } from 'three-stdlib';
+import { PLYLoader } from 'three-stdlib';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { gsap } from 'gsap';
@@ -27,6 +30,11 @@ interface ThreeCanvasProps {
   editable?: boolean;
   compactMarkers?: boolean;
   focusAnnotationId?: string | null;
+  focusRegionId?: string | null;
+  /** ポリゴンアノテーションの色（CSS color string） */
+  polygonColor?: string;
+  /** ポリゴンアノテーションの不透明度（0.0〜1.0） */
+  polygonOpacity?: number;
   onCapture?: (dataUrl: string) => void;
   onObjectClick?: () => void; // マーカー以外をクリックしたとき（オブジェクト全体選択）
 }
@@ -63,6 +71,9 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   editable = true,
   compactMarkers = false,
   focusAnnotationId = null,
+  focusRegionId = null,
+  polygonColor = '#ffff00',
+  polygonOpacity = 0.1,
   onCapture,
   onObjectClick,
 }) => {
@@ -82,7 +93,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   const spritesRef = useRef<THREE.Sprite[]>([]);
   const polygonsRef = useRef<THREE.Mesh[]>([]);
   const sceneRef = useRef<THREE.Scene | null>(null);
-  const modelRef = useRef<THREE.Group | null>(null); // 3Dモデルへの参照
+  const modelRef = useRef<THREE.Object3D | null>(null); // 3Dモデルへの参照
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null); // カメラへの参照
   const controlsRef = useRef<OrbitControls | null>(null); // コントロールへの参照
   const frameCountRef = useRef(0); // フレームカウンタ
@@ -100,8 +111,32 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   const tempLinesRef = useRef<THREE.Line[]>([]); // 一時的な線の表示
   const annotationModeRef = useRef<boolean>(annotationMode);
   const compactMarkersRef = useRef<boolean>(compactMarkers);
+  const polygonColorRef = useRef<string>(polygonColor);
+  const polygonOpacityRef = useRef<number>(polygonOpacity);
   const onObjectClickRef = useRef<(() => void) | undefined>(onObjectClick);
   useEffect(() => { onObjectClickRef.current = onObjectClick; }, [onObjectClick]);
+
+  // polygonColor / polygonOpacity が変わったら ref と既存ポリゴンマテリアルを更新
+  useEffect(() => {
+    polygonColorRef.current = polygonColor;
+    polygonsRef.current.forEach((p) => {
+      if (p.userData?.transient) return; // 描画中の暫定ポリゴンはスキップ
+      // 選択中（focusRegionId 等で highlight 中）のマーカーは別の useEffect が制御するためスキップ
+      if (focusRegionId && p.userData.regionId === focusRegionId) return;
+      const mat = p.material as THREE.MeshBasicMaterial;
+      mat.color.set(polygonColor);
+    });
+  }, [polygonColor, focusRegionId]);
+
+  useEffect(() => {
+    polygonOpacityRef.current = polygonOpacity;
+    polygonsRef.current.forEach((p) => {
+      if (p.userData?.transient) return;
+      if (focusRegionId && p.userData.regionId === focusRegionId) return;
+      const mat = p.material as THREE.MeshBasicMaterial;
+      mat.opacity = polygonOpacity;
+    });
+  }, [polygonOpacity, focusRegionId]);
 
   const [isProgressVisible, setIsProgressVisible] = useState(true);
 
@@ -123,6 +158,41 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
     },
     [setInfoPanel]
   );
+
+  // focusRegionId に対応するマーカーをハイライト（textual エディタ用）
+  useEffect(() => {
+    const highlightColor = '#3b82f6';
+    const dimSprite = (s: THREE.Sprite) => {
+      const mat = s.material as THREE.SpriteMaterial;
+      mat.color.set('#ffffff');
+      mat.opacity = compactMarkersRef.current ? 1.0 : 0.7;
+    };
+    const dimPolygon = (m: THREE.Mesh) => {
+      const mat = m.material as THREE.MeshBasicMaterial;
+      mat.color.set(polygonColorRef.current);
+      mat.opacity = polygonOpacityRef.current;
+    };
+    const highlightSprite = (s: THREE.Sprite) => {
+      const mat = s.material as THREE.SpriteMaterial;
+      mat.color.set(highlightColor);
+      mat.opacity = 1.0;
+    };
+    const highlightPolygon = (m: THREE.Mesh) => {
+      const mat = m.material as THREE.MeshBasicMaterial;
+      mat.color.set(highlightColor);
+      mat.opacity = 0.35;
+    };
+
+    spritesRef.current.forEach((s) => {
+      if (focusRegionId && s.userData.regionId === focusRegionId) highlightSprite(s);
+      else dimSprite(s);
+    });
+    polygonsRef.current.forEach((p) => {
+      if (p.userData?.transient) return;
+      if (focusRegionId && p.userData.regionId === focusRegionId) highlightPolygon(p);
+      else dimPolygon(p);
+    });
+  }, [focusRegionId, manifestUrl]);
 
   // focusAnnotationIdが変わったときにカメラを移動
   const focusAnnotationIdRef = useRef<string | null>(null);
@@ -297,56 +367,84 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
       }
 
       const importedModel = manifest.items[0].items[0].items[0].body.id;
-      console.log('Model URL:', importedModel);
-      //const importedModelType = manifest.items[0].items[0].items[0].body.type;
-      // Use the input manifestUrl instead of manifest.id to ensure consistency
+      const importedFormat: string | undefined = manifest.items[0].items[0].items[0].body.format;
+      console.log('Model URL:', importedModel, 'format:', importedFormat);
       targetManifest.current = manifestUrl;
       tagetCanvas.current = manifest.items[0].id;
 
-      // GLTFLoader
-      const loader = new GLTFLoader();
+      // body.format (MIME) または URL 拡張子から loader を選択
+      const detectKind = (url: string, format?: string): 'gltf' | 'obj' | 'fbx' | 'ply' => {
+        const f = (format || '').toLowerCase();
+        if (f.includes('gltf') || f.includes('glb')) return 'gltf';
+        if (f.includes('obj')) return 'obj';
+        if (f.includes('fbx')) return 'fbx';
+        if (f.includes('ply')) return 'ply';
+        const ext = url.split('?')[0].split('#')[0].split('.').pop()?.toLowerCase();
+        if (ext === 'obj') return 'obj';
+        if (ext === 'fbx') return 'fbx';
+        if (ext === 'ply') return 'ply';
+        return 'gltf';
+      };
 
-      // Try to set up DRACO loader, but make it optional
-      try {
-        const dracoLoader = new DRACOLoader();
-        dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
-        dracoLoader.preload();
-        loader.setDRACOLoader(dracoLoader);
-        console.log('DRACO loader configured');
-      } catch (error) {
-        console.warn('DRACO loader failed to initialize, continuing without it:', error);
-      }
-
-      loader.load(
-        //'/models/inscription_1.glb', // Replace with the path to your .glb file
-        importedModel,
-
-        (gltf) => {
-          console.log('Model loaded successfully:', gltf);
-          const model = gltf.scene;
-          scene.add(model);
-
-          // Store model reference for occlusion detection
-          modelRef.current = model;
-
-          // モデルのロードが完了したらprogress barを非表示にする
-          setIsProgressVisible(false);
-        },
-        (xhr) => {
-          // ロード進捗を取得
+      const onProgress = (xhr: ProgressEvent) => {
+        if (xhr.total > 0) {
           const progress = (xhr.loaded / xhr.total) * 100;
           console.log(`Loading model: ${progress.toFixed(2)}%`);
-          // 進捗バーを更新する場合
           const progressBar = document.getElementById('progress-bar');
           if (progressBar) {
             progressBar.style.width = `${progress}%`;
           }
-        },
-        (error) => {
-          console.error('An error happened loading the model:', error);
-          setIsProgressVisible(false);
         }
-      );
+      };
+
+      const onLoaded = (model: THREE.Object3D) => {
+        console.log('Model loaded successfully:', model);
+        scene.add(model);
+        modelRef.current = model;
+        setIsProgressVisible(false);
+      };
+
+      const onError = (error: unknown) => {
+        console.error('An error happened loading the model:', error);
+        setIsProgressVisible(false);
+      };
+
+      const kind = detectKind(importedModel, importedFormat);
+
+      if (kind === 'gltf') {
+        const loader = new GLTFLoader();
+        try {
+          const dracoLoader = new DRACOLoader();
+          dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+          dracoLoader.preload();
+          loader.setDRACOLoader(dracoLoader);
+          console.log('DRACO loader configured');
+        } catch (error) {
+          console.warn('DRACO loader failed to initialize, continuing without it:', error);
+        }
+        loader.load(importedModel, (gltf) => onLoaded(gltf.scene), onProgress, onError);
+      } else if (kind === 'obj') {
+        const loader = new OBJLoader();
+        loader.load(importedModel, (obj) => onLoaded(obj), onProgress, onError);
+      } else if (kind === 'fbx') {
+        const loader = new FBXLoader();
+        loader.load(importedModel, (fbx) => onLoaded(fbx), onProgress, onError);
+      } else if (kind === 'ply') {
+        const loader = new PLYLoader();
+        loader.load(
+          importedModel,
+          (geometry) => {
+            geometry.computeVertexNormals();
+            const material = geometry.hasAttribute('color')
+              ? new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide })
+              : new THREE.MeshStandardMaterial({ color: 0xcccccc, side: THREE.DoubleSide });
+            const mesh = new THREE.Mesh(geometry, material);
+            onLoaded(mesh);
+          },
+          onProgress,
+          onError
+        );
+      }
 
       // regions コレクションの変更を監視してマーカーを再生成
       const regionsQuery = query(collection(db, 'regions'));
@@ -415,7 +513,12 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
                   const indices: number[] = [];
                   for (let i = 1; i < vertices.length - 1; i++) indices.push(0, i, i + 1);
                   geometry.setIndex(indices);
-                  const material = new THREE.MeshBasicMaterial({ color: 'yellow', side: THREE.DoubleSide, transparent: true, opacity: 0.1 });
+                  const material = new THREE.MeshBasicMaterial({
+                    color: polygonColorRef.current,
+                    side: THREE.DoubleSide,
+                    transparent: true,
+                    opacity: polygonOpacityRef.current,
+                  });
                   const polygon = new THREE.Mesh(geometry, material);
                   polygon.userData = {
                     regionId: region.id,
@@ -660,6 +763,8 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
                   opacity: 0.2,
                 });
                 const polygon = new THREE.Mesh(geometry, material);
+                // 描画中の暫定ポリゴン。polygonColor/Opacity 更新の対象外として識別
+                polygon.userData = { ...(polygon.userData || {}), transient: true };
                 scene.add(polygon);
                 polygonRef.current = polygon;
                 polygonArea.current = polygon.geometry.attributes.position

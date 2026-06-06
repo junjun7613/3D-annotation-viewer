@@ -1,9 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
-import EditorJSHtml from 'editorjs-html';
 import { NewAnnotation, IIIFAnnotation, WikidataItem } from '@/types/main';
 import { toWikidataEntityUri } from '@/lib/services/wikidata';
-
-const parser = EditorJSHtml();
+import { renderMarkdown } from './markdown';
 
 export interface GeoFeature {
   '@context': string;
@@ -285,8 +283,12 @@ function convertAnnotationToIIIF(
   regionsMap?: Map<string, Record<string, unknown>>,
   seenRegionIds?: Set<string>
 ): { annotation: IIIFAnnotation; geoFeatures: GeoFeature[] } {
-  const html = parser.parse(doc.data.body.value);
-  const descriptionHtml = Array.isArray(html) ? html.join('') : String(html);
+  const markdown = typeof doc.data.body.value === 'string' ? doc.data.body.value : '';
+  const descriptionHtml = renderMarkdown(markdown, {
+    bibliography: doc.bibliography,
+    wikidata: doc.wikidata,
+    media: doc.media,
+  });
 
   const regionId = (doc as unknown as Record<string, unknown>).regionId as string | undefined;
   const regionData = regionId ? regionsMap?.get(regionId) : undefined;

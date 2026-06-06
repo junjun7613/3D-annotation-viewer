@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { auth } from '@/lib/firebase/firebase';
@@ -8,7 +8,6 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 import type { NextPage } from 'next';
 import SignIn from '@/app/components/SignIn';
 import type { Annotation2D } from '@/app/components/TwoDCanvas';
-import TEILinkViewer from '@/app/components/TEILinkViewer';
 
 const TwoDCanvas = dynamic(() => import('@/app/components/TwoDCanvas'), { ssr: false });
 import { FaPencilAlt, FaBook, FaRegFilePdf, FaTrashAlt, FaList, FaUpload } from 'react-icons/fa';
@@ -21,22 +20,10 @@ import { useAtom, useSetAtom } from 'jotai';
 import { infoPanelAtom, regionPanelAtom, objectAnnotationListAtom, objectAnnotationPanelOpenAtom } from '@/app/atoms/infoPanelAtom';
 
 
-import EditorJSHtml from 'editorjs-html';
-import Header from '@editorjs/header';
-import List from '@editorjs/list';
-//import ImageTools from '@editorjs/image';
-//import LinkTool from '@editorjs/link';
-
-// import HTMLViewer from './components/HTMLviewer';
-
 import { createSlug } from '@/utils/converter';
-
-import type { ToolConstructable } from '@editorjs/editorjs';
+import { renderMarkdown } from '@/utils/markdown';
 
 import { v4 as uuidv4 } from 'uuid';
-
-// const Editor = dynamic(() => import('./components/Editor'), { ssr: false });
-import { OutputData } from '@editorjs/editorjs'; // OutputDataをインポート
 
 import db from '@/lib/firebase/firebase';
 import { deleteDoc, doc, getDoc, getDocs, query, where, updateDoc, collection, addDoc, onSnapshot } from 'firebase/firestore';
@@ -45,14 +32,11 @@ import { objectMetadataService, objectAnnotationService } from '@/lib/services/o
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import type { MediaItem, WikidataItem, BibliographyItem, BibliographyRoleType, BibliographicRelationType, AuthorityRelationType, AuthorityEntityType, MediaRelationType, ReferenceLevel, MediaRoleType, LocationItem } from '@/types/main';
 
-import type EditorJS from '@editorjs/editorjs';
-// import { link } from 'fs';
-
 // Custom hooks
 import { useManifestUrl } from '@/app/hooks/useManifestUrl';
 import { useObjectMetadata } from '@/app/hooks/useObjectMetadata';
-import { useTeiLinking } from '@/app/hooks/useTeiLinking';
 import { useAnnotationList } from '@/app/hooks/useAnnotationList';
+import { useIIIFThumbnails } from '@/app/hooks/useIIIFThumbnails';
 
 // Dialog components
 import {
@@ -60,12 +44,12 @@ import {
   WikidataDialog,
   BibliographyDialog,
   TitleEditDialog,
+  DescriptionDialog,
   AnnotationListDialog,
 } from '@/app/components/dialogs';
 import RegionAnnotationList from '@/app/components/RegionAnnotationList';
 
 const Home: NextPage = () => {
-  const editorRef = useRef<EditorJS | null>(null);
   const [user] = useAuthState(auth);
 
   const [annotationsVisible, setAnnotationsVisible] = useState(true);
@@ -81,29 +65,7 @@ const Home: NextPage = () => {
   const {
     objectMetadata,
     setObjectMetadata,
-    savedTeiOriginal,
-    savedTeiLineMappings,
   } = useObjectMetadata(manifestUrl);
-  const {
-    teiLineMappings,
-    selectedTeiLine,
-    setSelectedTeiLine,
-    originalTeiXml,
-    setOriginalTeiXml,
-    setTeiLineMappings,
-    isGeneratingTei,
-    highlightedLineNumber,
-    handleTeiLineClick,
-    handleTeiUnlink,
-    clearTei,
-    downloadSourceDocTei,
-  } = useTeiLinking({
-    infoPanelContent,
-    manifestUrl,
-    user,
-    savedTeiOriginal,
-    savedTeiLineMappings,
-  });
   const {
     annotationList,
     isAnnotationListOpen,
@@ -113,12 +75,8 @@ const Home: NextPage = () => {
     handleAnnotationListOpen,
   } = useAnnotationList(manifestUrl);
 
-  // Compute effective selected TEI line (highlightedLineNumber takes priority)
-  const effectiveSelectedTeiLine = highlightedLineNumber ?? selectedTeiLine;
-
   // infoPanelContentという連想配列を作成
 
-  const [, /*editorData*/ setEditorData] = useState<OutputData | undefined>();
   const [infoTab, setInfoTab] = useState<'resources' | 'linkedData' | 'references' | 'location'>('resources');
 
   interface MediaItem {
@@ -241,8 +199,8 @@ const Home: NextPage = () => {
     index: number;
   } | null>(null);
 
-  // (TEI state, handlers, manifest URL useEffect, and object metadata useEffect
-  //  are now managed by useManifestUrl, useObjectMetadata, and useTeiLinking hooks)
+  // (manifest URL useEffect and object metadata useEffect are now managed by
+  //  useManifestUrl / useObjectMetadata hooks. TEI editing was moved to /editor/textual.)
 
   // 2D regions: real-time sync from Firestore（マーカーは regions コレクションをソースとする）
   useEffect(() => {
@@ -395,32 +353,20 @@ const Home: NextPage = () => {
     if (regionPanelContent) setObjectAnnotationPanelOpen(false);
   }, [regionPanelContent, setObjectAnnotationPanelOpen]);
 
-  // description editor関連
-  useEffect(() => {
-    if (infoPanelContent?.description) {
-      const parser = EditorJSHtml();
-      const html = parser.parse(infoPanelContent.description as unknown as OutputData);
+  // 現アノテーションの IIIF メディアについて manifest 経由でサムネを取得
+  const iiifThumbnails = useIIIFThumbnails(infoPanelContent?.media);
 
-      //setDesc(infoPanelContent.description);
-      setDesc(html);
-      setEditorData(infoPanelContent.description as unknown as OutputData); // descriptionをOutputData型に変換してセット
-      /*
-      setEditorData({
-        blocks: [
-          {
-            type: 'paragraph',
-            data: {
-              text: infoPanelContent.description,
-            },
-          },
-        ],
-      });
-      */
-    } else {
-      setDesc('');
-      setEditorData(undefined);
-    }
-    // locationの初期化
+  // description は Markdown 文字列で保持し、表示用に HTML 化する
+  useEffect(() => {
+    const md = typeof infoPanelContent?.description === 'string'
+      ? infoPanelContent.description
+      : '';
+    setDesc(renderMarkdown(md, {
+      bibliography: infoPanelContent?.bibliography,
+      wikidata: infoPanelContent?.wikidata,
+      media: infoPanelContent?.media,
+      iiifThumbnails,
+    }));
     if (infoPanelContent?.location) {
       setLocationLat(infoPanelContent.location.lat || '');
       setLocationLng(infoPanelContent.location.lng || '');
@@ -428,116 +374,51 @@ const Home: NextPage = () => {
       setLocationLat('');
       setLocationLng('');
     }
-  }, [infoPanelContent]);
+  }, [infoPanelContent, iiifThumbnails]);
 
-  // description editorの初期化
-  useEffect(() => {
-    if (typeof window !== 'undefined' && isDescDialogOpen) {
-      /*
-      editorRef.current = new EditorJS({
-        holder: 'editorJS',
-        tools: {
-          header: {
-            class: Header as unknown as ToolConstructable,
-            inlineToolbar: ['link'],
-          },
-          list: {
-            class: List as unknown as ToolConstructable, // Block
-            inlineToolbar: true,
-          },
-        },
-        data: infoPanelContent?.description
-          ? (infoPanelContent.description as unknown as OutputData)
-          : undefined, // デフォルト値がない場合は空の状態にする
-      });
-      */
-
-      const initEditor = async () => {
-        const EditorJS = (await import('@editorjs/editorjs')).default;
-
-        if (!editorRef.current) {
-          editorRef.current = new EditorJS({
-            holder: 'editorJS',
-            tools: {
-              header: {
-                class: Header as unknown as ToolConstructable,
-                inlineToolbar: ['link'],
-              },
-              list: {
-                class: List as unknown as ToolConstructable, // Block
-                inlineToolbar: true,
-              },
-              /*
-              linkTool: {
-                class: LinkTool,
-                config: {
-                  endpoint: '/api/fetch-link'
-                }
-              }
-              */
-            },
-            data: infoPanelContent?.description
-              ? (infoPanelContent.description as unknown as OutputData)
-              : undefined, // デフォルト値がない場合は空の状態にする
-          });
-        }
-      };
-
-      initEditor();
-
-      return () => {
-        if (editorRef.current) {
-          editorRef.current.destroy();
-          editorRef.current = null;
-        }
-      };
+  /** Description 本文（rendered HTML）内のメディアサムネクリックを処理 */
+  const handleDescriptionClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    const figure = target.closest<HTMLElement>('.md-embed-media');
+    if (!figure) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const refId = figure.dataset.refId;
+    if (!refId || !infoPanelContent?.media) return;
+    const idx = infoPanelContent.media.findIndex((m) => m.id === refId);
+    if (idx < 0) return;
+    const m = infoPanelContent.media[idx];
+    if (m.type === 'img') {
+      setSelectedImage({ source: m.source, caption: m.caption, index: idx });
+    } else if (m.type === 'video') {
+      const ytId = m.source.split('/')[3] || m.source;
+      setSelectedVideo({ source: `https://www.youtube.com/embed/${ytId}`, caption: m.caption, index: idx });
+    } else if (m.type === 'iiif' && m.manifestUrl) {
+      setSelectedIIIF({ manifestUrl: m.manifestUrl, caption: m.caption, index: idx });
+    } else if (m.type === 'sketchfab' && m.canvasId) {
+      setSelectedSketchFab({ modelId: m.canvasId, caption: m.caption, index: idx });
     }
-  }, [isDescDialogOpen, infoPanelContent?.description]);
-
-  /*
-  const handleEditorChange = (data: OutputData) => {
-    console.log(data);
-    setEditorData(data);
-    // Editor.jsのデータをdescに変換してセット
-    const updatedDesc = data.blocks.map((block) => block.data.text).join('\n');
-    console.log(updatedDesc);
-    setDesc(updatedDesc);
   };
-  */
 
-  const btnSaves = async () => {
-    if (editorRef.current) {
-      try {
-        const outputData = await editorRef.current.save();
-
-        // undefinedを削除
-        const cleanedData = JSON.parse(JSON.stringify(outputData));
-
-        const docRef = doc(db, 'test', infoPanelContent?.id || '');
-        const docSnap = await getDoc(docRef);
-
-        if (docSnap.exists()) {
-          const origData = docSnap.data();
-          // origData.data.body.valueにoutputDataをセット
-          await updateDoc(docRef, {
-            data: {
-              body: {
-                value: cleanedData,
-                label: origData.data.body.label,
-                type: origData.data.body.type,
-              },
-              target: origData.data.target,
-            },
-          });
-        } else {
-          console.warn('No such document!');
-        }
-
-        handleDescCloseDialog();
-      } catch {
-        // Saving failed
-      }
+  const saveDescription = async (markdown: string) => {
+    if (!infoPanelContent?.id) return;
+    const docRef = doc(db, 'test', infoPanelContent.id);
+    const docSnap = await getDoc(docRef);
+    if (!docSnap.exists()) {
+      console.warn('No such document!');
+      return;
     }
+    const origData = docSnap.data();
+    await updateDoc(docRef, {
+      data: {
+        body: {
+          value: markdown,
+          label: origData.data.body.label,
+          type: origData.data.body.type,
+        },
+        target: origData.data.target,
+      },
+    });
   };
 
   const base64ToCsv = (base64: string): string => {
@@ -1534,9 +1415,8 @@ const Home: NextPage = () => {
     // Annotationの処理
     querySnapshot.forEach((doc) => {
       const data = doc.data();
-      const parser = EditorJSHtml();
-      const cleanedData = JSON.parse(JSON.stringify(data.data.body.value || { blocks: [] }));
-      const html = parser.parse(cleanedData);
+      const markdown: string = typeof data.data?.body?.value === 'string' ? data.data.body.value : '';
+      const html = renderMarkdown(markdown).replace(/"/g, '\\"').replace(/\n/g, ' ');
       if (data.target_manifest === id) {
         // IIIF Manifest出力と同一のアノテーションURI
         turtleData += `\n<${annoBase}/${doc.id}> a :Annotation ;\n`;
@@ -2025,6 +1905,12 @@ const Home: NextPage = () => {
             <Link href="/about" className="text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors text-sm font-medium">
               About
             </Link>
+            <Link
+              href={`/editor/textual${manifestUrl ? `?manifest=${encodeURIComponent(manifestUrl)}` : ''}`}
+              className="text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors text-sm font-medium"
+            >
+              Textual
+            </Link>
             <div className="ml-2 border-l border-[var(--border)] pl-4">
               <SignIn />
             </div>
@@ -2275,8 +2161,8 @@ const Home: NextPage = () => {
               </div>
             ) : (
             <>
-            <div className="flex gap-3 border-b border-[var(--border)] pb-3 mb-3 flex-shrink-0" style={{ minHeight: '300px', maxHeight: '300px' }}>
-              <div className="flex-1 card">
+            <div className="border-b border-[var(--border)] pb-3 mb-3 flex-shrink-0" style={{ minHeight: '220px', maxHeight: '300px' }}>
+              <div className="card h-full">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <h3 className="text-base font-semibold m-0 text-[var(--text-primary)]">
@@ -2300,24 +2186,9 @@ const Home: NextPage = () => {
                 </div>
                 <div
                   className="description-content overflow-y-auto max-h-56 text-sm leading-relaxed text-[var(--text-secondary)]"
+                  onClick={handleDescriptionClick}
                   dangerouslySetInnerHTML={{ __html: desc || '' }}
                 ></div>
-              </div>
-              <div className="flex-1 card">
-                <TEILinkViewer
-                  manifestUrl={manifestUrl}
-                  initialXml={originalTeiXml || undefined}
-                  onTextLoad={(xml: string) => { setOriginalTeiXml(xml); setTeiLineMappings({}); setSelectedTeiLine(null); }}
-                  onLineClick={handleTeiLineClick}
-                  onUnlink={handleTeiUnlink}
-                  lineMappings={teiLineMappings}
-                  selectedLineNumber={effectiveSelectedTeiLine}
-                  highlightedLineNumber={highlightedLineNumber}
-                  canExport={!!originalTeiXml && Object.keys(teiLineMappings).length > 0}
-                  isExporting={isGeneratingTei}
-                  onExport={originalTeiXml ? downloadSourceDocTei : undefined}
-                  onClearTei={originalTeiXml ? clearTei : undefined}
-                />
               </div>
             </div>
             <div className="flex-1 overflow-hidden flex flex-col">
@@ -2924,26 +2795,16 @@ const Home: NextPage = () => {
         initialTitle={editTitle}
       />
 
-      {isDescDialogOpen && (
-        <div className="dialog-overlay" onClick={handleDescCloseDialog}>
-          <div className="dialog w-[900px] h-[500px]" onClick={(e) => e.stopPropagation()}>
-            <form className="flex flex-col gap-4 h-full">
-              <div
-                id="editorJS"
-                className="h-[350px] min-h-[350px] mb-5 overflow-y-auto border border-[var(--border)] rounded-md p-3"
-              />
-              <div className="flex justify-end gap-3 mt-auto">
-                <button type="button" onClick={btnSaves} className="btn-info">
-                  Save
-                </button>
-                <button type="button" onClick={handleDescCloseDialog} className="btn-primary">
-                  Close
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <DescriptionDialog
+        isOpen={isDescDialogOpen}
+        onClose={handleDescCloseDialog}
+        initialValue={typeof infoPanelContent?.description === 'string' ? infoPanelContent.description : ''}
+        onSave={saveDescription}
+        bibliography={infoPanelContent?.bibliography}
+        wikidata={infoPanelContent?.wikidata}
+        media={infoPanelContent?.media}
+        iiifThumbnails={iiifThumbnails}
+      />
 
       {selectedImage && (
         <div className="dialog-overlay" onClick={() => setSelectedImage(null)}>

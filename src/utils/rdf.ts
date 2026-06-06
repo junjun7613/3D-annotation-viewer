@@ -1,7 +1,5 @@
-import EditorJSHtml from 'editorjs-html';
 import type { BibliographyItem, MediaItem, WikidataItem, ObjectMetadata, NewAnnotation } from '@/types/main';
-
-const parser = EditorJSHtml();
+import { renderMarkdown, extractResourceRefs } from './markdown';
 
 const PREFIXES =
   '@prefix : <https://www.example.com/vocabulary/> .\n' +
@@ -18,6 +16,7 @@ const PREFIXES =
   '@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n' +
   '@prefix bibo: <http://purl.org/ontology/bibo/> .\n' +
   '@prefix dcterms: <http://purl.org/dc/terms/> .\n' +
+  '@prefix cito: <http://purl.org/spar/cito/> .\n' +
   '@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .\n';
 
 const VOCAB_DEFINITIONS =
@@ -366,13 +365,36 @@ export function buildTurtle(
   annotations
     .filter((ann) => ann.target_manifest === manifestId)
     .forEach((ann) => {
-      const cleanedBody = JSON.parse(JSON.stringify(ann.data?.body?.value || { blocks: [] }));
-      const html = parser.parse(cleanedBody);
+      const markdown: string = typeof ann.data?.body?.value === 'string' ? ann.data.body.value : '';
+      const html = renderMarkdown(markdown, {
+        bibliography: ann.bibliography,
+        wikidata: ann.wikidata,
+        media: ann.media,
+      }).replace(/"/g, '\\"').replace(/\r?\n/g, ' ');
 
       ttl += `\n<${annoBase}/${ann.id}> a oa:Annotation ;\n`;
       const ps: string[] = [];
       ps.push(`  rdfs:label "${ann.data?.body?.label ?? ''}"`);
       ps.push(`  schema:description "${html}"`);
+
+      // 本文中の Linked Resource 参照を CiTO で表現
+      const refs = extractResourceRefs(markdown);
+      const annBibIds = new Set((ann.bibliography ?? []).map((b) => b.id));
+      const annAuthIds = new Set((ann.wikidata ?? []).map((w) => (w as unknown as { id?: string }).id).filter((v): v is string => !!v));
+      const annAuthUris = new Set((ann.wikidata ?? []).map((w) => w.uri));
+      refs.bibIds
+        .filter((id) => annBibIds.has(id))
+        .forEach((id) => ps.push(`  cito:cites <${bibBase}/${id}>`));
+      refs.authIds
+        .filter((id) => annAuthIds.has(id) || annAuthUris.has(id))
+        .forEach((id) => {
+          // id が URI そのままなら直接使用、そうでなければ wikidata 配列から uri を引く
+          const w = (ann.wikidata ?? []).find((x) =>
+            (x as unknown as { id?: string }).id === id || x.uri === id
+          );
+          const target = w?.uri || id;
+          ps.push(`  cito:discusses <${target}>`);
+        });
 
       // regionId があれば oa:SpecificResource を経由、なければ従来通り直接参照
       const regionId = (ann as unknown as Record<string, unknown>).regionId as string | undefined;
