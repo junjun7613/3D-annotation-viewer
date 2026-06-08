@@ -32,7 +32,7 @@ import { v4 as uuidv4 } from 'uuid';
 import db from '@/lib/firebase/firebase';
 import { deleteDoc, doc, getDoc, getDocs, query, where, updateDoc, collection, addDoc, onSnapshot } from 'firebase/firestore';
 import { createWikidataItem } from '@/lib/services/wikidata';
-import { objectMetadataService, objectAnnotationService } from '@/lib/services/objectMetadata';
+import { objectAnnotationService } from '@/lib/services/objectMetadata';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import type { MediaItem, WikidataItem, BibliographyItem, BibliographyRoleType, BibliographicRelationType, AuthorityRelationType, AuthorityEntityType, MediaRelationType, ReferenceLevel, MediaRoleType, LocationItem } from '@/types/main';
 
