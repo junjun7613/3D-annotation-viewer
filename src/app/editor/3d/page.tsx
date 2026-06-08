@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { auth } from '@/lib/firebase/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
@@ -3136,4 +3136,10 @@ const Home: NextPage = () => {
   );
 };
 
-export default Home;
+const HomePage: NextPage = () => (
+  <Suspense fallback={null}>
+    <Home />
+  </Suspense>
+);
+
+export default HomePage;
