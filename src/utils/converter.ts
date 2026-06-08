@@ -494,12 +494,50 @@ function addObjectMetadataToManifest(data: any, objectMetadata: ObjectMetadata, 
   }
 }
 
+// pid 指定時、manifest トップに研究プロジェクト情報を付加する
+// metadata に Project / Visibility / Description を、seeAlso に projects/<pid> を追加。
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function addProjectInfoToManifest(data: any, project: ProjectInfo, baseUrl: string): void {
+  if (!Array.isArray(data.metadata)) data.metadata = [];
+  if (!Array.isArray(data.seeAlso)) data.seeAlso = [];
+
+  data.metadata.push({
+    label: { en: ['Research Project'], ja: ['研究プロジェクト'] },
+    value: { en: [project.name] },
+  });
+  data.metadata.push({
+    label: { en: ['Project Visibility'], ja: ['プロジェクト公開範囲'] },
+    value: { en: [project.visibility] },
+  });
+  if (project.description) {
+    data.metadata.push({
+      label: { en: ['Project Description'], ja: ['プロジェクト概要'] },
+      value: { en: [project.description] },
+    });
+  }
+
+  data.seeAlso.push({
+    id: `${baseUrl}/projects/${project.id}`,
+    type: 'Dataset',
+    label: { en: [`Research Project: ${project.name}`] },
+    format: 'text/html',
+  });
+}
+
+export interface ProjectInfo {
+  id: string;
+  name: string;
+  description?: string;
+  visibility: string;
+}
+
 export const downloadIIIFManifest = async (
   manifestUrl: string,
   firebaseDocuments: NewAnnotation[],
   baseUrl: string,
   objectMetadata?: ObjectMetadata | null,
-  regionsMap?: Map<string, Record<string, unknown>>
+  regionsMap?: Map<string, Record<string, unknown>>,
+  project?: ProjectInfo | null
 ) => {
   const newUrl = manifestUrl.split('/').slice(0, -1).join('/');
 
@@ -510,12 +548,28 @@ export const downloadIIIFManifest = async (
       ? data.label
       : data.label?.ja?.[0] || data.label?.en?.[0] || data.label?.none?.[0] || 'Manifest';
 
+  // IIIF Presentation v2 互換: items が無ければ sequences[0].canvases を items とみなして
+  // 同じ配列参照を共有させ、以降の v3 前提コード（data.items[0].annotations 等）が動くようにする。
+  if (!Array.isArray(data.items) || data.items.length === 0) {
+    const v2Canvases = data?.sequences?.[0]?.canvases;
+    if (Array.isArray(v2Canvases) && v2Canvases.length > 0) {
+      data.items = v2Canvases;
+    } else {
+      throw new Error(
+        `IIIF manifest has no items / sequences[0].canvases — unsupported shape: ${manifestUrl}`
+      );
+    }
+  }
+
   // アノテーションとGeo featuresを変換
   const annotations: IIIFAnnotation[] = [];
   const allGeoFeatures: GeoFeature[] = [];
   const seenRegionIds = new Set<string>();
 
   firebaseDocuments.forEach((doc) => {
+    // Object Annotation は領域セレクタを持たないため IIIF 領域アノテとしては出力しない。
+    // Object 全体のメタデータは別途 addObjectMetadataToManifest 経由で manifest 直下に載る。
+    if ((doc as unknown as { isObjectLevel?: boolean }).isObjectLevel === true) return;
     const { annotation, geoFeatures } = convertAnnotationToIIIF(
       doc,
       newUrl,
@@ -569,6 +623,11 @@ export const downloadIIIFManifest = async (
   // Objectメタデータを追加
   if (objectMetadata) {
     addObjectMetadataToManifest(data, objectMetadata, baseUrl, manifestLabel);
+  }
+
+  // 研究プロジェクト情報を追加（pid 指定時のみ）
+  if (project) {
+    addProjectInfoToManifest(data, project, baseUrl);
   }
 
   // RDF APIへのseeAlsoをトップレベルに追加

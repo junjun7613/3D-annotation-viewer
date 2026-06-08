@@ -27,6 +27,10 @@ interface ThreeCanvasProps {
   annotationsVisible: boolean;
   annotationMode: boolean;
   manifestUrl: string;
+  /** 現在の研究プロジェクト ID。null/undefined のときアノテーション作成は無効 */
+  researchProjectId?: string | null;
+  /** true: 領域マーカークリック時に他プロジェクトのアノテも含めて一覧表示する（read-only） */
+  showAllProjects?: boolean;
   editable?: boolean;
   compactMarkers?: boolean;
   focusAnnotationId?: string | null;
@@ -68,6 +72,8 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   annotationsVisible,
   annotationMode,
   manifestUrl,
+  researchProjectId = null,
+  showAllProjects = false,
   editable = true,
   compactMarkers = false,
   focusAnnotationId = null,
@@ -115,6 +121,10 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   const polygonOpacityRef = useRef<number>(polygonOpacity);
   const onObjectClickRef = useRef<(() => void) | undefined>(onObjectClick);
   useEffect(() => { onObjectClickRef.current = onObjectClick; }, [onObjectClick]);
+  const researchProjectIdRef = useRef<string | null>(researchProjectId);
+  useEffect(() => { researchProjectIdRef.current = researchProjectId; }, [researchProjectId]);
+  const showAllProjectsRef = useRef<boolean>(showAllProjects);
+  useEffect(() => { showAllProjectsRef.current = showAllProjects; }, [showAllProjects]);
 
   // polygonColor / polygonOpacity が変わったら ref と既存ポリゴンマテリアルを更新
   useEffect(() => {
@@ -447,6 +457,10 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
       }
 
       // regions コレクションの変更を監視してマーカーを再生成
+      //
+      // 領域ノードはプロジェクト横断の公開資産なので、target_manifest が一致する全領域を
+      // マーカー化する。クリック時のアノテーション一覧は現プロジェクトのものに絞る
+      // （onMouseClick 内の where('researchProjectId','==',pid) フィルタ参照）。
       const regionsQuery = query(collection(db, 'regions'));
       const unsubscribe = onSnapshot(regionsQuery, () => {
         getRegions()
@@ -595,8 +609,17 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
                 const regionId = intersectedObject.userData.regionId as string | undefined;
                 if (!regionId) return;
 
-                // regionId に紐づく全アノテーションを取得して regionPanelAtom にセット
-                const q2 = query(collection(db, 'test'), where('regionId', '==', regionId));
+                // regionId に紐づくアノテーションを取得。
+                // showAllProjects = true のときは projectId フィルタを掛けず全件取る（read-only 用途）。
+                const pid = researchProjectIdRef.current;
+                const showAll = showAllProjectsRef.current;
+                const q2 = (!showAll && pid)
+                  ? query(
+                      collection(db, 'test'),
+                      where('regionId', '==', regionId),
+                      where('researchProjectId', '==', pid)
+                    )
+                  : query(collection(db, 'test'), where('regionId', '==', regionId));
                 getDocs(q2).then((snap) => {
                   const anns = snap.docs.map((d) => {
                     const a = d.data();
@@ -604,6 +627,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
                       id: d.id,
                       creator: a.creator ?? '',
                       createdAt: a.createdAt ?? undefined,
+                      researchProjectId: a.researchProjectId ?? undefined,
                       title: a.data?.body?.label ?? '',
                       description: a.data?.body?.value ?? '',
                       media: a.media ?? [],
@@ -1011,6 +1035,12 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
           camPos: [camPos.current?.x, camPos.current?.y, camPos.current?.z],
         };
 
+    const pid = researchProjectIdRef.current;
+    if (!pid) {
+      alert('プロジェクトが選択されていません。ホームから開き直してください。');
+      return;
+    }
+
     // 1. 領域ノードを regions コレクションに保存
     const regionDoc = await addDoc(collection(db, 'regions'), {
       creator: user.uid,
@@ -1020,9 +1050,11 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
       selector,
     });
 
-    // 2. アノテーションを regions の regionId を付与して保存
+    // 2. アノテーションを regionId と researchProjectId を付与して保存
     const annotationData = {
+      id,
       regionId: regionDoc.id,
+      researchProjectId: pid,
       target_manifest: targetManifest.current,
       target_canvas: tagetCanvas.current,
       creator: user.uid,
@@ -1031,15 +1063,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
       wikidata: [],
       bibliography: [],
       data: {
-        body: {
-          label: title,
-          value: {
-            blocks: [{ type: 'paragraph', id, data: { text: '' } }],
-            time: '',
-            version: '',
-          },
-          type: 'TextualBody',
-        },
+        body: { label: title, value: '', type: 'TextualBody' },
         target: { selector },
       },
     };

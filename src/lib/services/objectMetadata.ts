@@ -290,25 +290,33 @@ export const objectMetadataService = {
 // オブジェクトレベルアノテーション（test コレクション）
 // ======================================================
 
-/** 指定 manifest の isObjectLevel アノテーションを取得。なければ作成して返す */
+/**
+ * 指定 manifest × プロジェクトの Object Annotation を取得。なければ作成して返す。
+ *
+ * Phase 2 以降は **プロジェクトごとに独立**な Object Annotation を持つため、
+ * (target_manifest, isObjectLevel, researchProjectId) の 3 つで一意となる。
+ * 同一 manifest でも pid が異なれば別ドキュメント。
+ */
 export async function getOrCreateObjectAnnotation(
   manifestUrl: string,
-  userId: string
+  userId: string,
+  researchProjectId: string
 ): Promise<{ id: string }> {
   const q = query(
     collection(db, 'test'),
     where('target_manifest', '==', manifestUrl),
-    where('isObjectLevel', '==', true)
+    where('isObjectLevel', '==', true),
+    where('researchProjectId', '==', researchProjectId)
   );
   const snap = await getDocs(q);
   if (!snap.empty) {
     return { id: snap.docs[0].id };
   }
-  // 存在しなければ新規作成
   const id = uuidv4();
   await addDoc(collection(db, 'test'), {
     id,
     isObjectLevel: true,
+    researchProjectId,
     target_manifest: manifestUrl,
     target_canvas: '',
     creator: userId,
@@ -317,11 +325,10 @@ export async function getOrCreateObjectAnnotation(
     wikidata: [],
     bibliography: [],
     data: {
-      body: { label: '', value: { blocks: [], time: '', version: '' }, type: 'TextualBody' },
+      body: { label: '', value: '', type: 'TextualBody' },
       target: { selector: { type: '', value: [0, 0, 0], area: [], camPos: [0, 0, 0] } },
     },
   });
-  // 作成したドキュメントを取得して id を返す
   const snap2 = await getDocs(q);
   return { id: snap2.docs[0].id };
 }
@@ -330,10 +337,11 @@ export async function getOrCreateObjectAnnotation(
 async function updateObjectAnnotationField(
   manifestUrl: string,
   userId: string,
+  researchProjectId: string,
   field: 'media' | 'wikidata' | 'bibliography',
   updater: (current: unknown[]) => unknown[]
 ): Promise<void> {
-  const { id } = await getOrCreateObjectAnnotation(manifestUrl, userId);
+  const { id } = await getOrCreateObjectAnnotation(manifestUrl, userId, researchProjectId);
   const docRef = doc(db, 'test', id);
   const docSnap = await getDoc(docRef);
   if (!docSnap.exists()) return;
@@ -342,49 +350,65 @@ async function updateObjectAnnotationField(
 }
 
 export const objectAnnotationService = {
-  getAll: async (manifestUrl: string) => {
-    const q = query(
-      collection(db, 'test'),
-      where('target_manifest', '==', manifestUrl),
-      where('isObjectLevel', '==', true)
-    );
+  /**
+   * Object Annotation を取得。
+   * showAllProjects = true のときは researchProjectId 一致を無視して、当該 manifest の
+   * 全プロジェクトの Object Annotation を返す（read-only 用途）。
+   */
+  getAll: async (
+    manifestUrl: string,
+    researchProjectId: string,
+    showAllProjects: boolean = false,
+  ) => {
+    const q = showAllProjects
+      ? query(
+          collection(db, 'test'),
+          where('target_manifest', '==', manifestUrl),
+          where('isObjectLevel', '==', true)
+        )
+      : query(
+          collection(db, 'test'),
+          where('target_manifest', '==', manifestUrl),
+          where('isObjectLevel', '==', true),
+          where('researchProjectId', '==', researchProjectId)
+        );
     const snap = await getDocs(q);
     return snap.docs.map(d => ({ ...(d.data() as Record<string, unknown>), docId: d.id }));
   },
 
-  addMedia: async (manifestUrl: string, item: MediaItem, userId: string) => {
-    await updateObjectAnnotationField(manifestUrl, userId, 'media', cur => [...cur, item]);
+  addMedia: async (manifestUrl: string, item: MediaItem, userId: string, researchProjectId: string) => {
+    await updateObjectAnnotationField(manifestUrl, userId, researchProjectId, 'media', cur => [...cur, item]);
   },
-  updateMedia: async (manifestUrl: string, media: MediaItem[], userId: string) => {
-    const { id } = await getOrCreateObjectAnnotation(manifestUrl, userId);
+  updateMedia: async (manifestUrl: string, media: MediaItem[], userId: string, researchProjectId: string) => {
+    const { id } = await getOrCreateObjectAnnotation(manifestUrl, userId, researchProjectId);
     await updateDoc(doc(db, 'test', id), { media });
   },
-  deleteMedia: async (manifestUrl: string, index: number, userId: string) => {
-    await updateObjectAnnotationField(manifestUrl, userId, 'media',
+  deleteMedia: async (manifestUrl: string, index: number, userId: string, researchProjectId: string) => {
+    await updateObjectAnnotationField(manifestUrl, userId, researchProjectId, 'media',
       cur => (cur as MediaItem[]).filter((_, i) => i !== index));
   },
 
-  addWikidata: async (manifestUrl: string, item: WikidataItem, userId: string) => {
-    await updateObjectAnnotationField(manifestUrl, userId, 'wikidata', cur => [...cur, item]);
+  addWikidata: async (manifestUrl: string, item: WikidataItem, userId: string, researchProjectId: string) => {
+    await updateObjectAnnotationField(manifestUrl, userId, researchProjectId, 'wikidata', cur => [...cur, item]);
   },
-  updateWikidata: async (manifestUrl: string, wikidata: WikidataItem[], userId: string) => {
-    const { id } = await getOrCreateObjectAnnotation(manifestUrl, userId);
+  updateWikidata: async (manifestUrl: string, wikidata: WikidataItem[], userId: string, researchProjectId: string) => {
+    const { id } = await getOrCreateObjectAnnotation(manifestUrl, userId, researchProjectId);
     await updateDoc(doc(db, 'test', id), { wikidata });
   },
-  deleteWikidata: async (manifestUrl: string, index: number, userId: string) => {
-    await updateObjectAnnotationField(manifestUrl, userId, 'wikidata',
+  deleteWikidata: async (manifestUrl: string, index: number, userId: string, researchProjectId: string) => {
+    await updateObjectAnnotationField(manifestUrl, userId, researchProjectId, 'wikidata',
       cur => (cur as WikidataItem[]).filter((_, i) => i !== index));
   },
 
-  addBibliography: async (manifestUrl: string, item: BibliographyItem, userId: string) => {
-    await updateObjectAnnotationField(manifestUrl, userId, 'bibliography', cur => [...cur, item]);
+  addBibliography: async (manifestUrl: string, item: BibliographyItem, userId: string, researchProjectId: string) => {
+    await updateObjectAnnotationField(manifestUrl, userId, researchProjectId, 'bibliography', cur => [...cur, item]);
   },
-  updateBibliography: async (manifestUrl: string, bibliography: BibliographyItem[], userId: string) => {
-    const { id } = await getOrCreateObjectAnnotation(manifestUrl, userId);
+  updateBibliography: async (manifestUrl: string, bibliography: BibliographyItem[], userId: string, researchProjectId: string) => {
+    const { id } = await getOrCreateObjectAnnotation(manifestUrl, userId, researchProjectId);
     await updateDoc(doc(db, 'test', id), { bibliography });
   },
-  deleteBibliography: async (manifestUrl: string, index: number, userId: string) => {
-    await updateObjectAnnotationField(manifestUrl, userId, 'bibliography',
+  deleteBibliography: async (manifestUrl: string, index: number, userId: string, researchProjectId: string) => {
+    await updateObjectAnnotationField(manifestUrl, userId, researchProjectId, 'bibliography',
       cur => (cur as BibliographyItem[]).filter((_, i) => i !== index));
   },
 };

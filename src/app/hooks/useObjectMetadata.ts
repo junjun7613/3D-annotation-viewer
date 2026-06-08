@@ -36,8 +36,10 @@ async function fetchManifestMeta(manifestUrl: string): Promise<ManifestMeta> {
 
 /**
  * Fetches and manages object metadata from Firestore when the manifest URL changes.
+ *
+ * @param researchProjectId 現プロジェクト ID。null の場合は Object Annotation のマージをスキップする。
  */
-export function useObjectMetadata(manifestUrl: string) {
+export function useObjectMetadata(manifestUrl: string, researchProjectId: string | null) {
   const [objectMetadata, setObjectMetadata] = useState<ObjectMetadata | null>(null);
   const [objectLocationLat, setObjectLocationLat] = useState('');
   const [objectLocationLng, setObjectLocationLng] = useState('');
@@ -50,8 +52,10 @@ export function useObjectMetadata(manifestUrl: string) {
       const metadata = await objectMetadataService.getObjectMetadata(manifestUrl);
 
       // objectAnnotationService から media / wikidata / bibliography を取得
-      // 複数アノテーションがある場合は最初のものを表示用として使用
-      const objAnns = await objectAnnotationService.getAll(manifestUrl);
+      // 現プロジェクトのアノテーションのみを対象にする
+      const objAnns = researchProjectId
+        ? await objectAnnotationService.getAll(manifestUrl, researchProjectId)
+        : [];
       const firstAnn = objAnns[0] as Record<string, unknown> | undefined;
 
       const mergedMetadata: typeof metadata = metadata
@@ -86,7 +90,7 @@ export function useObjectMetadata(manifestUrl: string) {
       }
     };
     fetchObjectMetadata();
-  }, [manifestUrl]);
+  }, [manifestUrl, researchProjectId]);
 
   return {
     objectMetadata,

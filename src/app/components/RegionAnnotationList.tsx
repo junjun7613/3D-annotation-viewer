@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { FaPlus, FaLink } from 'react-icons/fa';
 import type { InfoPanelContent, AnnotationRelationType, AnnotationRelation } from '@/types/main';
+import ForeignProjectBadge from '@/app/components/ForeignProjectBadge';
 
 const RELATION_OPTIONS: { value: AnnotationRelationType; label: string; color: string }[] = [
   { value: 'supports',    label: '支持',  color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' },
@@ -17,10 +18,12 @@ interface Props {
   onAddNew: () => void;
   onAddRelation?: (fromId: string, relation: AnnotationRelation) => void;
   existingRelations?: Record<string, AnnotationRelation[]>; // annotationId → relations
+  /** 現プロジェクト ID。これと異なる researchProjectId を持つアノテはバッジ + read-only として扱う */
+  currentProjectId?: string | null;
 }
 
 export default function RegionAnnotationList({
-  regionId, annotations, onSelect, onAddNew, onAddRelation, existingRelations = {},
+  regionId, annotations, onSelect, onAddNew, onAddRelation, existingRelations = {}, currentProjectId = null,
 }: Props) {
   const [relatingFrom, setRelatingFrom] = useState<string | null>(null);
   const [selectedRelation, setSelectedRelation] = useState<AnnotationRelationType>('supports');
@@ -59,6 +62,7 @@ export default function RegionAnnotationList({
         <div className="p-3 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-900/10 flex flex-col gap-2">
           <p className="text-xs font-semibold text-amber-700 dark:text-amber-300">
             「{annotations.find(a => a.id === relatingFrom)?.title || '（タイトルなし）'}」から関係を付与する先を選択してください
+            <span className="ml-1 font-normal opacity-70">（他プロジェクトのアノテも選択可・参照のみ記録されます）</span>
           </p>
           <div className="flex gap-2">
             {RELATION_OPTIONS.map((opt) => (
@@ -98,7 +102,13 @@ export default function RegionAnnotationList({
           <p className="text-sm text-[var(--text-secondary)] py-2">アノテーションがありません。</p>
         )}
         {annotations.map((ann) => {
+          const isForeign =
+            currentProjectId !== null &&
+            ann.researchProjectId !== undefined &&
+            ann.researchProjectId !== currentProjectId;
           const isSource = relatingFrom === ann.id;
+          // 方針 A (片方向 cross-project): from が自プロジェクトの relation であれば、
+          // to は他プロジェクトでも可（書き込みは from 側のみ、rules はそれを許容）。
           const isTarget = relatingFrom !== null && relatingFrom !== ann.id;
           const relations = existingRelations[ann.id] ?? [];
 
@@ -113,15 +123,22 @@ export default function RegionAnnotationList({
                       ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/10'
                       : isTarget
                       ? 'border-[var(--primary)] bg-blue-50 dark:bg-blue-900/10 cursor-pointer'
+                      : isForeign
+                      ? 'border-[var(--border)] bg-[var(--secondary-bg)]/40 hover:border-[var(--primary)]'
                       : 'border-[var(--border)] hover:border-[var(--primary)] hover:bg-blue-50 dark:hover:bg-blue-900/10'
                   }`}
                 >
-                  <p className={`text-sm font-medium truncate ${
-                    isTarget ? 'text-[var(--primary)]' : 'text-[var(--text-primary)] group-hover:text-[var(--primary)]'
-                  }`}>
-                    {isTarget && <span className="mr-1">→</span>}
-                    {ann.title || '（タイトルなし）'}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className={`text-sm font-medium truncate flex-1 ${
+                      isTarget ? 'text-[var(--primary)]' : 'text-[var(--text-primary)] group-hover:text-[var(--primary)]'
+                    }`}>
+                      {isTarget && <span className="mr-1">→</span>}
+                      {ann.title || '（タイトルなし）'}
+                    </p>
+                    {isForeign && ann.researchProjectId && (
+                      <ForeignProjectBadge projectId={ann.researchProjectId} />
+                    )}
+                  </div>
                   <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
                     <span>{ann.creator}</span>
                     {ann.createdAt && (
@@ -150,8 +167,8 @@ export default function RegionAnnotationList({
                   </div>
                 </button>
 
-                {/* 関係付けボタン（他アノテーションが存在する場合のみ） */}
-                {onAddRelation && annotations.length > 1 && !relatingFrom && (
+                {/* 関係付けボタン（他アノテーションが存在する場合のみ・自プロジェクトのみ） */}
+                {onAddRelation && annotations.length > 1 && !relatingFrom && !isForeign && (
                   <button
                     type="button"
                     onClick={() => { setRelatingFrom(ann.id); setSelectedRelation('supports'); }}
@@ -171,6 +188,11 @@ export default function RegionAnnotationList({
                     const opt = RELATION_OPTIONS.find(o => o.value === rel.relation);
                     const key = `${ann.id}-${i}`;
                     const isExpanded = expandedRelation === key;
+                    const targetIsForeign =
+                      !!target &&
+                      currentProjectId !== null &&
+                      target.researchProjectId !== undefined &&
+                      target.researchProjectId !== currentProjectId;
                     return (
                       <div key={i} className="flex flex-col gap-0.5">
                         <div className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
@@ -184,6 +206,9 @@ export default function RegionAnnotationList({
                           </button>
                           <span>→</span>
                           <span className="truncate">{target?.title || rel.annotationId}</span>
+                          {targetIsForeign && target?.researchProjectId && (
+                            <ForeignProjectBadge projectId={target.researchProjectId} />
+                          )}
                           {rel.comment && (
                             <span className="opacity-40 text-xs">{isExpanded ? '▲' : '▼'}</span>
                           )}

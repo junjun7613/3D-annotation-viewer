@@ -43,6 +43,7 @@ next-env.d.ts
 
 # firestore exports
 .firestore-exports/
+.firestore-backups/
 
 # tei test
 /tei_test/

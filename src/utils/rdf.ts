@@ -409,6 +409,10 @@ export function buildTurtle(
         const iso = new Date(ann.createdAt).toISOString();
         ps.push(`  prov:generatedAtTime "${iso}"^^xsd:dateTime`);
       }
+      // どの研究プロジェクト発の言明か（移行過渡期データには欠落あり）
+      if (ann.researchProjectId) {
+        ps.push(`  :fromProject <urn:project:${ann.researchProjectId}>`);
+      }
       (ann.wikidata as WikidataItem[] ?? []).forEach((item) => {
         buildAuthorityConnections(item, `<${item.uri}>`).forEach((p) => ps.push(p));
       });

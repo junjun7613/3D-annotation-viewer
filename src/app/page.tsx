@@ -1,23 +1,66 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuthState } from 'react-firebase-hooks/auth';
 import SignIn from '@/app/components/SignIn';
-import { FaCube, FaImage, FaDownload } from 'react-icons/fa';
-import { PiGraphLight } from 'react-icons/pi';
+import { FaDownload, FaPlus, FaFolder, FaLock, FaGlobe, FaUser } from 'react-icons/fa';
+import { auth } from '@/lib/firebase/firebase';
+import { projectService, getProjectStats } from '@/lib/services/projects';
 import { buildVocabularyTurtle } from '@/utils/rdf';
+import type { Project } from '@/types/main';
+
+type ProjectCard = Project & {
+  annotationCount: number;
+  lastUpdatedAt: number | null;
+};
+
+function formatDate(ms: number | null): string {
+  if (!ms) return '—';
+  const d = new Date(ms);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 
 export default function Home() {
   const router = useRouter();
-  const [manifestUrl, setManifestUrl] = useState('');
+  const [user, authLoading] = useAuthState(auth);
+  const [projects, setProjects] = useState<ProjectCard[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const openEditor = (mode: '2d' | '3d') => {
-    const path = `/editor/${mode}${manifestUrl ? `?manifest=${encodeURIComponent(manifestUrl)}` : ''}`;
-    router.push(path);
-  };
+  useEffect(() => {
+    if (!user?.uid) {
+      setProjects([]);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    (async () => {
+      const list = await projectService.listForMember(user.uid);
+      const enriched = await Promise.all(
+        list.map(async (p) => {
+          const stats = await getProjectStats(p.id);
+          return { ...p, ...stats };
+        })
+      );
+      if (!cancelled) {
+        // 最終更新日降順、無いものは末尾
+        enriched.sort(
+          (a, b) => (b.lastUpdatedAt ?? 0) - (a.lastUpdatedAt ?? 0)
+        );
+        setProjects(enriched);
+        setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.uid]);
 
-  const openSearch = () => {
-    router.push('/search');
+  const openProject = (pid: string) => {
+    router.push(`/projects/${pid}`);
   };
 
   const downloadVocabulary = () => {
@@ -45,81 +88,117 @@ export default function Home() {
         </nav>
       </header>
 
-      <main className="flex-1 flex flex-col items-center justify-center px-4 py-16 relative">
-        <div className="w-full max-w-2xl flex flex-col items-center gap-10">
+      <main className="flex-1 px-6 py-10">
+        <div className="max-w-5xl mx-auto">
+          {!user && !authLoading && (
+            <div className="text-center py-20">
+              <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-3">
+                ログインしてプロジェクトを利用
+              </h2>
+              <p className="text-[var(--text-secondary)] text-sm">
+                右上の「ログインして利用」からサインインしてください。
+              </p>
+            </div>
+          )}
 
-          <div className="text-center">
-            <h2 className="text-3xl font-bold text-[var(--text-primary)] mb-3">Open a IIIF Manifest</h2>
-            <p className="text-[var(--text-secondary)] text-sm">Enter a IIIF Manifest URL and select an editor mode.</p>
-          </div>
+          {user && (
+            <>
+              <div className="flex items-end justify-between mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-[var(--text-primary)]">
+                    研究プロジェクト
+                  </h2>
+                  <p className="text-[var(--text-secondary)] text-sm mt-1">
+                    所属しているプロジェクトの一覧
+                  </p>
+                </div>
+                <button
+                  onClick={() => router.push('/projects/new')}
+                  className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-white rounded-md hover:opacity-90 transition-opacity text-sm font-medium"
+                >
+                  <FaPlus className="w-3 h-3" />
+                  新規プロジェクト
+                </button>
+              </div>
 
-          <div className="w-full flex gap-2">
-            <input
-              type="text"
-              value={manifestUrl}
-              onChange={(e) => setManifestUrl(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && manifestUrl) openEditor('3d'); }}
-              placeholder="https://example.org/iiif/manifest"
-              className="input-field mb-0 flex-1"
-            />
-          </div>
+              {loading ? (
+                <div className="text-center py-12 text-[var(--text-secondary)] text-sm">
+                  読み込み中…
+                </div>
+              ) : projects.length === 0 ? (
+                <div className="text-center py-16 bg-[var(--card-bg)] border border-dashed border-[var(--border)] rounded-xl">
+                  <FaFolder className="w-10 h-10 mx-auto text-[var(--text-secondary)] mb-4 opacity-40" />
+                  <p className="text-[var(--text-primary)] font-medium mb-1">
+                    プロジェクトがまだありません
+                  </p>
+                  <p className="text-[var(--text-secondary)] text-sm mb-6">
+                    新しいプロジェクトを作成して始めましょう
+                  </p>
+                  <button
+                    onClick={() => router.push('/projects/new')}
+                    className="px-4 py-2 bg-[var(--primary)] text-white rounded-md hover:opacity-90 transition-opacity text-sm font-medium"
+                  >
+                    プロジェクトを作成
+                  </button>
+                </div>
+              ) : (
+                <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {projects.map((p) => (
+                    <li key={p.id}>
+                      <button
+                        onClick={() => openProject(p.id)}
+                        className="w-full text-left p-5 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl hover:border-[var(--primary)] hover:shadow-md transition-all"
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <h3 className="font-semibold text-[var(--text-primary)] flex-1 truncate">
+                            {p.name}
+                          </h3>
+                          {p.visibility === 'public' ? (
+                            <FaGlobe className="w-3.5 h-3.5 text-[var(--text-secondary)] flex-shrink-0 mt-1" title="public" />
+                          ) : (
+                            <FaLock className="w-3.5 h-3.5 text-[var(--text-secondary)] flex-shrink-0 mt-1" title="private" />
+                          )}
+                        </div>
+                        {p.description && (
+                          <p className="text-xs text-[var(--text-secondary)] line-clamp-2 mb-3">
+                            {p.description}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-3 text-xs text-[var(--text-secondary)] mt-3">
+                          <span>
+                            アノテ <strong className="text-[var(--text-primary)]">{p.annotationCount}</strong>
+                          </span>
+                          <span>•</span>
+                          <span>更新 {formatDate(p.lastUpdatedAt)}</span>
+                          {p.createdBy === user.uid && (
+                            <span className="ml-auto flex items-center gap-1 text-[var(--primary)]">
+                              <FaUser className="w-2.5 h-2.5" />
+                              owner
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
 
-          <div className="grid grid-cols-3 gap-6 w-full">
-            <button
-              onClick={() => openEditor('2d')}
-              className="flex flex-col items-center gap-4 p-8 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl hover:border-[var(--primary)] hover:shadow-md transition-all group"
-            >
-              <div className="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-full group-hover:bg-blue-100 transition-colors">
-                <FaImage className="w-8 h-8 text-[var(--primary)]" />
+              <div className="mt-12 border-t border-[var(--border)] pt-8">
+                <button
+                  onClick={downloadVocabulary}
+                  className="w-full sm:w-auto flex items-center justify-center gap-3 px-5 py-3 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl hover:border-[var(--primary)] hover:shadow-md transition-all group"
+                >
+                  <div className="p-2 bg-emerald-50 dark:bg-emerald-900/30 rounded-full group-hover:bg-emerald-100 transition-colors">
+                    <FaDownload className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-semibold text-[var(--text-primary)] text-sm">Vocabulary をダウンロード</p>
+                    <p className="text-[var(--text-secondary)] text-xs mt-0.5">オントロジーを Turtle (.ttl) で出力</p>
+                  </div>
+                </button>
               </div>
-              <div className="text-center">
-                <p className="font-semibold text-[var(--text-primary)] text-lg">2D Editor</p>
-                <p className="text-[var(--text-secondary)] text-sm mt-1">Annotate images and canvases</p>
-              </div>
-            </button>
-
-            <button
-              onClick={() => openEditor('3d')}
-              className="flex flex-col items-center gap-4 p-8 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl hover:border-[var(--primary)] hover:shadow-md transition-all group"
-            >
-              <div className="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-full group-hover:bg-blue-100 transition-colors">
-                <FaCube className="w-8 h-8 text-[var(--primary)]" />
-              </div>
-              <div className="text-center">
-                <p className="font-semibold text-[var(--text-primary)] text-lg">3D Editor</p>
-                <p className="text-[var(--text-secondary)] text-sm mt-1">Annotate 3D models and scenes</p>
-              </div>
-            </button>
-
-            <button
-              onClick={openSearch}
-              className="flex flex-col items-center gap-4 p-8 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl hover:border-[var(--primary)] hover:shadow-md transition-all group"
-            >
-              <div className="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-full group-hover:bg-blue-100 transition-colors">
-                <PiGraphLight className="w-8 h-8 text-[var(--primary)]" />
-              </div>
-              <div className="text-center">
-                <p className="font-semibold text-[var(--text-primary)] text-lg">Semantic Search</p>
-                <p className="text-[var(--text-secondary)] text-sm mt-1">Search annotations by semantic relationships</p>
-              </div>
-            </button>
-          </div>
-
-          <div className="w-full border-t border-[var(--border)] pt-8">
-            <button
-              onClick={downloadVocabulary}
-              className="w-full flex items-center justify-center gap-3 p-5 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl hover:border-[var(--primary)] hover:shadow-md transition-all group"
-            >
-              <div className="p-3 bg-emerald-50 dark:bg-emerald-900/30 rounded-full group-hover:bg-emerald-100 transition-colors">
-                <FaDownload className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-              </div>
-              <div className="text-left">
-                <p className="font-semibold text-[var(--text-primary)] text-base">Download Vocabulary</p>
-                <p className="text-[var(--text-secondary)] text-sm mt-0.5">Export the ontology as a Turtle (.ttl) file</p>
-              </div>
-            </button>
-          </div>
-
+            </>
+          )}
         </div>
       </main>
     </div>

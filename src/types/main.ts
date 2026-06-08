@@ -1,5 +1,29 @@
 import type { Vector3 } from 'three';
 
+// ======================================================
+// Research Project — アノテーション所有・編集権限の単位
+// ======================================================
+
+export type ProjectRole = 'owner' | 'editor' | 'viewer';
+
+export type ProjectVisibility = 'public' | 'private';
+
+export interface Project {
+  id: string;
+  name: string;
+  description?: string;
+  visibility: ProjectVisibility;
+  createdAt: number;
+  createdBy: string;        // 作成者 UID（来歴）
+}
+
+export interface ProjectMember {
+  uid: string;
+  role: ProjectRole;
+  joinedAt: number;
+  invitedBy?: string;       // 招待者 UID（自分自身が作成した場合は createdBy と同じ）
+}
+
 // relation-hierarchy.json のノード型
 export interface RelationNode {
   id: string;
@@ -53,7 +77,8 @@ export interface AnnotationRelation {
 
 export interface NewAnnotation {
   id: string;
-  creator: string;
+  creator: string;                // 来歴：作成者 UID（権限判定には researchProjectId を使う）
+  researchProjectId?: string;     // 所属する研究プロジェクトの ID（移行過渡期は欠落あり）
   createdAt?: number;
   regionId?: string;              // 領域ノードへの参照（部分領域アノテーション）
   isObjectLevel?: boolean;        // オブジェクト全体を対象とするアノテーション
@@ -313,6 +338,8 @@ export interface InfoPanelContent {
   id: string;
   creator: string;
   createdAt?: number;
+  /** 当該アノテーションが属するプロジェクト ID。バッジ表示・read-only 判定に使う */
+  researchProjectId?: string;
   title: string;
   description: string;
   media: MediaItem[];

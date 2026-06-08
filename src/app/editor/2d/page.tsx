@@ -7,6 +7,7 @@ import { auth } from '@/lib/firebase/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import type { NextPage } from 'next';
 import SignIn from '@/app/components/SignIn';
+import ProjectSwitcher from '@/app/components/ProjectSwitcher';
 import type { Annotation2D } from '@/app/components/TwoDCanvas';
 
 const TwoDCanvas = dynamic(() => import('@/app/components/TwoDCanvas'), { ssr: false });
@@ -18,6 +19,9 @@ import { IoDocumentTextOutline } from 'react-icons/io5';
 import { LiaMapMarkedSolid } from 'react-icons/lia';
 import { useAtom, useSetAtom } from 'jotai';
 import { infoPanelAtom, regionPanelAtom, objectAnnotationListAtom, objectAnnotationPanelOpenAtom } from '@/app/atoms/infoPanelAtom';
+import { showAllProjectsAtom } from '@/app/atoms/annotationFilterAtom';
+import ForeignProjectBadge from '@/app/components/ForeignProjectBadge';
+import { LuGlobe } from 'react-icons/lu';
 
 
 import { createSlug } from '@/utils/converter';
@@ -37,6 +41,7 @@ import { useManifestUrl } from '@/app/hooks/useManifestUrl';
 import { useObjectMetadata } from '@/app/hooks/useObjectMetadata';
 import { useAnnotationList } from '@/app/hooks/useAnnotationList';
 import { useIIIFThumbnails } from '@/app/hooks/useIIIFThumbnails';
+import { useCurrentProject } from '@/app/hooks/useCurrentProject';
 
 // Dialog components
 import {
@@ -58,6 +63,8 @@ const Home: NextPage = () => {
 
   // Custom hooks
   const { manifestUrl, handleManifestUrlChange } = useManifestUrl();
+  const { projectId, canEdit: projectCanEdit, project: currentProject } = useCurrentProject();
+  const [showAllProjects, setShowAllProjects] = useAtom(showAllProjectsAtom);
   const [infoPanelContent] = useAtom(infoPanelAtom);
   const [regionPanelContent, setRegionPanelContent] = useAtom(regionPanelAtom);
   const [objectAnnotationList, setObjectAnnotationList] = useAtom(objectAnnotationListAtom);
@@ -65,7 +72,7 @@ const Home: NextPage = () => {
   const {
     objectMetadata,
     setObjectMetadata,
-  } = useObjectMetadata(manifestUrl);
+  } = useObjectMetadata(manifestUrl, projectId);
   const {
     annotationList,
     isAnnotationListOpen,
@@ -73,7 +80,15 @@ const Home: NextPage = () => {
     focusAnnotationId,
     setFocusAnnotationId,
     handleAnnotationListOpen,
-  } = useAnnotationList(manifestUrl);
+  } = useAnnotationList(manifestUrl, projectId, showAllProjects);
+
+  // 現在開いているアノテが他プロジェクトのものか
+  const isForeignAnnotation =
+    !!infoPanelContent?.researchProjectId &&
+    !!projectId &&
+    infoPanelContent.researchProjectId !== projectId;
+  const annotationCanEdit =
+    projectCanEdit && !isForeignAnnotation && infoPanelContent?.creator === user?.uid;
 
   // infoPanelContentという連想配列を作成
 
@@ -160,6 +175,13 @@ const Home: NextPage = () => {
   const setInfoPanel = useSetAtom(infoPanelAtom);
   const setRegionPanel = useSetAtom(regionPanelAtom);
 
+  // showAllProjects を OFF にしたら、他プロジェクトのアノテを開いていれば自動で閉じる
+  useEffect(() => {
+    if (!showAllProjects && isForeignAnnotation) {
+      setInfoPanel(null);
+    }
+  }, [showAllProjects, isForeignAnnotation, setInfoPanel]);
+
   //descriptionの情報をstateで管理
   const [desc, setDesc] = useState('');
   // locationの情報をstateで管理（annotation用）
@@ -203,6 +225,8 @@ const Home: NextPage = () => {
   //  useManifestUrl / useObjectMetadata hooks. TEI editing was moved to /editor/textual.)
 
   // 2D regions: real-time sync from Firestore（マーカーは regions コレクションをソースとする）
+  // 領域ノードはプロジェクト横断の公開資産なので、target_manifest が一致する全領域を表示する。
+  // クリック時のアノテーション一覧は現プロジェクトのものに絞る（onAnnotationClick 参照）。
   useEffect(() => {
     if (!manifestUrl) return;
     const unsubscribe = onSnapshot(collection(db, 'regions'), (snapshot) => {
@@ -235,6 +259,7 @@ const Home: NextPage = () => {
 
   const savePendingAnnotation = async () => {
     if (!pendingAnnotation || !pendingTitle.trim()) return;
+    if (!projectId) return;
     const id = uuidv4();
     const selector = pendingAnnotation.kind === 'rect'
       ? { type: '2DRectSelector', x: pendingAnnotation.x, y: pendingAnnotation.y, width: pendingAnnotation.width, height: pendingAnnotation.height }
@@ -249,9 +274,11 @@ const Home: NextPage = () => {
       selector,
     });
 
-    // 2. アノテーションに regionId を付与して保存
+    // 2. アノテーションに regionId と researchProjectId を付与して保存
     await addDoc(collection(db, 'test'), {
+      id,
       regionId: regionDoc.id,
+      researchProjectId: projectId,
       target_manifest: manifestUrl,
       target_canvas: pendingAnnotation.canvasId,
       creator: user?.uid || '',
@@ -260,11 +287,7 @@ const Home: NextPage = () => {
       wikidata: [],
       bibliography: [],
       data: {
-        body: {
-          label: pendingTitle,
-          value: { blocks: [{ type: 'paragraph', id, data: { text: '' } }], time: '', version: '' },
-          type: 'TextualBody',
-        },
+        body: { label: pendingTitle, value: '', type: 'TextualBody' },
         target: { selector },
       },
     });
@@ -273,13 +296,15 @@ const Home: NextPage = () => {
   };
 
   const saveRegionNewAnnotation = async () => {
-    if (!user || !regionNewTitle.trim() || !regionPanelContent) return;
+    if (!user || !regionNewTitle.trim() || !regionPanelContent || !projectId) return;
     const id = uuidv4();
     const regionDoc = await getDoc(doc(db, 'regions', regionPanelContent.regionId));
     if (!regionDoc.exists()) return;
     const regionData = regionDoc.data();
     const newAnnotation = {
+      id,
       regionId: regionPanelContent.regionId,
+      researchProjectId: projectId,
       target_manifest: regionData.target_manifest,
       target_canvas: regionData.target_canvas,
       creator: user.uid,
@@ -288,11 +313,7 @@ const Home: NextPage = () => {
       wikidata: [],
       bibliography: [],
       data: {
-        body: {
-          label: regionNewTitle,
-          value: { blocks: [{ type: 'paragraph', id, data: { text: '' } }], time: '', version: '' },
-          type: 'TextualBody',
-        },
+        body: { label: regionNewTitle, value: '', type: 'TextualBody' },
         target: { selector: regionData.selector },
       },
     };
@@ -318,7 +339,14 @@ const Home: NextPage = () => {
     const docSnap = await getDoc(docRef);
     if (!docSnap.exists()) return;
     const existing = (docSnap.data().relatedAnnotations ?? []) as import('@/types/main').AnnotationRelation[];
-    const newRelation = { ...relation, createdBy: user.uid, createdAt: Date.now() };
+    // Firestore は undefined フィールドを許容しないため、明示的に取り除く
+    const newRelation: import('@/types/main').AnnotationRelation = {
+      annotationId: relation.annotationId,
+      relation: relation.relation,
+      createdBy: user.uid,
+      createdAt: Date.now(),
+      ...(relation.comment ? { comment: relation.comment } : {}),
+    };
     await updateDoc(docRef, { relatedAnnotations: [...existing, newRelation] });
     if (regionPanelContent) {
       setRegionPanelContent({ ...regionPanelContent });
@@ -327,12 +355,13 @@ const Home: NextPage = () => {
 
   // オブジェクトレベルアノテーション一覧をリフレッシュ
   const refreshObjectAnnotations = async () => {
-    if (!manifestUrl) return;
-    const anns = await objectAnnotationService.getAll(manifestUrl);
+    if (!manifestUrl || !projectId) return;
+    const anns = await objectAnnotationService.getAll(manifestUrl, projectId, showAllProjects);
     setObjectAnnotationList(anns.map((a) => ({
       id: (a as Record<string, unknown>).docId as string,
       creator: (a as Record<string, unknown>).creator as string ?? '',
       createdAt: (a as Record<string, unknown>).createdAt as number | undefined,
+      researchProjectId: (a as Record<string, unknown>).researchProjectId as string | undefined,
       title: ((a as Record<string, unknown>).data as Record<string, unknown>)?.body
         ? (((a as Record<string, unknown>).data as Record<string, unknown>).body as Record<string, unknown>).label as string ?? ''
         : '',
@@ -346,7 +375,7 @@ const Home: NextPage = () => {
   useEffect(() => {
     if (manifestUrl) refreshObjectAnnotations();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [manifestUrl]);
+  }, [manifestUrl, showAllProjects]);
 
   // 領域パネル表示中はオブジェクトレベルパネルを閉じる
   useEffect(() => {
@@ -931,7 +960,7 @@ const Home: NextPage = () => {
 
   // Object用の保存関数群
   const saveObjectMedia = async () => {
-    if (!manifestUrl || !user) return;
+    if (!manifestUrl || !user || !projectId) return;
 
     const data: {
       id: string;
@@ -1049,11 +1078,11 @@ const Home: NextPage = () => {
       if (existing) {
         const updatedItem = { ...existing, ...data, id: existing.id };
         const newMedia = (objectMetadata?.media || []).map((m, i) => i === editObjectMediaIndex ? updatedItem : m);
-        await objectAnnotationService.updateMedia(manifestUrl, newMedia, user.uid);
+        await objectAnnotationService.updateMedia(manifestUrl, newMedia, user.uid, projectId);
         setObjectMetadata(prev => prev ? { ...prev, media: newMedia } : null);
       }
     } else {
-      await objectAnnotationService.addMedia(manifestUrl, data, user.uid);
+      await objectAnnotationService.addMedia(manifestUrl, data, user.uid, projectId);
       setObjectMetadata(prev => prev ? { ...prev, media: [...(prev?.media || []), data] } : null);
     }
 
@@ -1065,16 +1094,16 @@ const Home: NextPage = () => {
   };
 
   const saveObjectWikidata = async () => {
-    if (!manifestUrl || !user) return;
+    if (!manifestUrl || !user || !projectId) return;
 
     const data = await createWikidataItem(objectIRI);
 
     if (editObjectWikiIndex !== null) {
       const newWikidata = (objectMetadata?.wikidata || []).map((w, i) => i === editObjectWikiIndex ? data : w);
-      await objectAnnotationService.updateWikidata(manifestUrl, newWikidata, user.uid);
+      await objectAnnotationService.updateWikidata(manifestUrl, newWikidata, user.uid, projectId);
       setObjectMetadata(prev => prev ? { ...prev, wikidata: newWikidata } : null);
     } else {
-      await objectAnnotationService.addWikidata(manifestUrl, data, user.uid);
+      await objectAnnotationService.addWikidata(manifestUrl, data, user.uid, projectId);
       setObjectMetadata(prev => prev ? { ...prev, wikidata: [...(prev?.wikidata || []), data] } : null);
     }
 
@@ -1085,7 +1114,7 @@ const Home: NextPage = () => {
   };
 
   const saveObjectBibliography = async () => {
-    if (!manifestUrl || !user) return;
+    if (!manifestUrl || !user || !projectId) return;
 
     if (editObjectBibIndex !== null) {
       const existing = objectMetadata?.bibliography[editObjectBibIndex];
@@ -1098,7 +1127,7 @@ const Home: NextPage = () => {
         pdf: objectBibPDF,
       };
       const newBib = (objectMetadata?.bibliography || []).map((b, i) => i === editObjectBibIndex ? data : b);
-      await objectAnnotationService.updateBibliography(manifestUrl, newBib, user.uid);
+      await objectAnnotationService.updateBibliography(manifestUrl, newBib, user.uid, projectId);
       setObjectMetadata(prev => prev ? { ...prev, bibliography: newBib } : null);
     } else {
       const data = {
@@ -1109,7 +1138,7 @@ const Home: NextPage = () => {
         page: objectBibPage,
         pdf: objectBibPDF,
       };
-      await objectAnnotationService.addBibliography(manifestUrl, data, user.uid);
+      await objectAnnotationService.addBibliography(manifestUrl, data, user.uid, projectId);
       setObjectMetadata(prev => prev ? { ...prev, bibliography: [...(prev?.bibliography || []), data] } : null);
     }
 
@@ -1268,7 +1297,7 @@ const Home: NextPage = () => {
   */
 
   const deleteAnnotation = (id: string) => {
-    if (infoPanelContent?.creator == user?.uid) {
+    if (annotationCanEdit) {
       const confirmed = confirm('Are you sure you want to delete this annotation?');
       if (confirmed) {
         //idのdocをfirebaseデータベースから削除
@@ -1305,189 +1334,24 @@ const Home: NextPage = () => {
   };
 
   const downloadRDF = async (id: string) => {
-    const querySnapshot = await getDocs(collection(db, 'test'));
-    const objectMetadata = await objectMetadataService.getObjectMetadata(id);
-
-    // ManifestベースURLからURIを生成（IIIF Manifest出力と同一URIを使用）
-    const manifestBase = id.split('/').slice(0, -1).join('/');
-    const annoBase = `${manifestBase}/annotation`;
-    const mediaBase = `${manifestBase}/media`;
-    const bibBase = `${manifestBase}/bibliography`;
-
-    let turtleData =
-      '@prefix : <https://www.example.com/vocabulary/> .\n@prefix schema: <https://schema.org/> .\n@prefix dc: <http://purl.org/dc/elements/1.1/> .\n@prefix geo: <http://www.w3.org/2003/01/geo/wgs84_pos#> .\n@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n@prefix foaf: <http://xmlns.com/foaf/0.1/> .';
-    turtleData += '\n';
-
-    // Manifestエンティティを追加（Object level metadata）
-    if (objectMetadata) {
-      turtleData += `\n<${id}> a :Manifest ;\n`;
-      const manifestProperties = [];
-
-      if (objectMetadata.wikidata && objectMetadata.wikidata.length > 0) {
-        objectMetadata.wikidata.forEach((item) => {
-          manifestProperties.push(`  :relatedEntity <${item.uri}>`);
-        });
-      }
-
-      if (objectMetadata.media && objectMetadata.media.length > 0) {
-        objectMetadata.media.forEach((item) => {
-          manifestProperties.push(`  :media <${mediaBase}/object-${item.id}>`);
-        });
-      }
-
-      if (objectMetadata.bibliography && objectMetadata.bibliography.length > 0) {
-        objectMetadata.bibliography.forEach((item) => {
-          manifestProperties.push(`  :bibliography <${bibBase}/object-${item.id}>`);
-        });
-      }
-
-      if (objectMetadata.location) {
-        manifestProperties.push(`  geo:lat "${objectMetadata.location.lat}"`);
-        manifestProperties.push(`  geo:long "${objectMetadata.location.lng}"`);
-      }
-
-      if (manifestProperties.length > 0) {
-        manifestProperties.forEach((prop, index) => {
-          turtleData += prop + (index < manifestProperties.length - 1 ? ' ;\n' : ' .\n');
-        });
-      } else {
-        turtleData += '.\n';
-      }
-
-      // Wikidataエンティティの詳細
-      if (objectMetadata.wikidata && objectMetadata.wikidata.length > 0) {
-        objectMetadata.wikidata.forEach((item) => {
-          turtleData += `\n<${item.uri}> a :WikidataEntity ;\n`;
-          const wikiProperties = [];
-          wikiProperties.push(`  rdfs:label "${item.label}"`);
-          wikiProperties.push(`  :wikidataType "${item.type}"`);
-          if (item.lat && item.lng) {
-            wikiProperties.push(`  geo:lat "${item.lat}"`);
-            wikiProperties.push(`  geo:long "${item.lng}"`);
-          }
-          if (item.thumbnail) wikiProperties.push(`  foaf:depiction <${item.thumbnail}>`);
-          if (item.wikipedia) wikiProperties.push(`  rdfs:seeAlso <${item.wikipedia}>`);
-          wikiProperties.forEach((prop, index) => {
-            turtleData += prop + (index < wikiProperties.length - 1 ? ' ;\n' : ' .\n');
-          });
-        });
-      }
-
-      // Object Mediaの詳細
-      if (objectMetadata.media && objectMetadata.media.length > 0) {
-        objectMetadata.media.forEach((item) => {
-          turtleData += `\n<${mediaBase}/object-${item.id}> a :Media ;\n`;
-          turtleData += `  schema:uri "${item.source}" ;\n`;
-          turtleData += `  schema:description "${item.caption}" ;\n`;
-          turtleData += `  schema:additionalType :${item.type}`;
-          if (item.type === 'iiif' && 'manifestUrl' in item && item.manifestUrl) {
-            turtleData += ` ;\n  :iiifManifest <${item.manifestUrl}>`;
-            if ('canvasId' in item && item.canvasId) {
-              turtleData += ` ;\n  :iiifCanvas <${item.canvasId}>`;
-            }
-          }
-          if (item.type === 'sketchfab' && 'manifestUrl' in item && item.manifestUrl) {
-            turtleData += ` ;\n  :sketchfabUrl <${item.manifestUrl}>`;
-            if ('canvasId' in item && item.canvasId) {
-              turtleData += ` ;\n  :sketchfabModelId "${item.canvasId}"`;
-            }
-          }
-          turtleData += ` .\n`;
-        });
-      }
-
-      // Object Bibliographyの詳細
-      if (objectMetadata.bibliography && objectMetadata.bibliography.length > 0) {
-        objectMetadata.bibliography.forEach((item) => {
-          turtleData += `\n<${bibBase}/object-${item.id}> a :Bibliography ;\n`;
-          const bibProperties = [];
-          if (item.author) bibProperties.push(`  dc:creator "${item.author}"`);
-          if (item.title) bibProperties.push(`  dc:title "${item.title}"`);
-          if (item.year) bibProperties.push(`  dc:date "${item.year}"`);
-          if (item.pdf) bibProperties.push(`  schema:uri <${item.pdf}>`);
-          bibProperties.forEach((prop, index) => {
-            turtleData += prop + (index === bibProperties.length - 1 ? ' .\n' : ' ;\n');
-          });
-        });
-      }
+    // API route 経由でダウンロードする（private プロジェクト保護を route 側で担保）。
+    // pid を付けると当該プロジェクトのみ。private プロジェクトの場合は ID Token も渡す。
+    const slug = createSlug(id);
+    const baseUrl = `/api/3/${slug}/rdf`;
+    const target = projectId ? `${baseUrl}?pid=${encodeURIComponent(projectId)}` : baseUrl;
+    const headers: Record<string, string> = {};
+    if (user) {
+      try {
+        const token = await user.getIdToken();
+        headers['Authorization'] = `Bearer ${token}`;
+      } catch { /* token 取得失敗時は public 出力のみ */ }
     }
-
-    // Annotationの処理
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      const markdown: string = typeof data.data?.body?.value === 'string' ? data.data.body.value : '';
-      const html = renderMarkdown(markdown).replace(/"/g, '\\"').replace(/\n/g, ' ');
-      if (data.target_manifest === id) {
-        // IIIF Manifest出力と同一のアノテーションURI
-        turtleData += `\n<${annoBase}/${doc.id}> a :Annotation ;\n`;
-        const properties = [];
-
-        properties.push(`  rdfs:label "${data.data.body.label}"`);
-        properties.push(`  schema:description "${html}"`);
-        properties.push(`  :targetManifest <${data.target_manifest}>`);
-        properties.push(`  :targetCanvas <${data.target_canvas}>`);
-
-        if (data.wikidata) {
-          (data.wikidata as WikidataItem[]).forEach((item: WikidataItem) => {
-            properties.push(`  :wikidata <${item.uri}>`);
-          });
-        }
-        if (data.media) {
-          (data.media as MediaItem[]).forEach((item: MediaItem) => {
-            properties.push(`  :media <${mediaBase}/${item.id}>`);
-          });
-        }
-        if (data.bibliography) {
-          (data.bibliography as BibliographyItem[]).forEach((item: BibliographyItem) => {
-            properties.push(`  :bibliography <${bibBase}/${item.id}>`);
-          });
-        }
-
-        properties.forEach((prop, index) => {
-          turtleData += prop + (index < properties.length - 1 ? ' ;\n' : ' .\n');
-        });
-        if (properties.length === 0) turtleData += '.\n';
-
-        // Media詳細
-        if (data.media) {
-          (data.media as MediaItem[]).forEach((item: MediaItem) => {
-            turtleData += `\n<${mediaBase}/${item.id}> a :Media ;\n`;
-            turtleData += `  schema:uri "${item.source}" ;\n`;
-            turtleData += `  schema:description "${item.caption}" ;\n`;
-            turtleData += `  schema:additionalType :${item.type}`;
-            if (item.type === 'iiif' && 'manifestUrl' in item && item.manifestUrl) {
-              turtleData += ` ;\n  :iiifManifest <${item.manifestUrl}>`;
-              if ('canvasId' in item && item.canvasId) {
-                turtleData += ` ;\n  :iiifCanvas <${item.canvasId}>`;
-              }
-            }
-            if (item.type === 'sketchfab' && 'manifestUrl' in item && item.manifestUrl) {
-              turtleData += ` ;\n  :sketchfabUrl <${item.manifestUrl}>`;
-              if ('canvasId' in item && item.canvasId) {
-                turtleData += ` ;\n  :sketchfabModelId "${item.canvasId}"`;
-              }
-            }
-            turtleData += ` .\n`;
-          });
-        }
-
-        // Bibliography詳細
-        if (data.bibliography) {
-          data.bibliography.forEach((item: BibliographyItem) => {
-            turtleData += `\n<${bibBase}/${item.id}> a :Bibliography ;\n`;
-            const properties = [];
-            if (item.author) properties.push(`  dc:creator "${item.author}"`);
-            if (item.title) properties.push(`  dc:title "${item.title}"`);
-            if (item.year) properties.push(`  dc:date "${item.year}"`);
-            if (item.page) properties.push(`  schema:uri <${item.page}>`);
-            properties.forEach((prop, index) => {
-              turtleData += prop + (index === properties.length - 1 ? ' .\n' : ' ;\n');
-            });
-          });
-        }
-      }
-    });
-
+    const res = await fetch(target, { headers });
+    if (!res.ok) {
+      alert(`RDF 取得に失敗しました: ${res.status}`);
+      return;
+    }
+    const turtleData = await res.text();
     const blob = new Blob([turtleData], { type: 'text/turtle' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -1495,18 +1359,53 @@ const Home: NextPage = () => {
     a.download = 'graph-data.ttl';
     a.click();
     URL.revokeObjectURL(url);
-
     handleRDFCloseDialog();
   };
 
-  const downloadIIIFManifest = (manifestUrl: string) => {
+  const [isIIIFScopeDialogOpen, setIsIIIFScopeDialogOpen] = useState(false);
+  const openIIIFManifest = async (scope: 'project' | 'all') => {
+    if (!manifestUrl) return;
     const slug = createSlug(manifestUrl);
-    const url = `/api/3/${slug}/manifest`;
-    window.open(url, '_blank', 'noopener,noreferrer');
+    const url = scope === 'project' && projectId
+      ? `/api/3/${slug}/manifest?pid=${encodeURIComponent(projectId)}`
+      : `/api/3/${slug}/manifest`;
+    if (scope === 'project' && currentProject?.visibility === 'private') {
+      if (!user) {
+        alert('private プロジェクトの IIIF 出力にはサインインが必要です。');
+        return;
+      }
+      try {
+        const token = await user.getIdToken();
+        const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+        if (!res.ok) {
+          alert(`IIIF 取得に失敗しました: ${res.status}`);
+          return;
+        }
+        const json = await res.json();
+        const blob = new Blob([JSON.stringify(json, null, 2)], { type: 'application/json' });
+        const blobUrl = URL.createObjectURL(blob);
+        window.open(blobUrl, '_blank', 'noopener,noreferrer');
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+      } catch (e) {
+        alert(`IIIF 取得に失敗しました: ${e instanceof Error ? e.message : String(e)}`);
+        return;
+      }
+    } else {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+    setIsIIIFScopeDialogOpen(false);
+  };
+  const handleIIIFButtonClick = () => {
+    if (!manifestUrl) return;
+    if (projectId) {
+      setIsIIIFScopeDialogOpen(true);
+    } else {
+      openIIIFManifest('all');
+    }
   };
 
   const deleteMedia = (id: string, index: number) => {
-    if (infoPanelContent?.creator == user?.uid) {
+    if (annotationCanEdit) {
       const confirmed = confirm('Are you sure you want to delete this Wiki Item?');
       if (confirmed) {
         //idのdocのBibliographyフィールドのindexの要素を削除
@@ -1537,7 +1436,7 @@ const Home: NextPage = () => {
   };
 
   const deleteBib = (id: string, index: number) => {
-    if (infoPanelContent?.creator == user?.uid) {
+    if (annotationCanEdit) {
       const confirmed = confirm('Are you sure you want to delete this bibliography?');
       if (confirmed) {
         //idのdocのBibliographyフィールドのindexの要素を削除
@@ -1568,7 +1467,7 @@ const Home: NextPage = () => {
   };
 
   const deleteWiki = async (id: string, index: number) => {
-    if (infoPanelContent?.creator == user?.uid) {
+    if (annotationCanEdit) {
       const confirmed = confirm('Are you sure you want to delete this Wiki Item?');
       if (confirmed) {
         //idのdocのBibliographyフィールドのindexの要素を削除
@@ -1600,7 +1499,7 @@ const Home: NextPage = () => {
 
   // Edit handlers for annotation-level resources
   const editMedia = (_id: string, index: number) => {
-    if (infoPanelContent?.creator == user?.uid) {
+    if (annotationCanEdit) {
       setEditMediaIndex(index);
       setIsMediaDialogOpen(true);
     } else {
@@ -1609,7 +1508,7 @@ const Home: NextPage = () => {
   };
 
   const editWiki = (_id: string, index: number) => {
-    if (infoPanelContent?.creator == user?.uid) {
+    if (annotationCanEdit) {
       setEditWikiIndex(index);
       setIsWikidataDialogOpen(true);
     } else {
@@ -1618,7 +1517,7 @@ const Home: NextPage = () => {
   };
 
   const editBib = (_id: string, index: number) => {
-    if (infoPanelContent?.creator == user?.uid) {
+    if (annotationCanEdit) {
       setEditBibIndex(index);
       setIsBibDialogOpen(true);
     } else {
@@ -1634,7 +1533,7 @@ const Home: NextPage = () => {
   };
 
   const handleMediaOpenDialog = () => {
-    if (infoPanelContent?.creator == user?.uid) {
+    if (annotationCanEdit) {
       setEditMediaIndex(null);
       setIsMediaDialogOpen(true);
     } else {
@@ -1653,7 +1552,7 @@ const Home: NextPage = () => {
   };
 
   const handleBibOpenDialog = () => {
-    if (infoPanelContent?.creator == user?.uid) {
+    if (annotationCanEdit) {
       setEditBibIndex(null);
       setIsBibDialogOpen(true);
     } else {
@@ -1672,7 +1571,7 @@ const Home: NextPage = () => {
   };
 
   const handleDescOpenDialog = () => {
-    if (infoPanelContent?.creator == user?.uid) {
+    if (annotationCanEdit) {
       //setDesc(infoPanelContent?.description || '');
       setIsDescDialogOpen(true);
     } else {
@@ -1685,7 +1584,7 @@ const Home: NextPage = () => {
 
 
   const handleTitleOpenDialog = () => {
-    if (infoPanelContent?.creator == user?.uid) {
+    if (annotationCanEdit) {
       setEditTitle(infoPanelContent?.title || '');
       setIsTitleDialogOpen(true);
     } else {
@@ -1714,7 +1613,7 @@ const Home: NextPage = () => {
   };
 
   const handleWikidataOpenDialog = () => {
-    if (infoPanelContent?.creator == user?.uid) {
+    if (annotationCanEdit) {
       setEditWikiIndex(null);
       setIsWikidataDialogOpen(true);
     } else {
@@ -1729,7 +1628,7 @@ const Home: NextPage = () => {
     setIsAuthorityUploadDialogOpen(false);
   };
   const handleAuthorityUpload = () => {
-    if (infoPanelContent?.creator == user?.uid) {
+    if (annotationCanEdit) {
       setIsAuthorityUploadDialogOpen(true);
     } else {
       alert('You are not the creator of this annotation.');
@@ -1906,35 +1805,70 @@ const Home: NextPage = () => {
               About
             </Link>
             <Link
-              href={`/editor/textual${manifestUrl ? `?manifest=${encodeURIComponent(manifestUrl)}` : ''}`}
+              href={`/editor/textual${manifestUrl ? `?manifest=${encodeURIComponent(manifestUrl)}${projectId ? `&pid=${projectId}` : ''}` : ''}`}
               className="text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors text-sm font-medium"
             >
               Textual
             </Link>
+            <ProjectSwitcher />
+            <button
+              type="button"
+              onClick={() => setShowAllProjects(v => !v)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+                showAllProjects
+                  ? 'bg-[var(--primary)] text-white border-[var(--primary)]'
+                  : 'bg-transparent text-[var(--text-secondary)] border-[var(--border)] hover:text-[var(--primary)] hover:border-[var(--primary)]'
+              }`}
+              title={showAllProjects
+                ? '全プロジェクトのアノテーションを表示中（他プロジェクトは読み取り専用）'
+                : '現プロジェクトのアノテーションのみ表示中'}
+            >
+              <LuGlobe className="w-3.5 h-3.5" />
+              All projects
+            </button>
             <div className="ml-2 border-l border-[var(--border)] pl-4">
               <SignIn />
             </div>
           </nav>
         </header>
+        {!projectId ? (
+          <div className="bg-amber-50 dark:bg-amber-900/30 border-b border-amber-200 dark:border-amber-800 px-6 py-2 text-xs text-amber-900 dark:text-amber-100">
+            プロジェクトが選択されていません。アノテーションを作成するには、
+            <Link href="/" className="underline mx-1">ホーム</Link>
+            からプロジェクトを選んで資料を開いてください。
+          </div>
+        ) : !projectCanEdit ? (
+          <div className="bg-blue-50 dark:bg-blue-900/30 border-b border-blue-200 dark:border-blue-800 px-6 py-2 text-xs text-blue-900 dark:text-blue-100">
+            読み取り専用モード：このプロジェクトの編集権限がありません。閲覧のみ可能です。
+          </div>
+        ) : null}
         <div className="flex flex-1">
           <div className="flex-1 border-r border-[var(--border)] relative">
             <TwoDCanvas
               manifestUrl={manifestUrl}
               annotations={annotations2D}
-              annotationMode={annotationMode}
+              annotationMode={projectCanEdit ? annotationMode : 'none'}
               annotationsVisible={annotationsVisible}
               focusAnnotationId={focusAnnotationId}
               onRectAnnotation={handleRectAnnotation}
               onPolygonAnnotation={handlePolygonAnnotation2D}
               onAnnotationClick={async (regionId) => {
-                // id は regions のドキュメントID
-                const snap = await getDocs(query(collection(db, 'test'), where('regionId', '==', regionId)));
+                // id は regions のドキュメントID。showAll 時は全プロジェクトのアノテ、それ以外は現プロジェクトのみ。
+                const q2 = (!showAllProjects && projectId)
+                  ? query(
+                      collection(db, 'test'),
+                      where('regionId', '==', regionId),
+                      where('researchProjectId', '==', projectId)
+                    )
+                  : query(collection(db, 'test'), where('regionId', '==', regionId));
+                const snap = await getDocs(q2);
                 const anns = snap.docs.map((r) => {
                   const a = r.data();
                   return {
                     id: r.id,
                     creator: a.creator ?? '',
                     createdAt: a.createdAt ?? undefined,
+                    researchProjectId: a.researchProjectId ?? undefined,
                     title: a.data?.body?.label ?? '',
                     description: a.data?.body?.value ?? '',
                     media: a.media ?? [],
@@ -2014,7 +1948,7 @@ const Home: NextPage = () => {
                   <img src="/images/rdf.png" alt="RDF" className="w-7 h-7 object-contain" />
                 </button>
                 <button
-                  onClick={() => downloadIIIFManifest(manifestUrl)}
+                  onClick={handleIIIFButtonClick}
                   className="p-1.5 rounded-md bg-transparent border-0 cursor-pointer hover:bg-[var(--secondary-bg)] transition-colors"
                   title="View IIIF Manifest"
                 >
@@ -2036,6 +1970,7 @@ const Home: NextPage = () => {
                 <RegionAnnotationList
                   regionId={regionPanelContent.regionId}
                   annotations={regionPanelContent.annotations}
+                  currentProjectId={projectId}
                   onSelect={(ann) => {
                     setRegionPanelContent(null);
                     setObjectAnnotationPanelOpen(false);
@@ -2104,18 +2039,30 @@ const Home: NextPage = () => {
                   <p className="text-sm text-[var(--text-secondary)] py-2">アノテーションがありません。</p>
                 ) : (
                   <div className="flex flex-col gap-1.5">
-                    {objectAnnotationList.map((ann) => (
+                    {objectAnnotationList.map((ann) => {
+                      const annForeign =
+                        !!ann.researchProjectId && !!projectId && ann.researchProjectId !== projectId;
+                      return (
                       <button
                         key={ann.id}
                         onClick={() => {
                           setObjectAnnotationPanelOpen(false);
                           setInfoPanel(ann);
                         }}
-                        className="w-full text-left flex flex-col gap-1 p-3 rounded-lg border border-[var(--border)] hover:border-[var(--primary)] hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors group"
+                        className={`w-full text-left flex flex-col gap-1 p-3 rounded-lg border transition-colors group ${
+                          annForeign
+                            ? 'border-[var(--border)] bg-[var(--secondary-bg)]/40 hover:border-[var(--primary)]'
+                            : 'border-[var(--border)] hover:border-[var(--primary)] hover:bg-blue-50 dark:hover:bg-blue-900/10'
+                        }`}
                       >
-                        <p className="text-sm font-medium text-[var(--text-primary)] group-hover:text-[var(--primary)] truncate">
-                          {ann.title || '（タイトルなし）'}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium text-[var(--text-primary)] group-hover:text-[var(--primary)] truncate flex-1">
+                            {ann.title || '（タイトルなし）'}
+                          </p>
+                          {annForeign && ann.researchProjectId && (
+                            <ForeignProjectBadge projectId={ann.researchProjectId} />
+                          )}
+                        </div>
                         <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
                           <span>{ann.creator}</span>
                           {ann.createdAt && (
@@ -2143,15 +2090,16 @@ const Home: NextPage = () => {
                           )}
                         </div>
                       </button>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
                 <button
                   type="button"
                   onClick={async () => {
-                    if (!user || !manifestUrl) return;
+                    if (!user || !manifestUrl || !projectId) return;
                     const { getOrCreateObjectAnnotation } = await import('@/lib/services/objectMetadata');
-                    await getOrCreateObjectAnnotation(manifestUrl, user.uid);
+                    await getOrCreateObjectAnnotation(manifestUrl, user.uid, projectId);
                     await refreshObjectAnnotations();
                   }}
                   className="mt-2 w-full text-xs text-[var(--primary)] hover:opacity-80 transition-opacity text-left py-1"
@@ -2161,6 +2109,12 @@ const Home: NextPage = () => {
               </div>
             ) : (
             <>
+            {isForeignAnnotation && infoPanelContent?.researchProjectId && (
+              <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-700 dark:text-slate-200 flex-shrink-0">
+                <ForeignProjectBadge projectId={infoPanelContent.researchProjectId} />
+                <span>このアノテーションは他プロジェクトのものです（読み取り専用）。</span>
+              </div>
+            )}
             <div className="border-b border-[var(--border)] pb-3 mb-3 flex-shrink-0" style={{ minHeight: '220px', maxHeight: '300px' }}>
               <div className="card h-full">
                 <div className="flex items-center justify-between mb-3">
@@ -2168,21 +2122,25 @@ const Home: NextPage = () => {
                     <h3 className="text-base font-semibold m-0 text-[var(--text-primary)]">
                       {infoPanelContent?.title || 'DESCRIPTION'}
                     </h3>
-                    <button
-                      onClick={handleTitleOpenDialog}
-                      className="text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors"
-                      title="Edit title"
-                    >
-                      <FaPencilAlt className="w-3 h-3" />
-                    </button>
+                    {annotationCanEdit && (
+                      <button
+                        onClick={handleTitleOpenDialog}
+                        className="text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors"
+                        title="Edit title"
+                      >
+                        <FaPencilAlt className="w-3 h-3" />
+                      </button>
+                    )}
                   </div>
-                  <button
-                    onClick={handleDescOpenDialog}
-                    className="btn-icon btn-icon-sm btn-secondary"
-                    title="Edit description"
-                  >
-                    <FaPencilAlt />
-                  </button>
+                  {annotationCanEdit && (
+                    <button
+                      onClick={handleDescOpenDialog}
+                      className="btn-icon btn-icon-sm btn-secondary"
+                      title="Edit description"
+                    >
+                      <FaPencilAlt />
+                    </button>
+                  )}
                 </div>
                 <div
                   className="description-content overflow-y-auto max-h-56 text-sm leading-relaxed text-[var(--text-secondary)]"
@@ -2675,6 +2633,46 @@ const Home: NextPage = () => {
                 </button>
                 <button type="button" onClick={handleRDFCloseDialog} className="btn-secondary">
                   Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isIIIFScopeDialogOpen && (
+        <div className="dialog-overlay" onClick={() => setIsIIIFScopeDialogOpen(false)}>
+          <div className="dialog w-[420px]" onClick={(e) => e.stopPropagation()}>
+            <div className="flex flex-col gap-4">
+              <p className="text-sm font-semibold text-[var(--text-primary)]">IIIF マニフェストの出力範囲</p>
+              <p className="text-xs text-[var(--text-secondary)]">
+                どの範囲のアノテーションを含めて出力しますか？
+              </p>
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => openIIIFManifest('project')}
+                  className="text-left p-3 rounded-lg border border-[var(--border)] hover:border-[var(--primary)] hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors"
+                >
+                  <p className="text-sm font-medium text-[var(--text-primary)]">現在のプロジェクトのみ</p>
+                  <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                    自プロジェクトのアノテーションと、プロジェクトのメタデータを含める
+                  </p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openIIIFManifest('all')}
+                  className="text-left p-3 rounded-lg border border-[var(--border)] hover:border-[var(--primary)] hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors"
+                >
+                  <p className="text-sm font-medium text-[var(--text-primary)]">すべてのアノテーション</p>
+                  <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                    この資料に紐づく全プロジェクトのアノテーションを含める
+                  </p>
+                </button>
+              </div>
+              <div className="flex justify-end">
+                <button type="button" onClick={() => setIsIIIFScopeDialogOpen(false)} className="btn-secondary">
+                  キャンセル
                 </button>
               </div>
             </div>

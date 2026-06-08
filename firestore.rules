@@ -1,0 +1,153 @@
+// =====================================================================
+//  Firestore Security Rules — Research Project 所有モデル（Phase 1 ドラフト）
+// =====================================================================
+//
+//  方針:
+//    - projects / projects/{pid}/members を新設し、メンバーシップで権限を判定
+//    - test (アノテーション)        … researchProjectId ベースで権限判定
+//    - regions (領域ノード)         … プロジェクト横断の公開資産。座標は immutable
+//    - manifest_metadata            … 資料の事実情報。ログイン済みなら書き込み可
+//
+//  注:
+//    - 過渡期: researchProjectId が欠落しているドキュメントの読み取りは許容、
+//             ただし更新には researchProjectId 必須に倒すか別途検討
+//    - 領域削除の「アノテーション残存ゼロ」チェックはルールでは表現困難
+//      （コレクション集計が書けないため）→ アプリ + Cloud Functions で補強
+// =====================================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ============================================================
+    // ヘルパ関数
+    // ============================================================
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function memberDoc(pid) {
+      return /databases/$(database)/documents/projects/$(pid)/members/$(request.auth.uid);
+    }
+
+    function isMember(pid) {
+      return isSignedIn() && exists(memberDoc(pid));
+    }
+
+    function memberRole(pid) {
+      return get(memberDoc(pid)).data.role;
+    }
+
+    function isEditor(pid) {
+      return isMember(pid) && memberRole(pid) in ['owner', 'editor'];
+    }
+
+    function isOwner(pid) {
+      return isMember(pid) && memberRole(pid) == 'owner';
+    }
+
+    function projectIsPublic(pid) {
+      return exists(/databases/$(database)/documents/projects/$(pid))
+          && get(/databases/$(database)/documents/projects/$(pid)).data.visibility == 'public';
+    }
+
+    // ============================================================
+    // projects
+    // ============================================================
+
+    match /projects/{pid} {
+      // read: 公開 / メンバー / 作成者（createdBy ベースのクエリを通すため）
+      allow read: if resource.data.visibility == 'public'
+                  || isMember(pid)
+                  || (isSignedIn() && resource.data.createdBy == request.auth.uid);
+      allow create: if isSignedIn()
+                    && request.resource.data.createdBy == request.auth.uid;
+      allow update: if isOwner(pid);
+      allow delete: if isOwner(pid);
+
+      // ------- メンバーシップ -------
+      match /members/{uid} {
+        // list (サブコレクション一覧): 当該プロジェクトのメンバーだけが見える
+        //   `getDocs(membersCol(pid))` で全件取得する MemberManager 用
+        allow list: if isMember(pid);
+
+        // get (個別取得 / collectionGroup 横断): メンバー、自分のメンバーシップ、resource.data.uid 一致
+        //   collectionGroup('members').where('uid','==',uid) を通すため
+        allow get: if isMember(pid)
+                   || (isSignedIn() && request.auth.uid == uid)
+                   || (isSignedIn() && resource.data.uid == request.auth.uid);
+
+        // create:
+        //   - 既存 owner による招待
+        //   - もしくは「プロジェクト作成者が、自分自身を最初のメンバーとして登録」
+        //     （projects/{pid}.createdBy == 自分 && 追加するメンバーが自分 && role == 'owner'）
+        //     → これがないと、新規プロジェクト作成時に最初の owner ドキュメントが書けない
+        //       （循環依存：isOwner はメンバーシップ存在を前提とするため）
+        allow create: if isOwner(pid)
+                      || (isSignedIn()
+                          && request.auth.uid == uid
+                          && request.resource.data.role == 'owner'
+                          && get(/databases/$(database)/documents/projects/$(pid)).data.createdBy == request.auth.uid);
+
+        // update: ロール変更は owner のみ
+        allow update: if isOwner(pid);
+
+        // 自分自身の退会は誰でも可、それ以外（除名）は owner のみ
+        allow delete: if isOwner(pid)
+                      || (isSignedIn() && request.auth.uid == uid);
+      }
+    }
+
+    // ============================================================
+    // test (アノテーション)
+    //   - researchProjectId を持つドキュメントはプロジェクト権限で判定
+    //   - 過渡期データ（researchProjectId 欠落）は creator ベースで判定（旧ルール互換）
+    // ============================================================
+
+    // 注意: test の read を「公開」にしている理由
+    //   元々の旧ルールが `allow read: if true` で公開だったため、後方互換のため公開に据え置く。
+    //   研究プロジェクト所有モデルは create/update/delete の権限制御で担保する。
+    //   将来的にプロジェクト非公開アノテーションを実装する際は、
+    //   クライアント側で `where('researchProjectId','==',pid)` で絞る前提のルールに変える。
+    match /test/{docId} {
+      // list と get の両方を明示的に許可
+      allow list, get: if true;
+
+      allow create: if isSignedIn()
+                    && request.resource.data.creator == request.auth.uid
+                    && isEditor(request.resource.data.researchProjectId);
+
+      allow update, delete: if
+        // 新規データ: プロジェクト editor 以上
+        ('researchProjectId' in resource.data && isEditor(resource.data.researchProjectId))
+        // 過渡期データ: 旧来通り creator のみ
+        || (!('researchProjectId' in resource.data)
+            && isSignedIn()
+            && request.auth.uid == resource.data.creator);
+    }
+
+    // ============================================================
+    // regions (領域ノード — プロジェクト横断の公開資産)
+    // ============================================================
+
+    match /regions/{docId} {
+      allow read: if true;
+      allow create: if isSignedIn()
+                    && request.resource.data.creator == request.auth.uid;
+      // 座標は immutable
+      allow update: if false;
+      // 削除は creator のみ（アノテーション残存チェックはアプリ側で実施）
+      allow delete: if isSignedIn() && request.auth.uid == resource.data.creator;
+    }
+
+    // ============================================================
+    // manifest_metadata (資料の事実情報 — プロジェクト非依存)
+    // ============================================================
+
+    match /manifest_metadata/{docId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+  }
+}
