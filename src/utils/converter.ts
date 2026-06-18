@@ -456,21 +456,29 @@ function convertAnnotationToIIIF(
 
   const selectorType = rawSelector.type as string;
   const sourceType = sourceTypeFromSelector(selectorType);
+  // W3C Web Annotation Data Model に合わせ source / selector は単一オブジェクトで出力する
+  // （Universal Viewer / Annona 等の主要パーサは配列形を解釈しない）。
   const target: Record<string, unknown> = {
     type: 'SpecificResource',
-    source: [{ id: doc.target_canvas, type: sourceType }],
-    selector: [convertSelectorToIIIF(rawSelector)],
+    source: { id: doc.target_canvas, type: sourceType },
+    selector: convertSelectorToIIIF(rawSelector),
   };
   if (targetId) target.id = targetId;
 
+  // body は v3 の TextualBody に正規化。
+  // 本文（Markdown 由来の HTML）が空のときはアノテーションラベルをフォールバック表示にする。
+  const bodyValue = descriptionHtml && descriptionHtml.trim().length > 0
+    ? descriptionHtml
+    : (doc.data.body.label ?? '');
   const annotation: IIIFAnnotation = {
     id: `${newUrl}/annotation/${doc.id}`,
     type: 'Annotation',
     motivation: 'commenting',
     body: {
-      value: descriptionHtml,
+      type: 'TextualBody',
+      format: 'text/html',
+      value: bodyValue,
       label: doc.data.body.label,
-      type: doc.data.body.type,
     },
     target,
   };
@@ -705,8 +713,8 @@ export const downloadIIIFManifest = async (
     );
   }
 
-  // アノテーションとGeo featuresを変換
-  const annotations: IIIFAnnotation[] = [];
+  // アノテーションとGeo featuresを変換。target_canvas 単位にグルーピングする。
+  const annotationsByCanvas = new Map<string, IIIFAnnotation[]>();
   const allGeoFeatures: GeoFeature[] = [];
 
   firebaseDocuments.forEach((doc) => {
@@ -721,26 +729,34 @@ export const downloadIIIFManifest = async (
       manifestUrl,
       regionsMap
     );
-    annotations.push(annotation);
+    // 紐づけ先 canvas が manifest 内に存在しなければ先頭 canvas にフォールバック。
+    const targetCanvas = doc.target_canvas || (data.items[0]?.id as string) || '';
+    const bucket = annotationsByCanvas.get(targetCanvas) ?? [];
+    bucket.push(annotation);
+    annotationsByCanvas.set(targetCanvas, bucket);
     allGeoFeatures.push(...geoFeatures);
   });
 
-  // Canvas直下にannotations配列がなければ作成
-  if (!data.items[0].annotations) {
-    data.items[0].annotations = [];
-  }
+  // 各 canvas の annotations に、当該 canvas を target に持つアノテーション群を AnnotationPage として付与する。
+  const canvasById = new Map<string, Record<string, unknown>>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (data.items as any[]).forEach((c) => {
+    if (c && typeof c.id === 'string') canvasById.set(c.id, c);
+  });
 
-  // AnnotationPageを追加
-  const paintingAnnotationPage = {
-    id: `${newUrl}/annotationPage/${uuidv4()}`,
-    type: 'AnnotationPage',
-    items: annotations,
-  };
-  data.items[0].annotations.push(paintingAnnotationPage);
+  annotationsByCanvas.forEach((annos, canvasId) => {
+    const canvas = canvasById.get(canvasId) ?? data.items[0];
+    if (!Array.isArray(canvas.annotations)) canvas.annotations = [];
+    canvas.annotations.push({
+      id: `${newUrl}/annotationPage/${uuidv4()}`,
+      type: 'AnnotationPage',
+      items: annos,
+    });
+  });
 
-  // Geo featuresがある場合、georeferencingのAnnotationPageを追加
+  // Geo featuresがある場合、georeferencingのAnnotationPageを先頭 canvas に付与する。
   if (allGeoFeatures.length > 0) {
-    const targetCanvas = firebaseDocuments[0]?.target_canvas || '';
+    const targetCanvas = firebaseDocuments[0]?.target_canvas || (data.items[0]?.id as string) || '';
     const geoAnnotation: GeoAnnotation = {
       id: `${newUrl}/annotation/geo`,
       type: 'Annotation',
@@ -759,7 +775,9 @@ export const downloadIIIFManifest = async (
       type: 'AnnotationPage',
       items: [geoAnnotation],
     };
-    data.items[0].annotations.push(geoAnnotationPage);
+    const hostCanvas = canvasById.get(targetCanvas) ?? data.items[0];
+    if (!Array.isArray(hostCanvas.annotations)) hostCanvas.annotations = [];
+    hostCanvas.annotations.push(geoAnnotationPage);
   }
 
   // Objectメタデータを追加

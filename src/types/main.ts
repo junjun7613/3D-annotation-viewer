@@ -135,7 +135,7 @@ export interface IIIFAnnotation {
   id: string;
   type: string;
   motivation: string;
-  body: { value: string; label: string; type: string };
+  body: { type: string; value: string; format?: string; label?: string };
   target: Record<string, unknown>;
   seeAlso?: Record<string, unknown>[];
 }
