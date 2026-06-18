@@ -144,6 +144,162 @@ export async function fetchManifestLabel(manifestUrl: string): Promise<{ label: 
   return { label, data };
 }
 
+// label が string / 多言語 / 配列 のいずれであっても v3 言語マップに正規化する。
+// lang ヒントは入力 manifest の表記に従う（NDL は日本語想定なので "ja" を既定）。
+function toLanguageMap(label: unknown, defaultLang: string = 'ja'): Record<string, string[]> {
+  if (label == null) return { none: [''] };
+  if (typeof label === 'string') return { [defaultLang]: [label] };
+  if (Array.isArray(label)) return { [defaultLang]: label.map(String) };
+  if (typeof label === 'object') {
+    // すでに言語マップ形式（値が配列）ならそのまま、値が文字列なら配列化
+    const out: Record<string, string[]> = {};
+    for (const [k, v] of Object.entries(label as Record<string, unknown>)) {
+      if (Array.isArray(v)) out[k] = v.map(String);
+      else if (typeof v === 'string') out[k] = [v];
+    }
+    if (Object.keys(out).length > 0) return out;
+  }
+  return { none: [String(label)] };
+}
+
+// IIIF Presentation API 2.x マニフェストを 3.0 形式に正規化する。
+// 入力がすでに v3（items を持つ）であればそのまま返す。
+// 対応スコープ: ルート Manifest / sequences[0].canvases / 各 Canvas の images（painting Annotation）。
+// otherContent（v2 の AnnotationList 参照）は本実装ではフェッチせず破棄する。
+// 既存アノテーションは本システムが Canvas.annotations に新規 AnnotationPage として追加するため。
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function normalizeV2ToV3(data: any): any {
+  // すでに v3 とみなせる: items 配列を持っていれば触らない
+  if (Array.isArray(data.items) && data.items.length > 0) {
+    return data;
+  }
+
+  const v2Canvases = data?.sequences?.[0]?.canvases;
+  if (!Array.isArray(v2Canvases) || v2Canvases.length === 0) {
+    // v2 でも v3 でもない: 呼び出し元のエラーハンドリングに委ねる
+    return data;
+  }
+
+  // --- ルートを v3 化 ---
+  data['@context'] = 'http://iiif.io/api/presentation/3/context.json';
+  if (data['@id'] && !data.id) data.id = data['@id'];
+  delete data['@id'];
+  data.type = 'Manifest';
+  delete data['@type'];
+  data.label = toLanguageMap(data.label);
+
+  // attribution → requiredStatement（v3）
+  if (data.attribution && !data.requiredStatement) {
+    data.requiredStatement = {
+      label: toLanguageMap('Attribution', 'en'),
+      value: toLanguageMap(data.attribution),
+    };
+  }
+  delete data.attribution;
+
+  // logo は v3 では provider.logo 配下だが、出力 viewer 側で必須でないので簡易処理
+  if (data.logo) {
+    const logoUrl = typeof data.logo === 'string' ? data.logo : data.logo['@id'];
+    if (logoUrl) {
+      data.provider = data.provider || [
+        {
+          id: data.id || 'https://example.org/provider',
+          type: 'Agent',
+          label: toLanguageMap('Provider', 'en'),
+          logo: [{ id: logoUrl, type: 'Image', format: 'image/png' }],
+        },
+      ];
+    }
+    delete data.logo;
+  }
+
+  // license → rights（v3 は URL 文字列）
+  if (data.license && !data.rights) {
+    data.rights = typeof data.license === 'string' ? data.license : data.license['@id'];
+  }
+  delete data.license;
+
+  // metadata: v2 は { label, value } の文字列。v3 は言語マップ。
+  if (Array.isArray(data.metadata)) {
+    data.metadata = data.metadata.map((m: Record<string, unknown>) => ({
+      label: toLanguageMap(m.label),
+      value: toLanguageMap(m.value),
+    }));
+  }
+
+  // seeAlso: v2 は文字列でも許容。v3 は配列のオブジェクト。
+  if (typeof data.seeAlso === 'string') {
+    data.seeAlso = [{ id: data.seeAlso, type: 'Dataset' }];
+  }
+
+  // --- canvases → items に変換 ---
+  data.items = v2Canvases.map((c: Record<string, unknown>) => normalizeV2Canvas(c));
+  delete data.sequences;
+
+  return data;
+}
+
+// v2 Canvas を v3 Canvas に変換する。
+// images: [oa:Annotation{ resource: dctypes:Image, on: <canvasId> }] を
+// items: [AnnotationPage{ items: [Annotation{ motivation:"painting", body, target }] }] に展開する。
+function normalizeV2Canvas(canvas: Record<string, unknown>): Record<string, unknown> {
+  const canvasId = (canvas['@id'] as string) || (canvas.id as string);
+  const out: Record<string, unknown> = {
+    id: canvasId,
+    type: 'Canvas',
+    label: toLanguageMap(canvas.label),
+    width: canvas.width,
+    height: canvas.height,
+  };
+
+  const images = canvas.images as Array<Record<string, unknown>> | undefined;
+  if (Array.isArray(images) && images.length > 0) {
+    const paintingAnnotations = images.map((img) => {
+      const resource = (img.resource as Record<string, unknown>) || {};
+      const body: Record<string, unknown> = {
+        id: (resource['@id'] as string) || (resource.id as string),
+        type: 'Image',
+        format: (resource.format as string) || 'image/jpeg',
+      };
+      if (resource.width) body.width = resource.width;
+      if (resource.height) body.height = resource.height;
+
+      // IIIF Image API service の v2 → v3 変換（最小限）
+      const service = resource.service as Record<string, unknown> | undefined;
+      if (service) {
+        const svcId = (service['@id'] as string) || (service.id as string);
+        if (svcId) {
+          body.service = [
+            {
+              id: svcId,
+              type: 'ImageService2',
+              profile: (service.profile as string) || 'http://iiif.io/api/image/2/level1.json',
+            },
+          ];
+        }
+      }
+
+      return {
+        id: (img['@id'] as string) || `${canvasId}/painting/${uuidv4()}`,
+        type: 'Annotation',
+        motivation: 'painting',
+        body,
+        target: (img.on as string) || canvasId,
+      };
+    });
+
+    out.items = [
+      {
+        id: `${canvasId}/page`,
+        type: 'AnnotationPage',
+        items: paintingAnnotations,
+      },
+    ];
+  }
+
+  return out;
+}
+
 // seeAlsoアイテムを構築する関数
 function buildSeeAlsoItems(doc: NewAnnotation, manifestBase: string): Record<string, unknown>[] {
   const seeAlsoItems: Record<string, unknown>[] = [];
@@ -539,17 +695,14 @@ export const downloadIIIFManifest = async (
       ? data.label
       : data.label?.ja?.[0] || data.label?.en?.[0] || data.label?.none?.[0] || 'Manifest';
 
-  // IIIF Presentation v2 互換: items が無ければ sequences[0].canvases を items とみなして
-  // 同じ配列参照を共有させ、以降の v3 前提コード（data.items[0].annotations 等）が動くようにする。
+  // IIIF Presentation v2 を v3 に正規化する。v3 ならそのまま通す。
+  // これにより以降の v3 前提コード（data.items[0].annotations 等）が一貫して動作し、
+  // 出力 manifest も IIIF Presentation API 3.0 に準拠する。
+  normalizeV2ToV3(data);
   if (!Array.isArray(data.items) || data.items.length === 0) {
-    const v2Canvases = data?.sequences?.[0]?.canvases;
-    if (Array.isArray(v2Canvases) && v2Canvases.length > 0) {
-      data.items = v2Canvases;
-    } else {
-      throw new Error(
-        `IIIF manifest has no items / sequences[0].canvases — unsupported shape: ${manifestUrl}`
-      );
-    }
+    throw new Error(
+      `IIIF manifest has no items / sequences[0].canvases — unsupported shape: ${manifestUrl}`
+    );
   }
 
   // アノテーションとGeo featuresを変換
