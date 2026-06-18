@@ -136,9 +136,7 @@ export interface IIIFAnnotation {
   type: string;
   motivation: string;
   body: { type: string; value: string; format?: string; label?: string };
-  // W3C Web Annotation: target は単一の IRI 文字列、SpecificResource オブジェクト、
-  // またはそれらの配列（複数 target）のいずれも許容される。
-  target: string | Record<string, unknown> | Array<string | Record<string, unknown>>;
+  target: Record<string, unknown>;
   seeAlso?: Record<string, unknown>[];
 }
 

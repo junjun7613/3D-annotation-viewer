@@ -461,32 +461,17 @@ function convertAnnotationToIIIF(
 
   const selectorType = rawSelector.type as string;
   const sourceType = sourceTypeFromSelector(selectorType);
-  const iiifSelector = convertSelectorToIIIF(rawSelector);
+  // 2D は source を Canvas URI の文字列で出力する。
+  // SpecificResource.source をオブジェクト形で書くと Mirador 3 等の主要 v3 ビューアは
+  // selector を画像オーバーレイに反映しない（一覧表示は出るが矩形が描画されない）。
+  // W3C Web Annotation でも source は IRI（文字列）形が一般的。3D は独自セレクタなので Scene URI をオブジェクトで保持。
   const is2D = sourceType === 'Canvas';
-
-  // SpecificResource: 本論の領域 URI 集約を表現する正規 target。
-  // 同一 regionId を共有する複数アノテーションは target.id を共有することで集約される。
-  const specificResource: Record<string, unknown> = {
+  const target: Record<string, unknown> = {
     type: 'SpecificResource',
     source: is2D ? doc.target_canvas : { id: doc.target_canvas, type: sourceType },
-    selector: iiifSelector,
+    selector: convertSelectorToIIIF(rawSelector),
   };
-  if (targetId) specificResource.id = targetId;
-
-  // 2D は target を [Media Fragment URI 文字列, SpecificResource] の配列にする。
-  // - 文字列: Mirador 3 等の主要 v3 ビューアが矩形オーバーレイを描画するために必須。
-  //   W3C Web Annotation の simple target IRI 形式で、Canvas URI に Media Fragment を付与する。
-  //   SVG ポリゴンは Media Fragment では表現できないため、矩形（FragmentSelector）の場合のみ付与。
-  // - SpecificResource: 領域 URI 集約および非矩形セレクタの保持に必須。本論の主張を IIIF 出力にも残す。
-  // 3D は Media Fragment が定義されていないため SpecificResource のみ。
-  let target: string | Record<string, unknown> | Array<string | Record<string, unknown>>;
-  if (is2D && (iiifSelector as Record<string, unknown>).type === 'FragmentSelector') {
-    const fragValue = (iiifSelector as { value: string }).value;
-    const mediaFragmentUri = `${doc.target_canvas}#${fragValue}`;
-    target = [mediaFragmentUri, specificResource];
-  } else {
-    target = specificResource;
-  }
+  if (targetId) target.id = targetId;
 
   // body は v3 の TextualBody に正規化。
   // 本文（Markdown 由来の HTML）が空のときはアノテーションラベルをフォールバック表示にする。
