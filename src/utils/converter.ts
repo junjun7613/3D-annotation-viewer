@@ -403,19 +403,24 @@ function convertSelectorToIIIF(selector: Record<string, unknown>): Record<string
   // --- 2D ---
   if (type === '2DRectSelector') {
     const { x, y, width, height } = selector as { x: number; y: number; width: number; height: number };
-    // xywh= は正規化座標（0–1）を pixel に変換しない — viewer 側で解釈
+    // W3C Media Fragments 1.0: xywh=percent:X,Y,W,H は浮動小数許容。
+    // 小数2桁で保持し、整数丸めによる小領域の精度損失を避ける。
+    const fmt = (v: number) => (v * 100).toFixed(2);
     return {
       type: 'FragmentSelector',
       conformsTo: 'http://www.w3.org/TR/media-frags/',
-      value: `xywh=percent:${Math.round(x * 100)},${Math.round(y * 100)},${Math.round(width * 100)},${Math.round(height * 100)}`,
+      value: `xywh=percent:${fmt(x)},${fmt(y)},${fmt(width)},${fmt(height)}`,
     };
   }
   if (type === '2DPolygonSelector') {
     const points = selector.points as { x: number; y: number }[];
-    const svgPoints = points.map((p) => `${(p.x * 100).toFixed(2)}%,${(p.y * 100).toFixed(2)}%`).join(' ');
+    // W3C Web Annotation SVG Selector: value は valid な SVG 文書である必要があり、
+    // ルート <svg> には xmlns が必須。points 属性に % 単位は使えないため、
+    // viewBox="0 0 100 100" のユーザー座標系で 0–100 の数値として頂点を記述する。
+    const svgPoints = points.map((p) => `${(p.x * 100).toFixed(2)},${(p.y * 100).toFixed(2)}`).join(' ');
     return {
       type: 'SvgSelector',
-      value: `<svg><polygon points="${svgPoints}" /></svg>`,
+      value: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><polygon points="${svgPoints}"/></svg>`,
     };
   }
 
@@ -456,11 +461,14 @@ function convertAnnotationToIIIF(
 
   const selectorType = rawSelector.type as string;
   const sourceType = sourceTypeFromSelector(selectorType);
-  // W3C Web Annotation Data Model に合わせ source / selector は単一オブジェクトで出力する
-  // （Universal Viewer / Annona 等の主要パーサは配列形を解釈しない）。
+  // 2D は source を Canvas URI の文字列で出力する。
+  // SpecificResource.source をオブジェクト形で書くと Mirador 3 等の主要 v3 ビューアは
+  // selector を画像オーバーレイに反映しない（一覧表示は出るが矩形が描画されない）。
+  // W3C Web Annotation でも source は IRI（文字列）形が一般的。3D は独自セレクタなので Scene URI をオブジェクトで保持。
+  const is2D = sourceType === 'Canvas';
   const target: Record<string, unknown> = {
     type: 'SpecificResource',
-    source: { id: doc.target_canvas, type: sourceType },
+    source: is2D ? doc.target_canvas : { id: doc.target_canvas, type: sourceType },
     selector: convertSelectorToIIIF(rawSelector),
   };
   if (targetId) target.id = targetId;
