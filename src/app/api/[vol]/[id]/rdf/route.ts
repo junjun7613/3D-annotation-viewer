@@ -20,6 +20,9 @@ export async function GET(
 
   const url = new URL(request.url);
   const pid = url.searchParams.get('pid');
+  // scope=shared : pid プロジェクトのアノテに加え、同一 regionId を持つ
+  //                他の public プロジェクトのアノテも併せて出力する
+  const scope = url.searchParams.get('scope');
 
   // ----- 認証 (Bearer ID Token) を先に試みる。任意：private 判定に必要なら 401 を返す。
   let callerUid: string | null = null;
@@ -71,8 +74,17 @@ export async function GET(
 
   const allDocs = annotationsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
+  // 全件出力時 / scope=shared：private プロジェクト所属のアノテを除外するため
+  // public プロジェクト集合を事前取得
+  if (!pid || scope === 'shared') {
+    if (!publicProjectIds) {
+      const pubSnap = await db.collection('projects').where('visibility', '==', 'public').get();
+      publicProjectIds = new Set(pubSnap.docs.map((d) => d.id));
+    }
+  }
+
   // 全件出力時：private プロジェクト所属のアノテを除外
-  const visibleDocs = !pid && publicProjectIds
+  let visibleDocs = !pid && publicProjectIds
     ? allDocs.filter((d) => {
         const rpid = (d as Record<string, unknown>).researchProjectId as string | undefined;
         // researchProjectId 欠落（過渡期データ）は出力する（旧 RDF と互換）。
@@ -80,6 +92,42 @@ export async function GET(
         return !rpid || publicProjectIds!.has(rpid);
       })
     : allDocs;
+
+  // ----- scope=shared : 同一 regionId を共有する他 public プロジェクトのアノテを追加
+  if (pid && scope === 'shared' && publicProjectIds) {
+    const regionIds = Array.from(new Set(
+      allDocs
+        .map((d) => (d as Record<string, unknown>).regionId as string | undefined)
+        .filter((v): v is string => !!v)
+    ));
+    if (regionIds.length > 0) {
+      // Firestore `in` クエリは最大 30 件 → 30 件単位でチャンク
+      const chunks: string[][] = [];
+      for (let i = 0; i < regionIds.length; i += 30) {
+        chunks.push(regionIds.slice(i, i + 30));
+      }
+      const seenIds = new Set(allDocs.map((d) => (d as { id: string }).id));
+      const extraDocs: Array<{ id: string } & Record<string, unknown>> = [];
+      for (const chunk of chunks) {
+        const snap = await db.collection('test')
+          .where('target_manifest', '==', manifestId)
+          .where('regionId', 'in', chunk)
+          .get();
+        snap.docs.forEach((doc) => {
+          if (seenIds.has(doc.id)) return;
+          const data = doc.data() as Record<string, unknown>;
+          const rpid = data.researchProjectId as string | undefined;
+          // 同一プロジェクト分は既に拾い済み（researchProjectId == pid は seenIds で除外可能だが念のため）
+          if (rpid === pid) return;
+          // public プロジェクトのみ採用（researchProjectId 欠落データは安全側で除外）
+          if (!rpid || !publicProjectIds!.has(rpid)) return;
+          seenIds.add(doc.id);
+          extraDocs.push({ id: doc.id, ...data });
+        });
+      }
+      visibleDocs = [...visibleDocs, ...extraDocs];
+    }
+  }
 
   // isObjectLevel アノテーションと通常アノテーションを分離
   const objectLevelDocs = visibleDocs.filter((d) => (d as Record<string, unknown>).isObjectLevel);

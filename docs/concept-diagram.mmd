@@ -7,23 +7,23 @@ config:
     curve: basis
     htmlLabels: true
 ---
-flowchart TB
+flowchart LR
     %% ─────────── ノード (同階層は同じ subgraph、ラベルは空白で枠のみ) ───────────
     subgraph U[" "]
-      direction LR
+      direction TB
       UA["User A"]
       UB["User B"]
       UC["User C"]
     end
 
     subgraph P[" "]
-      direction LR
+      direction TB
       PA["<b>Project α</b>"]
       PB["<b>Project β</b>"]
     end
 
     subgraph AN[" "]
-      direction LR
+      direction TB
       A1["<b>Annot A1</b><br/><i>creator: A</i>"]
       A2["<b>Annot A2</b><br/><i>creator: B</i>"]
       B1["<b>Annot B1</b><br/><i>creator: C</i>"]
@@ -31,7 +31,7 @@ flowchart TB
     end
 
     subgraph RG[" "]
-      direction LR
+      direction TB
       R1["<b>Region R1</b><br/>共有資産"]
       R2["<b>Region R2</b><br/>共有資産"]
     end
@@ -50,9 +50,6 @@ flowchart TB
     PA -- "researchProjectId" --> A2
     PB -- "researchProjectId" --> B1
     PB -- "researchProjectId" --> B2
-
-    %% ─────────── Annotation 間メタ関係 (同一 Region 内) ───────────
-    A1 <-- "supports" --> A2
 
     %% ─────────── Annotation → Region (regionId) ───────────
     A1 -- "regionId" --> R1

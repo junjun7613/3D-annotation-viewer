@@ -1275,12 +1275,20 @@ const Home: NextPage = () => {
     }
   };
 
-  const downloadRDF = async (id: string) => {
+  // scope:
+  //   'project' — 現在のプロジェクトのアノテーションのみ
+  //   'shared'  — 上記 + 同一 regionId を持つ他 public プロジェクトのアノテーションも含める
+  //   'all'     — pid を渡さず、当該マニフェストに紐づく全 public アノテーションを出力
+  const downloadRDF = async (id: string, scope: 'project' | 'shared' | 'all' = 'project') => {
     // API route 経由でダウンロードする（private プロジェクト保護を route 側で担保）。
-    // pid を付けると当該プロジェクトのみ。private プロジェクトの場合は ID Token も渡す。
     const slug = createSlug(id);
-    const baseUrl = `/api/3/${slug}/rdf`;
-    const target = projectId ? `${baseUrl}?pid=${encodeURIComponent(projectId)}` : baseUrl;
+    const params = new URLSearchParams();
+    if (scope !== 'all' && projectId) {
+      params.set('pid', projectId);
+      if (scope === 'shared') params.set('scope', 'shared');
+    }
+    const qs = params.toString();
+    const target = `/api/3/${slug}/rdf${qs ? `?${qs}` : ''}`;
     const headers: Record<string, string> = {};
     if (user) {
       try {
@@ -2594,17 +2602,49 @@ const Home: NextPage = () => {
 
       {isRDFDialogOpen && (
         <div className="dialog-overlay" onClick={handleRDFCloseDialog}>
-          <div className="dialog w-[400px]" onClick={(e) => e.stopPropagation()}>
+          <div className="dialog w-[420px]" onClick={(e) => e.stopPropagation()}>
             <div className="flex flex-col gap-4">
-              <p className="text-sm text-[var(--text-secondary)]">
-                Export RDF/Turtle for the current manifest. Annotation URIs are derived from the manifest URL.
+              <p className="text-sm font-semibold text-[var(--text-primary)]">RDF/Turtle の出力範囲</p>
+              <p className="text-xs text-[var(--text-secondary)]">
+                どの範囲のアノテーションを含めて出力しますか？
               </p>
-              <div className="flex justify-end gap-3">
-                <button type="button" onClick={() => downloadRDF(manifestUrl)} className="btn-info">
-                  Download
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => downloadRDF(manifestUrl, 'project')}
+                  disabled={!projectId}
+                  className="text-left p-3 rounded-lg border border-[var(--border)] hover:border-[var(--primary)] hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <p className="text-sm font-medium text-[var(--text-primary)]">現在のプロジェクトのみ</p>
+                  <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                    自プロジェクトのアノテーションのみを含める
+                  </p>
                 </button>
+                <button
+                  type="button"
+                  onClick={() => downloadRDF(manifestUrl, 'shared')}
+                  disabled={!projectId}
+                  className="text-left p-3 rounded-lg border border-[var(--border)] hover:border-[var(--primary)] hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <p className="text-sm font-medium text-[var(--text-primary)]">同一領域を共有する他 public プロジェクトも含める</p>
+                  <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                    自プロジェクトのアノテに加え、同じ領域ノードに付与された他 public プロジェクトのアノテーションもマージ
+                  </p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => downloadRDF(manifestUrl, 'all')}
+                  className="text-left p-3 rounded-lg border border-[var(--border)] hover:border-[var(--primary)] hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors"
+                >
+                  <p className="text-sm font-medium text-[var(--text-primary)]">すべての public アノテーション</p>
+                  <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                    この資料に紐づく全 public プロジェクトのアノテーションを含める
+                  </p>
+                </button>
+              </div>
+              <div className="flex justify-end">
                 <button type="button" onClick={handleRDFCloseDialog} className="btn-secondary">
-                  Cancel
+                  キャンセル
                 </button>
               </div>
             </div>
