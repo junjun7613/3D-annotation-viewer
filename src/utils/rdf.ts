@@ -1,4 +1,4 @@
-import type { BibliographyItem, MediaItem, WikidataItem, ObjectMetadata, NewAnnotation } from '@/types/main';
+import type { BibliographyItem, MediaItem, WikidataItem, ObjectMetadata, NewAnnotation, Project } from '@/types/main';
 import { renderMarkdown, extractResourceRefs } from './markdown';
 
 const PREFIXES =
@@ -265,7 +265,13 @@ const VOCAB_DEFINITIONS =
   ':AnnotationRelation a rdf:Property ;\n  rdfs:domain oa:Annotation ;\n  rdfs:range oa:Annotation ;\n  rdfs:subPropertyOf oa:motivatedBy .\n' +
   ':supports rdfs:subPropertyOf :AnnotationRelation .\n' +
   ':challenges rdfs:subPropertyOf :AnnotationRelation .\n' +
-  ':supplements rdfs:subPropertyOf :AnnotationRelation .\n';
+  ':supplements rdfs:subPropertyOf :AnnotationRelation .\n' +
+
+  // -- Research Project --
+  '\n# -- Research Project --\n' +
+  ':ResearchProject a rdfs:Class ;\n  rdfs:subClassOf prov:Agent ;\n  rdfs:comment "A collaborative unit that owns and edits annotations." .\n' +
+  ':fromProject a rdf:Property ;\n  rdfs:domain oa:Annotation ;\n  rdfs:range :ResearchProject ;\n  rdfs:subPropertyOf prov:wasAttributedTo ;\n  rdfs:comment "The research project under which the annotation was authored." .\n' +
+  ':visibility a rdf:Property ;\n  rdfs:domain :ResearchProject ;\n  rdfs:range xsd:string .\n';
 
 export function buildVocabularyTurtle(): string {
   return PREFIXES + VOCAB_DEFINITIONS;
@@ -274,7 +280,8 @@ export function buildVocabularyTurtle(): string {
 export function buildTurtle(
   manifestId: string,
   annotations: NewAnnotation[],
-  objectMetadata: ObjectMetadata | null
+  objectMetadata: ObjectMetadata | null,
+  projects: Project[] = []
 ): string {
   const manifestBase = manifestId.split('/').slice(0, -1).join('/');
   const annoBase = `${manifestBase}/annotation`;
@@ -282,6 +289,22 @@ export function buildTurtle(
   const bibBase = `${manifestBase}/bibliography`;
 
   let ttl = PREFIXES;
+
+  // ----- Research Project リソース（メンバー一覧は除外、createdBy のみ参照） -----
+  projects.forEach((p) => {
+    ttl += `\n<urn:project:${p.id}> a :ResearchProject ;\n`;
+    const ps: string[] = [];
+    ps.push(`  rdfs:label "${escapeLiteral(p.name)}"`);
+    ps.push(`  schema:name "${escapeLiteral(p.name)}"`);
+    if (p.description) ps.push(`  schema:description "${escapeLiteral(p.description)}"`);
+    ps.push(`  :visibility "${p.visibility}"`);
+    if (p.createdAt) {
+      ps.push(`  prov:generatedAtTime "${new Date(p.createdAt).toISOString()}"^^xsd:dateTime`);
+      ps.push(`  dcterms:created "${new Date(p.createdAt).toISOString()}"^^xsd:dateTime`);
+    }
+    if (p.createdBy) ps.push(`  prov:wasAttributedTo <urn:uid:${p.createdBy}>`);
+    ps.forEach((line, i) => { ttl += line + (i < ps.length - 1 ? ' ;\n' : ' .\n'); });
+  });
 
   if (objectMetadata) {
     ttl += `\n<${manifestId}> a :Manifest ;\n`;
@@ -522,6 +545,11 @@ export function buildTurtle(
     });
 
   return ttl;
+}
+
+// Turtle リテラルの最低限のエスケープ（バックスラッシュ・ダブルクォート・改行）
+function escapeLiteral(s: string): string {
+  return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\r?\n/g, ' ');
 }
 
 function mediaClass(type: string): string {

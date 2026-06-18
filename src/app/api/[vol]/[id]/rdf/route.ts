@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getAuth } from 'firebase-admin/auth';
+import { FieldPath } from 'firebase-admin/firestore';
 import { db } from '@/lib/firebase/admin';
 import { decodeSlug, createSlug } from '@/utils/converter';
 import { buildTurtle } from '@/utils/rdf';
-import type { NewAnnotation, ObjectMetadata } from '@/types/main';
+import type { NewAnnotation, ObjectMetadata, Project } from '@/types/main';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -153,7 +154,33 @@ export async function GET(
     };
   }
 
-  const turtle = buildTurtle(manifestId, annotations, objectMetadata);
+  // ----- 出力対象のアノテーションが参照する researchProjectId の集合からプロジェクトを取得
+  //       private プロジェクトはここまでのフィルタで visibleDocs に残らないが、
+  //       念のため visibility=public のもののみ採用する。
+  const referencedProjectIds = Array.from(new Set(
+    visibleDocs
+      .map((d) => (d as Record<string, unknown>).researchProjectId as string | undefined)
+      .filter((v): v is string => !!v)
+  ));
+  const projects: Project[] = [];
+  if (referencedProjectIds.length > 0) {
+    const chunks: string[][] = [];
+    for (let i = 0; i < referencedProjectIds.length; i += 30) {
+      chunks.push(referencedProjectIds.slice(i, i + 30));
+    }
+    for (const chunk of chunks) {
+      const snap = await db.collection('projects')
+        .where(FieldPath.documentId(), 'in', chunk)
+        .get();
+      snap.docs.forEach((doc) => {
+        const data = doc.data() as Project;
+        if (data.visibility !== 'public') return;
+        projects.push({ ...data, id: doc.id });
+      });
+    }
+  }
+
+  const turtle = buildTurtle(manifestId, annotations, objectMetadata, projects);
 
   return new NextResponse(turtle, {
     status: 200,
