@@ -1,0 +1,94 @@
+---
+title: User / Project / Region / Annotation — 概念図
+config:
+  flowchart:
+    nodeSpacing: 55
+    rankSpacing: 75
+    curve: basis
+    htmlLabels: true
+---
+flowchart TB
+    %% ─────────── ノード (同階層は同じ subgraph、ラベルは空白で枠のみ) ───────────
+    subgraph U[" "]
+      direction LR
+      UA["User A"]
+      UB["User B"]
+      UC["User C"]
+    end
+
+    subgraph P[" "]
+      direction LR
+      PA["<b>Project α</b>"]
+      PB["<b>Project β</b>"]
+    end
+
+    subgraph AN[" "]
+      direction LR
+      A1["<b>Annot A1</b><br/><i>creator: A</i>"]
+      A2["<b>Annot A2</b><br/><i>creator: B</i>"]
+      B1["<b>Annot B1</b><br/><i>creator: C</i>"]
+      B2["<b>Annot B2</b><br/><i>creator: A</i><br/>isObjectLevel"]
+    end
+
+    subgraph RG[" "]
+      direction LR
+      R1["<b>Region R1</b><br/>共有資産"]
+      R2["<b>Region R2</b><br/>共有資産"]
+    end
+
+    OBJ["<b>Object</b><br/>(IIIF Manifest)"]
+
+    %% ─────────── User → Project (members/{uid}: role) ───────────
+    UA -- "owner"  --> PA
+    UB -- "editor" --> PA
+    UB -- "editor" --> PB
+    UC -- "viewer" --> PB
+    UA -- "owner"  --> PB
+
+    %% ─────────── Project → Annotation (researchProjectId) ───────────
+    PA -- "researchProjectId" --> A1
+    PA -- "researchProjectId" --> A2
+    PB -- "researchProjectId" --> B1
+    PB -- "researchProjectId" --> B2
+
+    %% ─────────── Annotation 間メタ関係 (同一 Region 内) ───────────
+    A1 <-- "supports" --> A2
+
+    %% ─────────── Annotation → Region (regionId) ───────────
+    A1 -- "regionId" --> R1
+    A2 -- "regionId" --> R1
+    B1 -- "regionId" --> R2
+
+    %% ─────────── プロジェクト境界を越える参照 ───────────
+    B1 -. "横断参照<br/>(regionId)" .-> R1
+
+    %% ─────────── Region → Object (target_manifest) ───────────
+    R1 -- "target_manifest" --> OBJ
+    R2 -- "target_manifest" --> OBJ
+
+    %% ─────────── Object-level annotation (Region をスキップ) ───────────
+    B2 -- "target_manifest<br/>(Region 経由しない)" --> OBJ
+
+    %% ─────────── スタイル ───────────
+    classDef user    fill:#FFE9A8,stroke:#C49A2C,stroke-width:2px,color:#000
+    classDef project fill:#CDE4FF,stroke:#3478C6,stroke-width:2px,color:#000
+    classDef annot   fill:#E7D6FF,stroke:#7A4FB5,stroke-width:2px,color:#000
+    classDef region  fill:#C9F0D5,stroke:#2F8C50,stroke-width:2px,color:#000
+    classDef object  fill:#FFD3C2,stroke:#C95B30,stroke-width:2px,color:#000
+
+    class UA,UB,UC user
+    class PA,PB project
+    class A1,A2,B1,B2 annot
+    class R1,R2 region
+    class OBJ object
+
+    %% subgraph 枠を薄く (透過に近く)
+    style U  fill:#FFFBEF,stroke:#E0C77A,stroke-dasharray:3 3
+    style P  fill:#F2F7FF,stroke:#A3C2E8,stroke-dasharray:3 3
+    style AN fill:#F7F1FF,stroke:#C4ACE0,stroke-dasharray:3 3
+    style RG fill:#F0F9F3,stroke:#A7D7B6,stroke-dasharray:3 3
+
+    %% supports リンク (記述順 0-index=9)
+    linkStyle 9 stroke:#888,stroke-width:1.5px
+    %% 横断参照リンク (記述順 0-index=13) を強調
+    linkStyle 13 stroke:#2F8C50,stroke-width:2px,stroke-dasharray:6 4

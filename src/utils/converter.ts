@@ -273,15 +273,16 @@ function sourceTypeFromSelector(selectorType: string): string {
 }
 
 // アノテーションをIIIF形式に変換する関数
-// seenRegionIds: 同一 regionId の2つ目以降はセレクタを省略して id 参照のみにする
+// 同一 regionId を共有する場合も、各アノテーションは独立に valid な
+// SpecificResource（id + source + selector を完全展開）として出力する。
+// 領域 URI（target.id）の一致でアノテーション間の集約は RDF 側に委ねる。
 function convertAnnotationToIIIF(
   doc: NewAnnotation,
   newUrl: string,
   baseUrl: string,
   manifestLabel: string,
   manifestUrl: string,
-  regionsMap?: Map<string, Record<string, unknown>>,
-  seenRegionIds?: Set<string>
+  regionsMap?: Map<string, Record<string, unknown>>
 ): { annotation: IIIFAnnotation; geoFeatures: GeoFeature[] } {
   const markdown = typeof doc.data.body.value === 'string' ? doc.data.body.value : '';
   const descriptionHtml = renderMarkdown(markdown, {
@@ -297,24 +298,14 @@ function convertAnnotationToIIIF(
     : (doc.data.target.selector as unknown as Record<string, unknown>);
   const targetId = regionId ? `${newUrl}/region/${regionId}` : undefined;
 
-  // 同一 regionId の初出かどうか
-  const isFirstOccurrence = regionId ? !seenRegionIds?.has(regionId) : true;
-  if (regionId && seenRegionIds && isFirstOccurrence) seenRegionIds.add(regionId);
-
-  let target: Record<string, unknown>;
-  if (targetId && !isFirstOccurrence) {
-    // 2つ目以降：id 参照のみ（セレクタ・source の重複を避ける）
-    target = { id: targetId, type: 'SpecificResource' };
-  } else {
-    const selectorType = rawSelector.type as string;
-    const sourceType = sourceTypeFromSelector(selectorType);
-    target = {
-      type: 'SpecificResource',
-      source: [{ id: doc.target_canvas, type: sourceType }],
-      selector: [convertSelectorToIIIF(rawSelector)],
-    };
-    if (targetId) target.id = targetId;
-  }
+  const selectorType = rawSelector.type as string;
+  const sourceType = sourceTypeFromSelector(selectorType);
+  const target: Record<string, unknown> = {
+    type: 'SpecificResource',
+    source: [{ id: doc.target_canvas, type: sourceType }],
+    selector: [convertSelectorToIIIF(rawSelector)],
+  };
+  if (targetId) target.id = targetId;
 
   const annotation: IIIFAnnotation = {
     id: `${newUrl}/annotation/${doc.id}`,
@@ -564,7 +555,6 @@ export const downloadIIIFManifest = async (
   // アノテーションとGeo featuresを変換
   const annotations: IIIFAnnotation[] = [];
   const allGeoFeatures: GeoFeature[] = [];
-  const seenRegionIds = new Set<string>();
 
   firebaseDocuments.forEach((doc) => {
     // Object Annotation は領域セレクタを持たないため IIIF 領域アノテとしては出力しない。
@@ -576,8 +566,7 @@ export const downloadIIIFManifest = async (
       baseUrl,
       manifestLabel,
       manifestUrl,
-      regionsMap,
-      seenRegionIds
+      regionsMap
     );
     annotations.push(annotation);
     allGeoFeatures.push(...geoFeatures);
