@@ -380,7 +380,16 @@ function buildSeeAlsoItems(doc: NewAnnotation, manifestBase: string): Record<str
 // Firebase保存形式のセレクターをIIIF仕様形式に変換する
 // 3D: IIIF 3D Draft仕様 https://iiif.github.io/3d/temp-draft-4.html
 // 2D: Web Annotation Data Model (FragmentSelector / SvgSelector)
-function convertSelectorToIIIF(selector: Record<string, unknown>): Record<string, unknown> {
+//
+// Mirador 互換のため 2D はキャンバスのピクセル座標で出力する：
+// - FragmentSelector: Mirador の AnnotationItem.fragmentSelector は xywh=(.*)$ を
+//   parseInt するため、percent: プレフィックスや浮動小数は描画されない。整数ピクセルが必須。
+// - SvgSelector: Mirador の CanvasAnnotationDisplay.svgPaths は <path> 要素のみを
+//   Path2D に渡して描画するため、<polygon> は無視される。<path d="M...Z"> 形式 + ピクセル座標が必須。
+function convertSelectorToIIIF(
+  selector: Record<string, unknown>,
+  canvasDims?: { width: number; height: number }
+): Record<string, unknown> {
   const type = selector.type as string;
 
   // --- 3D ---
@@ -401,10 +410,21 @@ function convertSelectorToIIIF(selector: Record<string, unknown>): Record<string
   }
 
   // --- 2D ---
+  // canvas 寸法がない場合のフォールバック: percent ベース（Mirador は描画できないが
+  // 仕様上は valid なので IIIF データとしての健全性は保つ）
   if (type === '2DRectSelector') {
     const { x, y, width, height } = selector as { x: number; y: number; width: number; height: number };
-    // W3C Media Fragments 1.0: xywh=percent:X,Y,W,H は浮動小数許容。
-    // 小数2桁で保持し、整数丸めによる小領域の精度損失を避ける。
+    if (canvasDims) {
+      const px = Math.round(x * canvasDims.width);
+      const py = Math.round(y * canvasDims.height);
+      const pw = Math.round(width * canvasDims.width);
+      const ph = Math.round(height * canvasDims.height);
+      return {
+        type: 'FragmentSelector',
+        conformsTo: 'http://www.w3.org/TR/media-frags/',
+        value: `xywh=${px},${py},${pw},${ph}`,
+      };
+    }
     const fmt = (v: number) => (v * 100).toFixed(2);
     return {
       type: 'FragmentSelector',
@@ -414,13 +434,30 @@ function convertSelectorToIIIF(selector: Record<string, unknown>): Record<string
   }
   if (type === '2DPolygonSelector') {
     const points = selector.points as { x: number; y: number }[];
-    // W3C Web Annotation SVG Selector: value は valid な SVG 文書である必要があり、
-    // ルート <svg> には xmlns が必須。points 属性に % 単位は使えないため、
-    // viewBox="0 0 100 100" のユーザー座標系で 0–100 の数値として頂点を記述する。
-    const svgPoints = points.map((p) => `${(p.x * 100).toFixed(2)},${(p.y * 100).toFixed(2)}`).join(' ');
+    if (canvasDims && points.length > 0) {
+      // Mirador は <path> の d 属性のみ Path2D で描画するため、polygon ではなく path で出力。
+      // ピクセル座標で M x y L x y ... Z 形式に変換する。
+      const cmds = points.map((p, i) => {
+        const px = Math.round(p.x * canvasDims.width);
+        const py = Math.round(p.y * canvasDims.height);
+        return `${i === 0 ? 'M' : 'L'} ${px} ${py}`;
+      });
+      const d = `${cmds.join(' ')} Z`;
+      return {
+        type: 'SvgSelector',
+        value: `<svg xmlns="http://www.w3.org/2000/svg"><path d="${d}"/></svg>`,
+      };
+    }
+    // canvas 寸法不明時のフォールバック: viewBox 0-100 の path
+    const cmds = points.map((p, i) => {
+      const px = (p.x * 100).toFixed(2);
+      const py = (p.y * 100).toFixed(2);
+      return `${i === 0 ? 'M' : 'L'} ${px} ${py}`;
+    });
+    const d = `${cmds.join(' ')} Z`;
     return {
       type: 'SvgSelector',
-      value: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><polygon points="${svgPoints}"/></svg>`,
+      value: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="${d}"/></svg>`,
     };
   }
 
@@ -443,7 +480,8 @@ function convertAnnotationToIIIF(
   baseUrl: string,
   manifestLabel: string,
   manifestUrl: string,
-  regionsMap?: Map<string, Record<string, unknown>>
+  regionsMap?: Map<string, Record<string, unknown>>,
+  canvasDimsMap?: Map<string, { width: number; height: number }>
 ): { annotation: IIIFAnnotation; geoFeatures: GeoFeature[] } {
   const markdown = typeof doc.data.body.value === 'string' ? doc.data.body.value : '';
   const descriptionHtml = renderMarkdown(markdown, {
@@ -466,10 +504,11 @@ function convertAnnotationToIIIF(
   // selector を画像オーバーレイに反映しない（一覧表示は出るが矩形が描画されない）。
   // W3C Web Annotation でも source は IRI（文字列）形が一般的。3D は独自セレクタなので Scene URI をオブジェクトで保持。
   const is2D = sourceType === 'Canvas';
+  const canvasDims = is2D && doc.target_canvas ? canvasDimsMap?.get(doc.target_canvas) : undefined;
   const target: Record<string, unknown> = {
     type: 'SpecificResource',
     source: is2D ? doc.target_canvas : { id: doc.target_canvas, type: sourceType },
-    selector: convertSelectorToIIIF(rawSelector),
+    selector: convertSelectorToIIIF(rawSelector, canvasDims),
   };
   if (targetId) target.id = targetId;
 
@@ -721,6 +760,15 @@ export const downloadIIIFManifest = async (
     );
   }
 
+  // Canvas ピクセル寸法のマップを作成（Mirador 互換の selector 出力に使用）
+  const canvasDimsMap = new Map<string, { width: number; height: number }>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (data.items as any[]).forEach((c) => {
+    if (c && typeof c.id === 'string' && typeof c.width === 'number' && typeof c.height === 'number') {
+      canvasDimsMap.set(c.id, { width: c.width, height: c.height });
+    }
+  });
+
   // アノテーションとGeo featuresを変換。target_canvas 単位にグルーピングする。
   const annotationsByCanvas = new Map<string, IIIFAnnotation[]>();
   const allGeoFeatures: GeoFeature[] = [];
@@ -735,7 +783,8 @@ export const downloadIIIFManifest = async (
       baseUrl,
       manifestLabel,
       manifestUrl,
-      regionsMap
+      regionsMap,
+      canvasDimsMap
     );
     // 紐づけ先 canvas が manifest 内に存在しなければ先頭 canvas にフォールバック。
     const targetCanvas = doc.target_canvas || (data.items[0]?.id as string) || '';
