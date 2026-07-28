@@ -13,6 +13,7 @@ import SignIn from '@/app/components/SignIn';
 import ThreeCanvas from '@/app/components/ThreeCanvasManifest';
 import type { Annotation2D } from '@/app/components/TwoDCanvas';
 import TEILinkViewer from '@/app/components/TEILinkViewer';
+import SparqlTextViewer from '@/app/components/SparqlTextViewer';
 import { regionPanelAtom, infoPanelAtom } from '@/app/atoms/infoPanelAtom';
 import { objectMetadataService } from '@/lib/services/objectMetadata';
 import { generateSourceDocTei, type RegionCoords } from '@/utils/teiGenerator';
@@ -39,6 +40,10 @@ const TextualEditor: NextPage = () => {
   // 利用可能な要素タイプと、ユーザーが選択中のタイプ
   const [availableTypes, setAvailableTypes] = useState<{ type: string; count: number }[]>([]);
   const [activeTypes, setActiveTypes] = useState<string[]>(['lb']);
+
+  // Text data source: TEI XML upload or ATAG SPARQL endpoint
+  const atagEndpoint = process.env.NEXT_PUBLIC_ATAG_SPARQL_ENDPOINT || '';
+  const [dataSource, setDataSource] = useState<'tei' | 'atag'>('tei');
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -310,10 +315,40 @@ const TextualEditor: NextPage = () => {
           )}
         </div>
 
-        {/* Right: TEI viewer */}
+        {/* Right: Text viewer (TEI XML or ATAG SPARQL) */}
         <div className="flex-1 min-w-0 border-l border-[var(--border)] flex flex-col overflow-hidden">
-          {/* Selected region indicator */}
-          <div className={`px-4 py-2 border-b border-[var(--border)] flex-shrink-0 text-sm ${selectedRegionId ? 'bg-[color-mix(in_srgb,var(--primary)_8%,transparent)]' : ''}`}>
+          {/* Data source tabs */}
+          {atagEndpoint && (
+            <div className="flex border-b border-[var(--border)] flex-shrink-0">
+              <button
+                onClick={() => setDataSource('tei')}
+                className={`px-4 py-2 text-xs font-medium transition-colors ${
+                  dataSource === 'tei'
+                    ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                TEI XML
+              </button>
+              <button
+                onClick={() => setDataSource('atag')}
+                className={`px-4 py-2 text-xs font-medium transition-colors ${
+                  dataSource === 'atag'
+                    ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                ATAG SPARQL
+              </button>
+            </div>
+          )}
+
+          {/* Selected region indicator (TEI mode only) */}
+          <div
+            className={`px-4 py-2 border-b border-[var(--border)] flex-shrink-0 text-sm ${
+              selectedRegionId ? 'bg-[color-mix(in_srgb,var(--primary)_8%,transparent)]' : ''
+            } ${dataSource === 'tei' ? '' : 'hidden'}`}
+          >
             {selectedRegionId ? (
               <div className="flex items-center gap-2">
                 <svg width="10" height="10" viewBox="0 0 12 12" className="flex-shrink-0">
@@ -332,8 +367,8 @@ const TextualEditor: NextPage = () => {
             )}
           </div>
 
-          {/* Element type filter */}
-          {availableTypes.length > 0 && (
+          {/* Element type filter (TEI mode only) */}
+          {dataSource === 'tei' && availableTypes.length > 0 && (
             <div className="px-4 py-2 border-b border-[var(--border)] flex-shrink-0">
               <div className="flex items-center justify-between mb-1">
                 <span className="text-[10px] uppercase tracking-wide text-[var(--text-secondary)]">Element types</span>
@@ -360,28 +395,35 @@ const TextualEditor: NextPage = () => {
             </div>
           )}
 
-          <div className="flex-1 overflow-hidden p-4">
-            <TEILinkViewer
-              manifestUrl={manifestUrl}
-              initialXml={originalTeiXml || undefined}
-              onTextLoad={(xml) => {
-                setOriginalTeiXml(xml);
-                setElementMappings({});
-                setSelectedElementId(null);
-                persistTei(xml, {});
-              }}
-              onElementClick={handleElementClick}
-              onUnlink={handleElementUnlink}
-              elementMappings={elementMappings}
-              selectedElementId={selectedElementId}
-              highlightedElementId={highlightedElementId}
-              activeElementTypes={activeTypes}
-              onAvailableTypesChange={setAvailableTypes}
-              canExport={!!originalTeiXml && Object.keys(elementMappings).length > 0}
-              isExporting={isGeneratingTei}
-              onExport={originalTeiXml ? downloadSourceDocTei : undefined}
-              onClearTei={originalTeiXml ? handleClearTei : undefined}
-            />
+          <div className="flex-1 overflow-hidden p-4 flex flex-col min-h-0">
+            <div className={`flex-1 min-h-0 ${dataSource === 'tei' ? '' : 'hidden'}`}>
+              <TEILinkViewer
+                manifestUrl={manifestUrl}
+                initialXml={originalTeiXml || undefined}
+                onTextLoad={(xml) => {
+                  setOriginalTeiXml(xml);
+                  setElementMappings({});
+                  setSelectedElementId(null);
+                  persistTei(xml, {});
+                }}
+                onElementClick={handleElementClick}
+                onUnlink={handleElementUnlink}
+                elementMappings={elementMappings}
+                selectedElementId={selectedElementId}
+                highlightedElementId={highlightedElementId}
+                activeElementTypes={activeTypes}
+                onAvailableTypesChange={setAvailableTypes}
+                canExport={!!originalTeiXml && Object.keys(elementMappings).length > 0}
+                isExporting={isGeneratingTei}
+                onExport={originalTeiXml ? downloadSourceDocTei : undefined}
+                onClearTei={originalTeiXml ? handleClearTei : undefined}
+              />
+            </div>
+            {atagEndpoint && (
+              <div className={`flex-1 min-h-0 ${dataSource === 'atag' ? '' : 'hidden'}`}>
+                <SparqlTextViewer endpoint={atagEndpoint} />
+              </div>
+            )}
           </div>
         </div>
       </div>
