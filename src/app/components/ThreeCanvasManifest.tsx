@@ -425,7 +425,8 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
         const loader = new GLTFLoader();
         try {
           const dracoLoader = new DRACOLoader();
-          dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+          dracoLoader.setDecoderPath('/draco/');
+          dracoLoader.setDecoderConfig({ type: 'wasm' });
           dracoLoader.preload();
           loader.setDRACOLoader(dracoLoader);
           console.log('DRACO loader configured');

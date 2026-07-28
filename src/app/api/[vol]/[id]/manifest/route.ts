@@ -102,21 +102,45 @@ export async function GET(
     });
   }
 
-  // Objectメタデータを取得
+  // Object メタデータを取得
+  // - manifest_metadata: プロジェクト非依存のマニフェスト共通情報（location / thumbnail / label / TEI）
+  // - Object Annotation（test.isObjectLevel=true）: プロジェクト単位の media / wikidata / bibliography
+  //   pid 指定時は当該プロジェクトのみ、pid なし時は public プロジェクトの Object Annotation を結合する。
   const manifestDocId = createSlug(manifestId);
   const objectMetadataRef = db.collection('manifest_metadata').doc(manifestDocId);
   const objectMetadataDoc = await objectMetadataRef.get();
+  const metaData = objectMetadataDoc.exists ? objectMetadataDoc.data() : null;
 
-  let objectMetadata = null;
-  if (objectMetadataDoc.exists) {
-    const data = objectMetadataDoc.data();
-    objectMetadata = {
-      media: data?.media || [],
-      wikidata: data?.wikidata || [],
-      bibliography: data?.bibliography || [],
-      location: data?.location,
-    };
-  }
+  const objectLevelDocs = allDocs.filter(
+    (d) => (d as unknown as { isObjectLevel?: boolean }).isObjectLevel === true
+  );
+  // 全件出力時のみ、Object Annotation も public プロジェクト所属に絞り込む
+  const visibleObjectLevelDocs = !pid && publicProjectIds
+    ? objectLevelDocs.filter((d) => {
+        const rpid = (d as unknown as { researchProjectId?: string }).researchProjectId;
+        return !rpid || publicProjectIds!.has(rpid);
+      })
+    : objectLevelDocs;
+
+  const mergedMedia = visibleObjectLevelDocs.flatMap(
+    (d) => ((d as unknown as { media?: unknown[] }).media ?? []) as never[]
+  );
+  const mergedWikidata = visibleObjectLevelDocs.flatMap(
+    (d) => ((d as unknown as { wikidata?: unknown[] }).wikidata ?? []) as never[]
+  );
+  const mergedBibliography = visibleObjectLevelDocs.flatMap(
+    (d) => ((d as unknown as { bibliography?: unknown[] }).bibliography ?? []) as never[]
+  );
+
+  const hasObjectMetadata = !!metaData || visibleObjectLevelDocs.length > 0;
+  const objectMetadata = hasObjectMetadata
+    ? {
+        media: mergedMedia,
+        wikidata: mergedWikidata,
+        bibliography: mergedBibliography,
+        location: metaData?.location,
+      }
+    : null;
 
   // プロジェクト情報を manifest に付加（pid 指定時のみ）
   let project: ProjectInfo | null = null;
