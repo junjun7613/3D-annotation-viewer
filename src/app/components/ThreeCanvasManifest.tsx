@@ -149,6 +149,9 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   }, [polygonOpacity, focusRegionId]);
 
   const [isProgressVisible, setIsProgressVisible] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const dracoRejectionListenerRef = useRef<((e: PromiseRejectionEvent) => void) | null>(null);
+  const dracoErrorListenerRef = useRef<((e: ErrorEvent) => void) | null>(null);
 
 
   const targetManifest = useRef<string | null>(null);
@@ -356,6 +359,60 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
     labelRenderer.domElement.style.pointerEvents = 'none';
     document.body.appendChild(labelRenderer.domElement);
 
+    // manifest 切替時はエラー・進捗状態をリセット
+    setLoadError(null);
+    setIsProgressVisible(true);
+
+    // Draco Worker 内で発生した Aborted() は onError に届かず
+    // unhandledrejection として window に流れることがあるので拾う。
+    // manifest 切替のたびに登録されるので、前回のを外してから登録する。
+    if (dracoRejectionListenerRef.current) {
+      window.removeEventListener('unhandledrejection', dracoRejectionListenerRef.current);
+    }
+    const handleUnhandledRejection = (e: PromiseRejectionEvent) => {
+      const reason = e.reason;
+      // reason は文字列・Error・DRACOLoader Worker からの生 object などバリエーションがある
+      const parts = [
+        typeof reason === 'string' ? reason : '',
+        reason?.message,
+        reason?.error,
+        reason?.type,
+      ];
+      let text = parts.filter(Boolean).join(' ');
+      try {
+        text += ' ' + JSON.stringify(reason);
+      } catch {
+        /* JSON 化できない場合は無視 */
+      }
+      console.log('[loadError] unhandledrejection reason text:', text, reason);
+      if (
+        text.includes('Aborted') ||
+        text.includes('_emscripten') ||
+        text.includes('DRACO') ||
+        text.includes('draco')
+      ) {
+        setIsProgressVisible(false);
+        setLoadError('このモデルはサイズが大きすぎるためブラウザで表示できません。');
+      }
+    };
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+    dracoRejectionListenerRef.current = handleUnhandledRejection;
+
+    // Draco Worker が Aborted() で死ぬと Worker の onerror がメインスレッドに伝播する
+    if (dracoErrorListenerRef.current) {
+      window.removeEventListener('error', dracoErrorListenerRef.current);
+    }
+    const handleWindowError = (e: ErrorEvent) => {
+      const msg = String(e.message ?? '');
+      console.log('[loadError] window error:', msg, e);
+      if (msg.includes('Aborted') || msg.includes('_emscripten')) {
+        setIsProgressVisible(false);
+        setLoadError('このモデルはサイズが大きすぎるためブラウザで表示できません。');
+      }
+    };
+    window.addEventListener('error', handleWindowError);
+    dracoErrorListenerRef.current = handleWindowError;
+
     // manifestファイルの読み込み
     const fetchManifest = async () => {
       const response = await fetch(manifestUrl);
@@ -417,6 +474,17 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
       const onError = (error: unknown) => {
         console.error('An error happened loading the model:', error);
         setIsProgressVisible(false);
+        // Draco の Aborted() は Emscripten の WASM heap 上限に達したときに発生する。
+        // モデルが大きすぎてブラウザで decode できないケース。
+        const message = String((error as { message?: string })?.message ?? error);
+        console.log('[loadError] setting from onError, message:', message);
+        if (message.includes('Aborted') || message.includes('memory')) {
+          setLoadError(
+            'このモデルはサイズが大きすぎるためブラウザで表示できません。'
+          );
+        } else {
+          setLoadError('モデルの読み込みに失敗しました。');
+        }
       };
 
       const kind = detectKind(importedModel, importedFormat);
@@ -1157,7 +1225,34 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
           </form>
         </div>
       )}
-      {isProgressVisible && (
+      {loadError && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            maxWidth: '480px',
+            padding: '20px 24px',
+            backgroundColor: 'rgba(30, 30, 30, 0.92)',
+            color: '#fff',
+            borderRadius: '8px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            zIndex: 1001,
+            textAlign: 'center',
+            lineHeight: 1.6,
+          }}
+        >
+          <div style={{ fontSize: '16px', fontWeight: 600, marginBottom: '8px' }}>
+            3D モデルを表示できません
+          </div>
+          <div style={{ fontSize: '14px', opacity: 0.9 }}>{loadError}</div>
+          <div style={{ fontSize: '12px', opacity: 0.65, marginTop: '10px' }}>
+            軽量化されたモデルの提供をご検討ください。
+          </div>
+        </div>
+      )}
+      {isProgressVisible && !loadError && (
         <div
           id="progress-container"
           style={{

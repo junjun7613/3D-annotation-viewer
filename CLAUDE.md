@@ -175,7 +175,6 @@ Phase 1 / Phase 2 実装の経緯と未実施作業（ルールデプロイ）: 
 - SearchPanel の `associated_with` 単一化への追従
 - `depicts_object/person/place/event` の後方互換処理（旧データのみ）
 - `relevant_to_period/region` は型定義に残存（UI 削除済み）
-- vocabulary.ttl の `provides_typology` の domain を Media まで拡張
 
 ### クリーンアップ候補（動作には影響なし）
 

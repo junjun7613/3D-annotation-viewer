@@ -79,6 +79,9 @@ export default function Home() {
       <header className="bg-[var(--card-bg)] border-b border-[var(--border)] h-14 px-6 flex justify-between items-center shadow-sm flex-shrink-0">
         <h1 className="m-0 text-lg sm:text-xl font-bold text-[var(--text-primary)]">IIIF Semantic Editor</h1>
         <nav className="flex items-center gap-4">
+          <a href="/search" className="text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors text-sm font-medium">
+            Search
+          </a>
           <a href="/about" className="text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors text-sm font-medium">
             About
           </a>

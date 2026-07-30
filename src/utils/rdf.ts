@@ -24,6 +24,9 @@ const VOCAB_DEFINITIONS =
   '# Cultural Heritage Annotation Ontology (CHAO) v0.1\n' +
   '# ============================================================\n' +
   '#\n' +
+  '# Source of truth for the relation hierarchy:\n' +
+  '#   public/ontology/relation-hierarchy.json\n' +
+  '#\n' +
   '# CRMdig Correspondence (informative):\n' +
   '#   oa:Annotation        ≈  crmdig:D29_Annotation_Object\n' +
   '#   oa:SpecificResource  ≈  crmdig:D35_Area\n' +
@@ -97,178 +100,110 @@ const VOCAB_DEFINITIONS =
   ':MediaThreeDModel rdfs:subClassOf :MediaResource .\n' +
 
   // ----------------------------------------------------------
-  // 3. Relation Hierarchy
+  // 3. Relation Hierarchy — top level
+  //    Aligned with public/ontology/relation-hierarchy.json
   // ----------------------------------------------------------
   '\n# -- 3. Relation Hierarchy (top level) --\n' +
   ':Relation a rdf:Property .\n' +
-  ':DirectRelation rdfs:subPropertyOf :Relation .\n' +
-  ':ConceptualRelation rdfs:subPropertyOf :Relation .\n' +
+  ':DirectRelation rdfs:subPropertyOf :Relation ;\n  rdfs:comment "対象そのものに関する直接的証拠。" .\n' +
+  ':ConceptualRelation rdfs:subPropertyOf :Relation ;\n  rdfs:comment "対象理解のための文脈的・解釈的関係。" .\n' +
 
-  // 3.1 Direct Relation — Generic
-  '\n# -- 3.1 Generic Direct Relation --\n' +
-  ':GenericDirectRelation rdfs:subPropertyOf :DirectRelation .\n' +
-  ':mentions rdfs:subPropertyOf :GenericDirectRelation .\n' +
-  ':depicts rdfs:subPropertyOf :GenericDirectRelation .\n' +
-  ':illustrates rdfs:subPropertyOf :GenericDirectRelation .\n' +
-
-  // 3.2 Direct Relation — Bibliographic
-  '\n# -- 3.2 Bibliographic Direct Relation --\n' +
+  // ----------------------------------------------------------
+  // 3.1 Direct Relation — Bibliographic
+  // ----------------------------------------------------------
+  '\n# -- 3.1 Bibliographic Direct Relation --\n' +
   ':BibliographicDirectRelation rdfs:subPropertyOf :DirectRelation .\n' +
-  ':describes rdfs:subPropertyOf :BibliographicDirectRelation .\n' +
-  ':reports rdfs:subPropertyOf :BibliographicDirectRelation .\n' +
-  ':analyzes rdfs:subPropertyOf :BibliographicDirectRelation .\n' +
-  ':catalogues rdfs:subPropertyOf :BibliographicDirectRelation .\n' +
-  ':transcribes rdfs:subPropertyOf :BibliographicDirectRelation .\n' +
-  ':translates rdfs:subPropertyOf :BibliographicDirectRelation .\n' +
+  ':mentions a rdf:Property ;\n  rdfs:subPropertyOf :BibliographicDirectRelation ;\n  rdfs:domain :LinkedResource ;\n  rdfs:range :AnnotationTarget ;\n  rdfs:subPropertyOf schema:mentions ;\n  rdfs:comment "文献中で対象に言及している / 対象中に典拠エンティティへの言及が存在する。" .\n' +
+  ':describes a rdf:Property ;\n  rdfs:subPropertyOf :BibliographicDirectRelation ;\n  rdfs:domain :BibliographicResource ;\n  rdfs:range :AnnotationTarget ;\n  rdfs:comment "対象について一定の詳細さをもって説明している。" .\n' +
+  ':reports a rdf:Property ;\n  rdfs:subPropertyOf :BibliographicDirectRelation ;\n  rdfs:domain :BibliographicResource ;\n  rdfs:range :AnnotationTarget ;\n  rdfs:subPropertyOf crm:P70_documents ;\n  rdfs:comment "対象の発見・調査・出土等を一次的に報告する。" .\n' +
+  ':analyzes a rdf:Property ;\n  rdfs:subPropertyOf :BibliographicDirectRelation ;\n  rdfs:domain :BibliographicResource ;\n  rdfs:range :AnnotationTarget ;\n  rdfs:comment "対象を研究主題として分析する。" .\n' +
+  ':catalogues a rdf:Property ;\n  rdfs:subPropertyOf :BibliographicDirectRelation ;\n  rdfs:domain :BibliographicResource ;\n  rdfs:range :AnnotationTarget ;\n  rdfs:subPropertyOf crm:P70_documents ;\n  rdfs:comment "対象を目録化・一覧化する。" .\n' +
+  ':illustrates a rdf:Property ;\n  rdfs:subPropertyOf :BibliographicDirectRelation ;\n  rdfs:domain :LinkedResource ;\n  rdfs:range :AnnotationTarget ;\n  rdfs:comment "文献: 対象の画像・図版・拓本等を掲載する / メディア: 対象を図示する資料。" .\n' +
+  ':transcribes a rdf:Property ;\n  rdfs:subPropertyOf :BibliographicDirectRelation ;\n  rdfs:domain :BibliographicResource ;\n  rdfs:range :AnnotationTarget ;\n  rdfs:subPropertyOf bibo:transcriptOf ;\n  rdfs:comment "対象に含まれる文字情報の翻刻を提供する。" .\n' +
+  ':translates a rdf:Property ;\n  rdfs:subPropertyOf :BibliographicDirectRelation ;\n  rdfs:domain :BibliographicResource ;\n  rdfs:range :AnnotationTarget ;\n  rdfs:subPropertyOf crm:P73_has_translation ;\n  rdfs:comment "対象に含まれる文字情報の翻訳を提供する。" .\n' +
 
-  // 3.3 Direct Relation — Authority
-  '\n# -- 3.3 Authority Direct Relation --\n' +
+  // ----------------------------------------------------------
+  // 3.2 Direct Relation — Authority
+  // ----------------------------------------------------------
+  '\n# -- 3.2 Authority Direct Relation --\n' +
   ':AuthorityDirectRelation rdfs:subPropertyOf :DirectRelation .\n' +
-  ':identifies rdfs:subPropertyOf :AuthorityDirectRelation .\n' +
-  ':depicts_object rdfs:subPropertyOf :AuthorityDirectRelation .\n' +
-  ':depicts_person rdfs:subPropertyOf :AuthorityDirectRelation .\n' +
-  ':depicts_place rdfs:subPropertyOf :AuthorityDirectRelation .\n' +
-  ':depicts_event rdfs:subPropertyOf :AuthorityDirectRelation .\n' +
-  ':mentions_person rdfs:subPropertyOf :AuthorityDirectRelation .\n' +
-  ':mentions_place rdfs:subPropertyOf :AuthorityDirectRelation .\n' +
-  ':mentions_event rdfs:subPropertyOf :AuthorityDirectRelation .\n' +
+  ':identifies a rdf:Property ;\n  rdfs:subPropertyOf :AuthorityDirectRelation ;\n  rdfs:domain :AnnotationTarget ;\n  rdfs:range :AuthorityResource ;\n  rdfs:subPropertyOf owl:sameAs ;\n  rdfs:comment "対象と典拠エンティティが実質的に同一である。" .\n' +
+  ':depicts a rdf:Property ;\n  rdfs:subPropertyOf :AuthorityDirectRelation ;\n  rdfs:domain :LinkedResource ;\n  rdfs:range :AnnotationTarget ;\n  rdfs:subPropertyOf crm:P62_depicts ;\n  rdfs:comment "対象が典拠エンティティを視覚的に表象している / メディアが対象を表象している。" .\n' +
 
-  // 3.4 Direct Relation — Media
-  '\n# -- 3.4 Media Direct Relation --\n' +
+  // ----------------------------------------------------------
+  // 3.3 Direct Relation — Media
+  // ----------------------------------------------------------
+  '\n# -- 3.3 Media Direct Relation --\n' +
   ':MediaDirectRelation rdfs:subPropertyOf :DirectRelation .\n' +
-  ':documents rdfs:subPropertyOf :MediaDirectRelation .\n' +
-  ':reproduces rdfs:subPropertyOf :MediaDirectRelation .\n' +
+  ':depicts_part a rdf:Property ;\n  rdfs:subPropertyOf :depicts ;\n  rdfs:subPropertyOf :MediaDirectRelation ;\n  rdfs:domain :MediaResource ;\n  rdfs:range :AnnotationTarget ;\n  rdfs:comment "メディアが対象の一部分のみを表象している。" .\n' +
+  ':documents a rdf:Property ;\n  rdfs:subPropertyOf :MediaDirectRelation ;\n  rdfs:domain :MediaResource ;\n  rdfs:range :AnnotationTarget ;\n  rdfs:comment "対象を記録するために作成されたメディア。" .\n' +
+  ':measures a rdf:Property ;\n  rdfs:subPropertyOf :MediaDirectRelation ;\n  rdfs:domain :MediaResource ;\n  rdfs:range :AnnotationTarget ;\n  rdfs:comment "対象の計測結果を表すメディア。" .\n' +
+  ':reproduces a rdf:Property ;\n  rdfs:subPropertyOf :MediaDirectRelation ;\n  rdfs:domain :MediaResource ;\n  rdfs:range :AnnotationTarget ;\n  rdfs:comment "対象の複製・転写・写しを提供する。" .\n' +
 
-  // 3.5 Conceptual Relation — Generic
-  '\n# -- 3.5 Generic Conceptual Relation --\n' +
-  ':GenericConceptualRelation rdfs:subPropertyOf :ConceptualRelation .\n' +
-  ':contextualizes rdfs:subPropertyOf :GenericConceptualRelation .\n' +
-  ':compares_with rdfs:subPropertyOf :GenericConceptualRelation .\n' +
-  ':related_to_concept rdfs:subPropertyOf :GenericConceptualRelation .\n' +
-
-  // 3.6 Conceptual Relation — Bibliographic
-  '\n# -- 3.6 Bibliographic Conceptual Relation --\n' +
+  // ----------------------------------------------------------
+  // 3.4 Conceptual Relation — Bibliographic
+  // ----------------------------------------------------------
+  '\n# -- 3.4 Bibliographic Conceptual Relation --\n' +
   ':BibliographicConceptualRelation rdfs:subPropertyOf :ConceptualRelation .\n' +
-  ':discusses_related_concept rdfs:subPropertyOf :BibliographicConceptualRelation .\n' +
-  ':provides_typology rdfs:subPropertyOf :BibliographicConceptualRelation .\n' +
+  ':contextualizes a rdf:Property ;\n  rdfs:subPropertyOf :BibliographicConceptualRelation ;\n  rdfs:domain :LinkedResource ;\n  rdfs:range :AnnotationTarget ;\n  rdfs:subPropertyOf dcterms:relation ;\n  rdfs:comment "対象理解のための背景情報・文脈情報を提供する（書誌・メディア共通）。" .\n' +
+  ':concept_contextualization a rdf:Property ;\n  rdfs:subPropertyOf :contextualizes ;\n  rdfs:domain :LinkedResource ;\n  rdfs:range :AnnotationTarget ;\n  rdfs:comment "対象理解に関わる概念的背景を提供する。" .\n' +
+  ':period_contextualization a rdf:Property ;\n  rdfs:subPropertyOf :contextualizes ;\n  rdfs:domain :LinkedResource ;\n  rdfs:range :AnnotationTarget ;\n  rdfs:comment "対象理解に関わる時代的背景を提供する。" .\n' +
+  ':region_contextualization a rdf:Property ;\n  rdfs:subPropertyOf :contextualizes ;\n  rdfs:domain :LinkedResource ;\n  rdfs:range :AnnotationTarget ;\n  rdfs:comment "対象理解に関わる地理的・地域的背景を提供する。" .\n' +
+  ':person_contextualization a rdf:Property ;\n  rdfs:subPropertyOf :contextualizes ;\n  rdfs:domain :LinkedResource ;\n  rdfs:range :AnnotationTarget ;\n  rdfs:comment "対象理解に関わる人物・集団についての背景情報を提供する。" .\n' +
+  ':compares_with a rdf:Property ;\n  rdfs:subPropertyOf :BibliographicConceptualRelation ;\n  rdfs:domain :LinkedResource ;\n  rdfs:range :AnnotationTarget ;\n  rdfs:comment "対象との比較資料を提供する（書誌・メディア共通）。" .\n' +
+  ':provides_typology a rdf:Property ;\n  rdfs:subPropertyOf :BibliographicConceptualRelation ;\n  rdfs:domain :LinkedResource ;\n  rdfs:range :AnnotationTarget ;\n  rdfs:comment "対象理解に必要な類型学的・分類学的基盤を提供する（書誌・メディア共通）。" .\n' +
+  ':illustrates_typology a rdf:Property ;\n  rdfs:subPropertyOf :provides_typology ;\n  rdfs:domain :MediaResource ;\n  rdfs:range :AnnotationTarget ;\n  rdfs:comment "対象理解のための類型学的・分類学的基盤を提供するメディア。" .\n' +
 
-  // 3.7 Conceptual Relation — Authority
-  '\n# -- 3.7 Authority Conceptual Relation --\n' +
+  // ----------------------------------------------------------
+  // 3.5 Conceptual Relation — Authority
+  // ----------------------------------------------------------
+  '\n# -- 3.5 Authority Conceptual Relation --\n' +
   ':AuthorityConceptualRelation rdfs:subPropertyOf :ConceptualRelation .\n' +
-  ':associated_with rdfs:subPropertyOf :AuthorityConceptualRelation .\n' +
-  ':associated_with_period rdfs:subPropertyOf :associated_with .\n' +
-  ':associated_with_region rdfs:subPropertyOf :associated_with .\n' +
-  ':associated_with_person rdfs:subPropertyOf :associated_with .\n' +
-  ':associated_with_culture rdfs:subPropertyOf :associated_with .\n' +
-  ':classified_as rdfs:subPropertyOf :AuthorityConceptualRelation .\n' +
-  ':has_type rdfs:subPropertyOf :AuthorityConceptualRelation .\n' +
-  ':written_in_language rdfs:subPropertyOf :AuthorityConceptualRelation .\n' +
-  ':uses_script rdfs:subPropertyOf :AuthorityConceptualRelation .\n' +
-  ':created_by rdfs:subPropertyOf :AuthorityConceptualRelation .\n' +
-  ':discovered_by rdfs:subPropertyOf :AuthorityConceptualRelation .\n' +
-  ':discovered_at rdfs:subPropertyOf :AuthorityConceptualRelation .\n' +
+  ':associated_with a rdf:Property ;\n  rdfs:subPropertyOf :AuthorityConceptualRelation ;\n  rdfs:domain :AnnotationTarget ;\n  rdfs:range :AuthorityResource ;\n  rdfs:comment "対象が人物・地域・時代・文化・概念などの典拠エンティティと概念的に関連する。" .\n' +
+  ':classified_as a rdf:Property ;\n  rdfs:subPropertyOf :AuthorityConceptualRelation ;\n  rdfs:domain :AnnotationTarget ;\n  rdfs:range :Concept ;\n  rdfs:subPropertyOf crm:P2_has_type ;\n  rdfs:comment "対象を既存の分類体系上のカテゴリへ位置付ける。" .\n' +
+  ':has_type a rdf:Property ;\n  rdfs:subPropertyOf :AuthorityConceptualRelation ;\n  rdfs:domain :AnnotationTarget ;\n  rdfs:range :Concept ;\n  rdfs:subPropertyOf crm:P2_has_type ;\n  rdfs:comment "対象の種別・形態・タイプを示す。" .\n' +
+  ':written_in_language a rdf:Property ;\n  rdfs:subPropertyOf :AuthorityConceptualRelation ;\n  rdfs:domain :AnnotationTarget ;\n  rdfs:range :Language ;\n  rdfs:subPropertyOf crm:P72_has_language ;\n  rdfs:comment "対象に使用されている言語を示す。" .\n' +
+  ':uses_script a rdf:Property ;\n  rdfs:subPropertyOf :AuthorityConceptualRelation ;\n  rdfs:domain :AnnotationTarget ;\n  rdfs:range :Script ;\n  rdfs:comment "対象に使用されている文字体系を示す。" .\n' +
+  ':created_by a rdf:Property ;\n  rdfs:subPropertyOf :AuthorityConceptualRelation ;\n  rdfs:domain :AnnotationTarget ;\n  rdfs:range :Person ;\n  rdfs:subPropertyOf dc:creator ;\n  rdfs:comment "対象の制作者・作者・建立者・発願者などを示す。" .\n' +
+  ':discovered_by a rdf:Property ;\n  rdfs:subPropertyOf :AuthorityConceptualRelation ;\n  rdfs:domain :AnnotationTarget ;\n  rdfs:range :Person ;\n  rdfs:comment "対象の発見者・発掘者・調査主体を示す。" .\n' +
+  ':discovered_at a rdf:Property ;\n  rdfs:subPropertyOf :AuthorityConceptualRelation ;\n  rdfs:domain :AnnotationTarget ;\n  rdfs:range :Place ;\n  rdfs:subPropertyOf crm:P7_took_place_at ;\n  rdfs:comment "対象の発見場所・出土地を示す。" .\n' +
 
   // ----------------------------------------------------------
-  // 4. Domain / Range declarations (Relation Vocabulary Catalogue §6)
+  // 4. Deprecated relation properties (backward-compat only)
+  //    現行 UI は :depicts / :mentions / :associated_with に集約済み。
+  //    以下は旧データの読み取り互換のためのみ保持する。
   // ----------------------------------------------------------
-  // 向きの方針:
-  //   書誌プロパティ  : BibliographicResource → AnnotationTarget
-  //   典拠プロパティ  : AnnotationTarget → AuthorityResource
-  //   メディアプロパティ: MediaResource → AnnotationTarget
-  //   Generic        : LinkedResource → AnnotationTarget（複数リソース種別に適用）
-  '\n# -- 4. Domain / Range --\n' +
-
-  // Generic Direct (mentions: Bib○ Auth○ Media△ / depicts: Auth○ Media○ / illustrates: Bib○ Media○)
-  ':mentions rdfs:domain :LinkedResource ;\n  rdfs:range :AnnotationTarget .\n' +
-  ':depicts rdfs:domain :LinkedResource ;\n  rdfs:range :AnnotationTarget .\n' +
-  ':illustrates rdfs:domain :LinkedResource ;\n  rdfs:range :AnnotationTarget .\n' +
-
-  // Bibliographic Direct (書誌 → 対象)
-  ':describes rdfs:domain :BibliographicResource ;\n  rdfs:range :AnnotationTarget .\n' +
-  ':reports rdfs:domain :BibliographicResource ;\n  rdfs:range :AnnotationTarget .\n' +
-  ':analyzes rdfs:domain :BibliographicResource ;\n  rdfs:range :AnnotationTarget .\n' +
-  ':catalogues rdfs:domain :BibliographicResource ;\n  rdfs:range :AnnotationTarget .\n' +
-  ':transcribes rdfs:domain :BibliographicResource ;\n  rdfs:range :AnnotationTarget .\n' +
-  ':translates rdfs:domain :BibliographicResource ;\n  rdfs:range :AnnotationTarget .\n' +
-
-  // Authority Direct (対象 → 典拠)
-  ':identifies rdfs:domain :AnnotationTarget ;\n  rdfs:range :AuthorityResource .\n' +
-  ':depicts_object rdfs:domain :AnnotationTarget ;\n  rdfs:range :Object .\n' +
-  ':depicts_person rdfs:domain :AnnotationTarget ;\n  rdfs:range :Person .\n' +
-  ':depicts_place rdfs:domain :AnnotationTarget ;\n  rdfs:range :Place .\n' +
-  ':depicts_event rdfs:domain :AnnotationTarget ;\n  rdfs:range :Event .\n' +
-  ':mentions_person rdfs:domain :AnnotationTarget ;\n  rdfs:range :Person .\n' +
-  ':mentions_place rdfs:domain :AnnotationTarget ;\n  rdfs:range :Place .\n' +
-  ':mentions_event rdfs:domain :AnnotationTarget ;\n  rdfs:range :Event .\n' +
-
-  // Media Direct (メディア → 対象)
-  ':documents rdfs:domain :MediaResource ;\n  rdfs:range :AnnotationTarget .\n' +
-  ':reproduces rdfs:domain :MediaResource ;\n  rdfs:range :AnnotationTarget .\n' +
-
-  // Generic Conceptual (Bib○ Auth△ Media○ → LinkedResource として汎用)
-  ':contextualizes rdfs:domain :LinkedResource ;\n  rdfs:range :AnnotationTarget .\n' +
-  ':compares_with rdfs:domain :LinkedResource ;\n  rdfs:range :AuthorityResource .\n' +
-  ':related_to_concept rdfs:domain :LinkedResource ;\n  rdfs:range :AuthorityResource .\n' +
-
-  // Bibliographic Conceptual (書誌 → 対象)
-  ':discusses_related_concept rdfs:domain :BibliographicResource ;\n  rdfs:range :AnnotationTarget .\n' +
-  ':provides_typology rdfs:domain :BibliographicResource ;\n  rdfs:range :AnnotationTarget .\n' +
-
-  // Authority Conceptual (対象 → 典拠)
-  ':associated_with rdfs:domain :AnnotationTarget ;\n  rdfs:range :AuthorityResource .\n' +
-  ':associated_with_period rdfs:domain :AnnotationTarget ;\n  rdfs:range :Period .\n' +
-  ':associated_with_region rdfs:domain :AnnotationTarget ;\n  rdfs:range :Region .\n' +
-  ':associated_with_person rdfs:domain :AnnotationTarget ;\n  rdfs:range :Person .\n' +
-  ':associated_with_culture rdfs:domain :AnnotationTarget ;\n  rdfs:range :Culture .\n' +
-  ':classified_as rdfs:domain :AnnotationTarget ;\n  rdfs:range :Concept .\n' +
-  ':has_type rdfs:domain :AnnotationTarget ;\n  rdfs:range :Concept .\n' +
-  ':written_in_language rdfs:domain :AnnotationTarget ;\n  rdfs:range :Language .\n' +
-  ':uses_script rdfs:domain :AnnotationTarget ;\n  rdfs:range :Script .\n' +
-  ':created_by rdfs:domain :AnnotationTarget ;\n  rdfs:range :Person .\n' +
-  ':discovered_by rdfs:domain :AnnotationTarget ;\n  rdfs:range :Person .\n' +
-  ':discovered_at rdfs:domain :AnnotationTarget ;\n  rdfs:range :Place .\n' +
+  '\n# -- 4. Deprecated relation properties (read-only backward-compat) --\n' +
+  ':depicts_object a rdf:Property ;\n  rdfs:subPropertyOf :depicts ;\n  rdfs:domain :AnnotationTarget ;\n  rdfs:range :Object ;\n  rdfs:subPropertyOf crm:P62_depicts ;\n  owl:deprecated true ;\n  rdfs:comment "Deprecated; use :depicts." .\n' +
+  ':depicts_person a rdf:Property ;\n  rdfs:subPropertyOf :depicts ;\n  rdfs:domain :AnnotationTarget ;\n  rdfs:range :Person ;\n  rdfs:subPropertyOf crm:P62_depicts ;\n  owl:deprecated true ;\n  rdfs:comment "Deprecated; use :depicts." .\n' +
+  ':depicts_place a rdf:Property ;\n  rdfs:subPropertyOf :depicts ;\n  rdfs:domain :AnnotationTarget ;\n  rdfs:range :Place ;\n  rdfs:subPropertyOf crm:P62_depicts ;\n  owl:deprecated true ;\n  rdfs:comment "Deprecated; use :depicts." .\n' +
+  ':depicts_event a rdf:Property ;\n  rdfs:subPropertyOf :depicts ;\n  rdfs:domain :AnnotationTarget ;\n  rdfs:range :Event ;\n  rdfs:subPropertyOf crm:P62_depicts ;\n  owl:deprecated true ;\n  rdfs:comment "Deprecated; use :depicts." .\n' +
+  ':mentions_person a rdf:Property ;\n  rdfs:subPropertyOf :mentions ;\n  rdfs:domain :AnnotationTarget ;\n  rdfs:range :Person ;\n  rdfs:subPropertyOf schema:mentions ;\n  owl:deprecated true ;\n  rdfs:comment "Deprecated; use :mentions." .\n' +
+  ':mentions_place a rdf:Property ;\n  rdfs:subPropertyOf :mentions ;\n  rdfs:domain :AnnotationTarget ;\n  rdfs:range :Place ;\n  rdfs:subPropertyOf schema:mentions ;\n  owl:deprecated true ;\n  rdfs:comment "Deprecated; use :mentions." .\n' +
+  ':mentions_event a rdf:Property ;\n  rdfs:subPropertyOf :mentions ;\n  rdfs:domain :AnnotationTarget ;\n  rdfs:range :Event ;\n  rdfs:subPropertyOf schema:mentions ;\n  owl:deprecated true ;\n  rdfs:comment "Deprecated; use :mentions." .\n' +
+  ':associated_with_period a rdf:Property ;\n  rdfs:subPropertyOf :associated_with ;\n  rdfs:domain :AnnotationTarget ;\n  rdfs:range :Period ;\n  rdfs:subPropertyOf crm:P4_has_time-span ;\n  owl:deprecated true ;\n  rdfs:comment "Deprecated; use :associated_with." .\n' +
+  ':associated_with_region a rdf:Property ;\n  rdfs:subPropertyOf :associated_with ;\n  rdfs:domain :AnnotationTarget ;\n  rdfs:range :Region ;\n  rdfs:subPropertyOf crm:P7_took_place_at ;\n  owl:deprecated true ;\n  rdfs:comment "Deprecated; use :associated_with." .\n' +
+  ':associated_with_person a rdf:Property ;\n  rdfs:subPropertyOf :associated_with ;\n  rdfs:domain :AnnotationTarget ;\n  rdfs:range :Person ;\n  owl:deprecated true ;\n  rdfs:comment "Deprecated; use :associated_with." .\n' +
+  ':associated_with_culture a rdf:Property ;\n  rdfs:subPropertyOf :associated_with ;\n  rdfs:domain :AnnotationTarget ;\n  rdfs:range :Culture ;\n  owl:deprecated true ;\n  rdfs:comment "Deprecated; use :associated_with." .\n' +
+  ':related_to_concept a rdf:Property ;\n  rdfs:subPropertyOf :associated_with ;\n  rdfs:domain :AnnotationTarget ;\n  rdfs:range :Concept ;\n  owl:deprecated true ;\n  rdfs:comment "Deprecated; use :associated_with." .\n' +
+  ':discusses_related_concept a rdf:Property ;\n  rdfs:subPropertyOf :contextualizes ;\n  rdfs:domain :BibliographicResource ;\n  rdfs:range :AnnotationTarget ;\n  owl:deprecated true ;\n  rdfs:comment "Deprecated; use :contextualizes or :concept_contextualization." .\n' +
+  ':relevant_to_period a rdf:Property ;\n  rdfs:subPropertyOf :contextualizes ;\n  rdfs:domain :BibliographicResource ;\n  rdfs:range :AnnotationTarget ;\n  owl:deprecated true ;\n  rdfs:comment "Deprecated; use :period_contextualization." .\n' +
+  ':relevant_to_region a rdf:Property ;\n  rdfs:subPropertyOf :contextualizes ;\n  rdfs:domain :BibliographicResource ;\n  rdfs:range :AnnotationTarget ;\n  owl:deprecated true ;\n  rdfs:comment "Deprecated; use :region_contextualization." .\n' +
+  ':relevant_to_person a rdf:Property ;\n  rdfs:subPropertyOf :contextualizes ;\n  rdfs:domain :BibliographicResource ;\n  rdfs:range :AnnotationTarget ;\n  owl:deprecated true ;\n  rdfs:comment "Deprecated; use :person_contextualization." .\n' +
 
   // ----------------------------------------------------------
-  // 5. Provisional mappings to existing vocabularies
+  // 5. Annotation inter-relations (Scholarly Discourse)
   // ----------------------------------------------------------
-  '\n# -- 4. Provisional mappings (approximate; structural differences apply) --\n' +
-  // Generic Direct
-  ':mentions rdfs:subPropertyOf schema:mentions .\n' +
-  ':depicts rdfs:subPropertyOf crm:P62_depicts .\n' +
-  ':depicts_object rdfs:subPropertyOf crm:P62_depicts .\n' +
-  ':depicts_person rdfs:subPropertyOf crm:P62_depicts .\n' +
-  ':depicts_place rdfs:subPropertyOf crm:P62_depicts .\n' +
-  ':depicts_event rdfs:subPropertyOf crm:P62_depicts .\n' +
-  ':mentions_person rdfs:subPropertyOf schema:mentions .\n' +
-  ':mentions_place rdfs:subPropertyOf schema:mentions .\n' +
-  ':mentions_event rdfs:subPropertyOf schema:mentions .\n' +
-  // Authority Direct
-  ':identifies rdfs:subPropertyOf owl:sameAs .\n' +
-  // Bibliographic Direct
-  ':reports rdfs:subPropertyOf crm:P70_documents .\n' +
-  ':catalogues rdfs:subPropertyOf crm:P70_documents .\n' +
-  ':transcribes rdfs:subPropertyOf bibo:transcriptOf .\n' +
-  ':translates rdfs:subPropertyOf crm:P73_has_translation .\n' +
-  // Generic Conceptual
-  ':contextualizes rdfs:subPropertyOf dcterms:relation .\n' +
-  // Authority Conceptual
-  ':associated_with_period rdfs:subPropertyOf crm:P4_has_time-span .\n' +
-  ':associated_with_region rdfs:subPropertyOf crm:P7_took_place_at .\n' +
-  ':classified_as rdfs:subPropertyOf crm:P2_has_type .\n' +
-  ':has_type rdfs:subPropertyOf crm:P2_has_type .\n' +
-  ':written_in_language rdfs:subPropertyOf crm:P72_has_language .\n' +
-  ':created_by rdfs:subPropertyOf dc:creator .\n' +
-  ':discovered_at rdfs:subPropertyOf crm:P7_took_place_at .\n' +
-
-  // -- Annotation inter-relations (Scholarly Discourse) --
-  '\n# -- Annotation inter-relations --\n' +
+  '\n# -- 5. Annotation inter-relations --\n' +
   ':AnnotationRelation a rdf:Property ;\n  rdfs:domain oa:Annotation ;\n  rdfs:range oa:Annotation ;\n  rdfs:subPropertyOf oa:motivatedBy .\n' +
   ':supports rdfs:subPropertyOf :AnnotationRelation .\n' +
   ':challenges rdfs:subPropertyOf :AnnotationRelation .\n' +
   ':supplements rdfs:subPropertyOf :AnnotationRelation .\n' +
 
-  // -- Research Project --
-  '\n# -- Research Project --\n' +
+  // ----------------------------------------------------------
+  // 6. Research Project
+  // ----------------------------------------------------------
+  '\n# -- 6. Research Project --\n' +
   ':ResearchProject a rdfs:Class ;\n  rdfs:subClassOf prov:Agent ;\n  rdfs:comment "A collaborative unit that owns and edits annotations." .\n' +
   ':fromProject a rdf:Property ;\n  rdfs:domain oa:Annotation ;\n  rdfs:range :ResearchProject ;\n  rdfs:subPropertyOf prov:wasAttributedTo ;\n  rdfs:comment "The research project under which the annotation was authored." .\n' +
   ':visibility a rdf:Property ;\n  rdfs:domain :ResearchProject ;\n  rdfs:range xsd:string .\n';
