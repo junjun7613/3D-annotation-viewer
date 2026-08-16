@@ -92,6 +92,7 @@ export const projectService = {
     description?: string;
     visibility: ProjectVisibility;
     ownerUid: string;
+    ownerDisplayName?: string;
   }): Promise<Project> {
     const id = uuidv4();
     const now = Date.now();
@@ -109,6 +110,7 @@ export const projectService = {
       role: 'owner',
       joinedAt: now,
       invitedBy: params.ownerUid,
+      ...(params.ownerDisplayName ? { displayName: params.ownerDisplayName } : {}),
     };
     await setDoc(memberRef(id, params.ownerUid), member);
     return project;

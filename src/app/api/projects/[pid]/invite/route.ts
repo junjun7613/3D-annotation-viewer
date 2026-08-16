@@ -61,12 +61,15 @@ export async function POST(
   }
 
   // 4. email → UID 解決
+  //    email 自体は認可のためだけに Auth で照合し、Firestore には保存しない（PII 非保管）
   let targetUid: string;
   let targetEmail: string;
+  let targetDisplayName: string | undefined;
   try {
     const userRecord = await getAuth().getUserByEmail(email);
     targetUid = userRecord.uid;
     targetEmail = userRecord.email ?? email;
+    targetDisplayName = userRecord.displayName ?? undefined;
   } catch {
     return NextResponse.json(
       { error: 'user not found', hint: '招待先ユーザーが先にサインインしている必要があります' },
@@ -78,13 +81,18 @@ export async function POST(
   const memberRef = db.doc(`projects/${pid}/members/${targetUid}`);
   const existing = await memberRef.get();
   if (existing.exists) {
-    await memberRef.update({ role });
+    // 既存メンバーはロール更新に加え、未保存の displayName を埋める
+    const patch: Partial<ProjectMember> = { role };
+    const current = existing.data() as ProjectMember;
+    if (!current.displayName && targetDisplayName) patch.displayName = targetDisplayName;
+    await memberRef.update(patch);
   } else {
     const member: ProjectMember = {
       uid: targetUid,
       role,
       joinedAt: Date.now(),
       invitedBy: callerUid,
+      ...(targetDisplayName ? { displayName: targetDisplayName } : {}),
     };
     await memberRef.set(member);
   }

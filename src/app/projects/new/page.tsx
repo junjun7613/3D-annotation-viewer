@@ -34,6 +34,7 @@ export default function NewProjectPage() {
         description: description.trim() || undefined,
         visibility,
         ownerUid: user.uid,
+        ownerDisplayName: user.displayName ?? undefined,
       });
       router.push(`/projects/${project.id}`);
     } catch (err) {

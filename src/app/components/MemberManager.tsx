@@ -146,12 +146,20 @@ export default function MemberManager({ projectId, canManage }: MemberManagerPro
         <div className="text-sm text-[var(--text-secondary)]">メンバーがいません</div>
       ) : (
         <ul className="divide-y divide-[var(--border)]">
-          {members.map((m) => (
+          {members.map((m) => {
+            const primary = m.displayName || `${m.uid.slice(0, 8)}…`;
+            const primaryIsFallback = !m.displayName;
+            return (
             <li key={m.uid} className="py-2 flex items-center gap-3">
               <RoleIcon role={m.role} />
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-[var(--text-primary)] font-mono truncate">{m.uid}</p>
-                <p className="text-xs text-[var(--text-secondary)]">
+                <p
+                  className={`text-sm text-[var(--text-primary)] truncate ${primaryIsFallback ? 'font-mono' : ''}`}
+                  title={m.uid}
+                >
+                  {primary}
+                </p>
+                <p className="text-xs text-[var(--text-secondary)] truncate">
                   {ROLE_LABEL[m.role]} ・ 参加 {new Date(m.joinedAt).toISOString().slice(0, 10)}
                 </p>
               </div>
@@ -179,7 +187,8 @@ export default function MemberManager({ projectId, canManage }: MemberManagerPro
                 <span className="text-xs text-[var(--text-secondary)]">あなた</span>
               )}
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </div>

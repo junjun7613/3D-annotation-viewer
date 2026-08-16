@@ -22,6 +22,8 @@ export interface ProjectMember {
   role: ProjectRole;
   joinedAt: number;
   invitedBy?: string;       // 招待者 UID（自分自身が作成した場合は createdBy と同じ）
+  displayName?: string;     // 表示用に非正規化。Auth の displayName を招待時にコピー
+                            // email は PII のため Firestore には保存しない
 }
 
 // relation-hierarchy.json のノード型
