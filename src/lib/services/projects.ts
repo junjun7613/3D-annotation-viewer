@@ -18,7 +18,7 @@ import {
   where,
   getDocs,
 } from 'firebase/firestore';
-import db from '@/lib/firebase/firebase';
+import db, { auth } from '@/lib/firebase/firebase';
 import { v4 as uuidv4 } from 'uuid';
 import type {
   Project,
@@ -40,6 +40,49 @@ function memberRef(projectId: string, uid: string) {
 
 function membersCol(projectId: string) {
   return collection(db, PROJECTS, projectId, MEMBERS);
+}
+
+/** 経路 A: 自作プロジェクト。既存動作の維持が最優先で、失敗しても空配列を返す。 */
+async function listCreatedProjects(uid: string): Promise<Project[]> {
+  try {
+    const snap = await getDocs(
+      query(collection(db, PROJECTS), where('createdBy', '==', uid))
+    );
+    return snap.docs.map((d) => d.data() as Project);
+  } catch (err) {
+    console.warn('[projectService.listForMember/created] failed:', err);
+    return [];
+  }
+}
+
+/**
+ * 経路 B: 招待分（他人が作成した所属プロジェクト）。
+ *
+ * client-side の collectionGroup('members') クエリは Firestore ルールの静的評価で
+ * permission-denied を返すため、Admin SDK 経由の /api/projects/mine を叩く。
+ * 失敗しても経路 A に影響しないよう常に配列を返す。
+ */
+async function listInvitedProjects(uid: string): Promise<Project[]> {
+  const user = auth.currentUser;
+  if (!user || user.uid !== uid) {
+    // ログインしていない、または uid が現在ユーザーと不一致 → 招待分は取得しない
+    return [];
+  }
+  try {
+    const token = await user.getIdToken();
+    const res = await fetch('/api/projects/mine', {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+      console.warn('[projectService.listForMember/invited] api error:', res.status, await res.text());
+      return [];
+    }
+    const body = (await res.json()) as { projects?: Project[] };
+    return body.projects ?? [];
+  } catch (err) {
+    console.warn('[projectService.listForMember/invited] failed:', err);
+    return [];
+  }
 }
 
 export const projectService = {
@@ -100,21 +143,22 @@ export const projectService = {
   /**
    * 指定ユーザーが所属しているプロジェクト一覧。
    *
-   * 現状は `createdBy == uid` で projects を直接検索する。
-   * 招待された他プロジェクトの取得（collectionGroup('members') 経由）は
-   * Phase 5 以降の課題：collectionGroup ルール `match /{path=**}/members/{uid}` を
-   * 別途定義する必要があり、セキュリティ評価が要るため見送る。
+   * 二経路構成:
+   *   経路 A: `createdBy == uid` で projects を直接検索（自作分）
+   *   経路 B: `collectionGroup('members').where('uid','==',uid)` で招待分を取得
+   *
+   * 経路 B が permission-denied やインデックス未作成で失敗しても、
+   * 経路 A は独立して成功する。既存動作（自作プロジェクト表示）を絶対に壊さないための構造。
    */
   async listForMember(uid: string): Promise<Project[]> {
-    try {
-      const createdSnap = await getDocs(
-        query(collection(db, PROJECTS), where('createdBy', '==', uid))
-      );
-      return createdSnap.docs.map((d) => d.data() as Project);
-    } catch (err) {
-      console.warn('[projectService.listForMember] failed:', err);
-      return [];
-    }
+    const [created, invited] = await Promise.all([
+      listCreatedProjects(uid),
+      listInvitedProjects(uid),
+    ]);
+    const byId = new Map<string, Project>();
+    created.forEach((p) => byId.set(p.id, p));
+    invited.forEach((p) => byId.set(p.id, p));
+    return Array.from(byId.values());
   },
 };
 
