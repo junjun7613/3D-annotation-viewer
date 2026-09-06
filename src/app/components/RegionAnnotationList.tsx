@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { FaPlus, FaLink } from 'react-icons/fa';
+import { FaPlus, FaLink, FaTrashAlt } from 'react-icons/fa';
 import type { InfoPanelContent, AnnotationRelationType, AnnotationRelation } from '@/types/main';
 import ForeignProjectBadge from '@/app/components/ForeignProjectBadge';
 
@@ -20,10 +20,15 @@ interface Props {
   existingRelations?: Record<string, AnnotationRelation[]>; // annotationId → relations
   /** 現プロジェクト ID。これと異なる researchProjectId を持つアノテはバッジ + read-only として扱う */
   currentProjectId?: string | null;
+  /** 領域ノードを削除できる場合（作成者本人 かつ アノテーション 0 件）に true */
+  canDelete?: boolean;
+  /** 削除ボタン押下時のハンドラ。呼び出し側で確認ダイアログ・実削除・panel クローズを行う */
+  onDeleteRegion?: () => void;
 }
 
 export default function RegionAnnotationList({
   regionId, annotations, onSelect, onAddNew, onAddRelation, existingRelations = {}, currentProjectId = null,
+  canDelete = false, onDeleteRegion,
 }: Props) {
   const [relatingFrom, setRelatingFrom] = useState<string | null>(null);
   const [selectedRelation, setSelectedRelation] = useState<AnnotationRelationType>('supports');
@@ -48,13 +53,25 @@ export default function RegionAnnotationList({
           <p className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide">領域ノード</p>
           <p className="text-xs text-[var(--text-secondary)] font-mono mt-0.5 opacity-60">{regionId}</p>
         </div>
-        <button
-          onClick={onAddNew}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-[var(--primary)] text-white hover:opacity-90 transition-opacity"
-        >
-          <FaPlus size={10} />
-          新規アノテーション
-        </button>
+        <div className="flex items-center gap-1.5">
+          {annotations.length === 0 && canDelete && onDeleteRegion && (
+            <button
+              onClick={onDeleteRegion}
+              title="この領域ノードを削除"
+              className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-lg border border-red-300 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+            >
+              <FaTrashAlt size={10} />
+              領域を削除
+            </button>
+          )}
+          <button
+            onClick={onAddNew}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-[var(--primary)] text-white hover:opacity-90 transition-opacity"
+          >
+            <FaPlus size={10} />
+            新規アノテーション
+          </button>
+        </div>
       </div>
 
       {/* 関係付け中の案内 */}

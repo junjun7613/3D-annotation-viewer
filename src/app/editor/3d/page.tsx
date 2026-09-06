@@ -29,6 +29,7 @@ import db from '@/lib/firebase/firebase';
 import { deleteDoc, doc, getDoc, getDocs, updateDoc, addDoc, collection } from 'firebase/firestore';
 import { createWikidataItem } from '@/lib/services/wikidata';
 import { objectMetadataService, objectAnnotationService } from '@/lib/services/objectMetadata';
+import { deleteRegionIfUnused } from '@/lib/services/regions';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import type { MediaItem, WikidataItem, BibliographyItem, BibliographyProperty, BibliographyRoleType, BibliographicRelationType, AuthorityRelationType, AuthorityEntityType, MediaRelationType, ReferenceLevel, MediaRoleType, LocationItem, NewAnnotation } from '@/types/main';
@@ -1927,6 +1928,24 @@ const Home: NextPage = () => {
                       a.relatedAnnotations ?? [],
                     ])
                   )}
+                  canDelete={!!user}
+                  onDeleteRegion={async () => {
+                    if (!user || !regionPanelContent) return;
+                    const rid = regionPanelContent.regionId;
+                    if (!window.confirm('この領域ノードを削除します。よろしいですか？')) return;
+                    const result = await deleteRegionIfUnused(rid, user.uid);
+                    if (result.ok) {
+                      setRegionPanel(null);
+                    } else {
+                      const msg: Record<string, string> = {
+                        not_found: '領域が見つかりませんでした（既に削除済みの可能性があります）。',
+                        forbidden: 'この領域の作成者のみが削除できます。',
+                        annotations_remain: '関連するアノテーションが存在するため削除できません。',
+                        tei_references_remain: 'TEI エディタでこの領域が参照されているため削除できません。',
+                      };
+                      window.alert(msg[result.reason] ?? '削除に失敗しました。');
+                    }
+                  }}
                 />
                 {isRegionNewAnnotationOpen && (
                   <div className="mt-4 pt-4 border-t border-[var(--border)] flex flex-col gap-3">

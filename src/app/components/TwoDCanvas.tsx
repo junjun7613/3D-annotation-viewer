@@ -16,16 +16,24 @@ export interface Annotation2D {
   points?: { x: number; y: number }[];
 }
 
+export interface CanvasInfo {
+  id: string;
+  label: string;
+  thumbnail?: string;
+}
+
 interface TwoDCanvasProps {
   manifestUrl: string;
   annotations: Annotation2D[];
   annotationMode: 'none' | 'rect' | 'polygon';
   annotationsVisible: boolean;
   focusAnnotationId?: string | null;
+  currentCanvasIndex?: number;
   onRectAnnotation?: (x: number, y: number, width: number, height: number, canvasId: string) => void;
   onPolygonAnnotation?: (points: { x: number; y: number }[], canvasId: string) => void;
   onAnnotationClick?: (id: string) => void;
   onObjectClick?: () => void;
+  onCanvasesLoaded?: (canvases: CanvasInfo[]) => void;
 }
 
 export default function TwoDCanvas({
@@ -34,10 +42,12 @@ export default function TwoDCanvas({
   annotationMode,
   annotationsVisible,
   focusAnnotationId,
+  currentCanvasIndex = 0,
   onRectAnnotation,
   onPolygonAnnotation,
   onAnnotationClick,
   onObjectClick,
+  onCanvasesLoaded,
 }: TwoDCanvasProps) {
   const viewerRef = useRef<OpenSeadragon.Viewer | null>(null);
   const osdContainerRef = useRef<HTMLDivElement>(null);
@@ -57,10 +67,12 @@ export default function TwoDCanvas({
   const onRectAnnotationRef = useRef(onRectAnnotation);
   const onPolygonAnnotationRef = useRef(onPolygonAnnotation);
   const onObjectClickRef = useRef(onObjectClick);
+  const onCanvasesLoadedRef = useRef(onCanvasesLoaded);
   useEffect(() => { annotationModeRef.current = annotationMode; }, [annotationMode]);
   useEffect(() => { onRectAnnotationRef.current = onRectAnnotation; }, [onRectAnnotation]);
   useEffect(() => { onPolygonAnnotationRef.current = onPolygonAnnotation; }, [onPolygonAnnotation]);
   useEffect(() => { onObjectClickRef.current = onObjectClick; }, [onObjectClick]);
+  useEffect(() => { onCanvasesLoadedRef.current = onCanvasesLoaded; }, [onCanvasesLoaded]);
 
   // Reset in-progress state when mode changes
   useEffect(() => {
@@ -190,41 +202,92 @@ export default function TwoDCanvas({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Load IIIF manifest
+  // Cache the fetched manifest per URL so canvas switching doesn't re-fetch
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const manifestCacheRef = useRef<{ url: string; canvases: any[] } | null>(null);
+
+  // Load IIIF manifest (fetches once per manifestUrl, then opens canvas at currentCanvasIndex)
   useEffect(() => {
     if (!viewerRef.current || !manifestUrl) return;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pickLabel = (label: any): string => {
+      if (!label) return '';
+      if (typeof label === 'string') return label;
+      // v3: LanguageMap
+      if (typeof label === 'object') {
+        const preferred = label.ja || label.en || label.none || label['@none'];
+        if (Array.isArray(preferred) && preferred.length) return String(preferred[0]);
+        const firstKey = Object.keys(label)[0];
+        const first = firstKey ? label[firstKey] : null;
+        if (Array.isArray(first) && first.length) return String(first[0]);
+      }
+      return '';
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const extractThumbnail = (canvas: any): string | undefined => {
+      const t = canvas.thumbnail;
+      if (!t) return undefined;
+      if (typeof t === 'string') return t;
+      if (Array.isArray(t) && t[0]) return t[0].id || t[0]['@id'];
+      return t.id || t['@id'];
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const openCanvas = (canvas: any) => {
+      if (!canvas || !viewerRef.current) return;
+      canvasIdRef.current = canvas.id || canvas['@id'] || '';
+
+      // IIIF v3
+      const paintingAnno = canvas.items?.[0]?.items?.[0];
+      const imageBody = paintingAnno?.body;
+      if (imageBody) {
+        const svc = Array.isArray(imageBody.service) ? imageBody.service[0] : imageBody.service;
+        const serviceId = svc?.id || svc?.['@id'] || imageBody.id;
+        if (serviceId && (imageBody.type === 'Image' || imageBody.format?.startsWith('image/'))) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (viewerRef.current as any).open(`${serviceId}/info.json`);
+          return;
+        }
+      }
+      // IIIF v2
+      const resource = canvas.images?.[0]?.resource;
+      if (resource) {
+        const svc = Array.isArray(resource.service) ? resource.service[0] : resource.service;
+        const serviceId = svc?.['@id'] || svc?.id;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (serviceId) (viewerRef.current as any).open(`${serviceId}/info.json`);
+      }
+    };
+
     const loadManifest = async () => {
       try {
-        const res = await fetch(manifestUrl);
-        const manifest = await res.json();
-        const canvas = manifest.items?.[0] || manifest.sequences?.[0]?.canvases?.[0];
-        if (!canvas) return;
-        canvasIdRef.current = canvas.id || canvas['@id'] || '';
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let canvases: any[];
+        if (manifestCacheRef.current?.url === manifestUrl) {
+          canvases = manifestCacheRef.current.canvases;
+        } else {
+          const res = await fetch(manifestUrl);
+          const manifest = await res.json();
+          // v3: items[], v2: sequences[0].canvases[]
+          canvases = manifest.items || manifest.sequences?.[0]?.canvases || [];
+          manifestCacheRef.current = { url: manifestUrl, canvases };
+          const infos: CanvasInfo[] = canvases.map((c, i) => ({
+            id: c.id || c['@id'] || `canvas-${i}`,
+            label: pickLabel(c.label) || `Canvas ${i + 1}`,
+            thumbnail: extractThumbnail(c),
+          }));
+          onCanvasesLoadedRef.current?.(infos);
+        }
 
-        // IIIF v3
-        const paintingAnno = canvas.items?.[0]?.items?.[0];
-        const imageBody = paintingAnno?.body;
-        if (imageBody) {
-          const svc = Array.isArray(imageBody.service) ? imageBody.service[0] : imageBody.service;
-          const serviceId = svc?.id || svc?.['@id'] || imageBody.id;
-          if (serviceId && (imageBody.type === 'Image' || imageBody.format?.startsWith('image/'))) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (viewerRef.current as any).open(`${serviceId}/info.json`);
-            return;
-          }
-        }
-        // IIIF v2
-        const resource = canvas.images?.[0]?.resource;
-        if (resource) {
-          const svc = Array.isArray(resource.service) ? resource.service[0] : resource.service;
-          const serviceId = svc?.['@id'] || svc?.id;
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          if (serviceId) (viewerRef.current as any).open(`${serviceId}/info.json`);
-        }
+        if (!canvases.length) return;
+        const idx = Math.max(0, Math.min(currentCanvasIndex, canvases.length - 1));
+        openCanvas(canvases[idx]);
       } catch { /* ignore */ }
     };
     loadManifest();
-  }, [manifestUrl]);
+  }, [manifestUrl, currentCanvasIndex]);
 
   // Draw annotation overlays
   const drawOverlays = useCallback(() => {

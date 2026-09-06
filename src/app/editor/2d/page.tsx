@@ -8,7 +8,7 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 import type { NextPage } from 'next';
 import SignIn from '@/app/components/SignIn';
 import ProjectSwitcher from '@/app/components/ProjectSwitcher';
-import type { Annotation2D } from '@/app/components/TwoDCanvas';
+import type { Annotation2D, CanvasInfo } from '@/app/components/TwoDCanvas';
 
 const TwoDCanvas = dynamic(() => import('@/app/components/TwoDCanvas'), { ssr: false });
 import { FaPencilAlt, FaBook, FaRegFilePdf, FaTrashAlt, FaList, FaUpload } from 'react-icons/fa';
@@ -33,6 +33,7 @@ import db from '@/lib/firebase/firebase';
 import { deleteDoc, doc, getDoc, getDocs, query, where, updateDoc, collection, addDoc, onSnapshot } from 'firebase/firestore';
 import { createWikidataItem } from '@/lib/services/wikidata';
 import { objectAnnotationService } from '@/lib/services/objectMetadata';
+import { deleteRegionIfUnused } from '@/lib/services/regions';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import type { MediaItem, WikidataItem, BibliographyItem, BibliographyRoleType, BibliographicRelationType, AuthorityRelationType, AuthorityEntityType, MediaRelationType, ReferenceLevel, MediaRoleType, LocationItem } from '@/types/main';
 
@@ -59,10 +60,26 @@ const Home: NextPage = () => {
 
   const [annotationsVisible, setAnnotationsVisible] = useState(true);
   const [annotationMode, setAnnotationMode] = useState<'none' | 'rect' | 'polygon'>('none');
+  const [canvases, setCanvases] = useState<CanvasInfo[]>([]);
+  const [currentCanvasIndex, setCurrentCanvasIndex] = useState(0);
+  const [canvasPage, setCanvasPage] = useState(0);
+  const CANVAS_PAGE_SIZE = 5;
+
+  // Keep the pager showing the page that contains the currently selected canvas.
+  useEffect(() => {
+    if (canvases.length === 0) return;
+    setCanvasPage(Math.floor(currentCanvasIndex / CANVAS_PAGE_SIZE));
+  }, [currentCanvasIndex, canvases.length]);
 
 
   // Custom hooks
   const { manifestUrl, handleManifestUrlChange } = useManifestUrl();
+
+  // Reset canvas selection when manifest URL changes
+  useEffect(() => {
+    setCanvases([]);
+    setCurrentCanvasIndex(0);
+  }, [manifestUrl]);
   const { projectId, canEdit: projectCanEdit, project: currentProject } = useCurrentProject();
   const [showAllProjects, setShowAllProjects] = useAtom(showAllProjectsAtom);
   const [infoPanelContent] = useAtom(infoPanelAtom);
@@ -226,7 +243,10 @@ const Home: NextPage = () => {
 
   // 2D regions: real-time sync from Firestore（マーカーは regions コレクションをソースとする）
   // 領域ノードはプロジェクト横断の公開資産なので、target_manifest が一致する全領域を表示する。
+  // ただし複数 canvas を持つマニフェストでは、現 canvas に紐づく領域だけに絞る。
+  // target_canvas が空文字/未設定のレガシーレコードは全 canvas で表示（従来動作維持）。
   // クリック時のアノテーション一覧は現プロジェクトのものに絞る（onAnnotationClick 参照）。
+  const currentCanvasId = canvases[currentCanvasIndex]?.id ?? '';
   useEffect(() => {
     if (!manifestUrl) return;
     const unsubscribe = onSnapshot(collection(db, 'regions'), (snapshot) => {
@@ -234,6 +254,9 @@ const Home: NextPage = () => {
       snapshot.forEach((docSnap) => {
         const d = docSnap.data();
         if (d.target_manifest !== manifestUrl) return;
+        // Canvas filter: skip if region has a specific canvas that differs from the current one.
+        // Empty/missing target_canvas is treated as "applies to all canvases" for legacy data.
+        if (d.target_canvas && currentCanvasId && d.target_canvas !== currentCanvasId) return;
         const sel = d.selector;
         if (sel?.type === '2DRectSelector') {
           list.push({ kind: 'rect', id: docSnap.id, label: '', x: sel.x, y: sel.y, width: sel.width, height: sel.height });
@@ -244,7 +267,7 @@ const Home: NextPage = () => {
       setAnnotations2D(list);
     });
     return () => unsubscribe();
-  }, [manifestUrl]);
+  }, [manifestUrl, currentCanvasId]);
 
   const handleRectAnnotation = (x: number, y: number, width: number, height: number, canvasId: string) => {
     setPendingAnnotation({ kind: 'rect', x, y, width, height, canvasId });
@@ -1852,12 +1875,81 @@ const Home: NextPage = () => {
         ) : null}
         <div className="flex flex-1">
           <div className="flex-1 border-r border-[var(--border)] relative">
+            {canvases.length > 1 && (() => {
+              const totalPages = Math.ceil(canvases.length / CANVAS_PAGE_SIZE);
+              const page = Math.min(canvasPage, totalPages - 1);
+              const start = page * CANVAS_PAGE_SIZE;
+              const pageItems = canvases.slice(start, start + CANVAS_PAGE_SIZE);
+              const hasPrev = page > 0;
+              const hasNext = page < totalPages - 1;
+              return (
+                <div
+                  className="absolute left-1/2 -translate-x-1/2 top-2 z-10 flex items-center gap-1 bg-black/60 backdrop-blur-sm rounded-lg p-1"
+                  title={`${canvases.length} canvases`}
+                >
+                  <button
+                    onClick={() => setCanvasPage((p) => Math.max(0, p - 1))}
+                    disabled={!hasPrev}
+                    aria-label="Previous canvases"
+                    className={`h-14 px-2 rounded-md text-white text-sm ${
+                      hasPrev ? 'hover:bg-white/10' : 'opacity-30 cursor-not-allowed'
+                    }`}
+                  >
+                    ‹
+                  </button>
+                  {pageItems.map((c, i) => {
+                    const idx = start + i;
+                    const active = idx === currentCanvasIndex;
+                    return (
+                      <button
+                        key={c.id || idx}
+                        onClick={() => setCurrentCanvasIndex(idx)}
+                        className={`flex-shrink-0 flex flex-col items-center rounded-md px-2 py-1 text-[10px] leading-tight transition ${
+                          active
+                            ? 'bg-blue-500 text-white'
+                            : 'text-white/80 hover:bg-white/10'
+                        }`}
+                      >
+                        {c.thumbnail ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={c.thumbnail}
+                            alt={c.label}
+                            className={`h-10 w-10 object-cover rounded mb-0.5 ${active ? 'ring-2 ring-white' : ''}`}
+                          />
+                        ) : (
+                          <span className="h-10 w-10 flex items-center justify-center rounded bg-white/10 mb-0.5 text-sm">
+                            {idx + 1}
+                          </span>
+                        )}
+                        <span className="max-w-[80px] truncate">{c.label}</span>
+                      </button>
+                    );
+                  })}
+                  <button
+                    onClick={() => setCanvasPage((p) => Math.min(totalPages - 1, p + 1))}
+                    disabled={!hasNext}
+                    aria-label="Next canvases"
+                    className={`h-14 px-2 rounded-md text-white text-sm ${
+                      hasNext ? 'hover:bg-white/10' : 'opacity-30 cursor-not-allowed'
+                    }`}
+                  >
+                    ›
+                  </button>
+                  <span className="px-2 text-[10px] text-white/70 whitespace-nowrap">
+                    {page + 1} / {totalPages}
+                  </span>
+                </div>
+              );
+            })()}
             <TwoDCanvas
               manifestUrl={manifestUrl}
               annotations={annotations2D}
               annotationMode={projectCanEdit ? annotationMode : 'none'}
               annotationsVisible={annotationsVisible}
               focusAnnotationId={focusAnnotationId}
+              currentCanvasIndex={currentCanvasIndex}
+              onCanvasesLoaded={setCanvases}
               onRectAnnotation={handleRectAnnotation}
               onPolygonAnnotation={handlePolygonAnnotation2D}
               onAnnotationClick={async (regionId) => {
@@ -1995,6 +2087,24 @@ const Home: NextPage = () => {
                       a.relatedAnnotations ?? [],
                     ])
                   )}
+                  canDelete={!!user}
+                  onDeleteRegion={async () => {
+                    if (!user || !regionPanelContent) return;
+                    const rid = regionPanelContent.regionId;
+                    if (!window.confirm('この領域ノードを削除します。よろしいですか？')) return;
+                    const result = await deleteRegionIfUnused(rid, user.uid);
+                    if (result.ok) {
+                      setRegionPanelContent(null);
+                    } else {
+                      const msg: Record<string, string> = {
+                        not_found: '領域が見つかりませんでした（既に削除済みの可能性があります）。',
+                        forbidden: 'この領域の作成者のみが削除できます。',
+                        annotations_remain: '関連するアノテーションが存在するため削除できません。',
+                        tei_references_remain: 'TEI エディタでこの領域が参照されているため削除できません。',
+                      };
+                      window.alert(msg[result.reason] ?? '削除に失敗しました。');
+                    }
+                  }}
                 />
                 {isRegionNewAnnotationOpen && (
                   <div className="mt-4 pt-4 border-t border-[var(--border)] flex flex-col gap-3">
