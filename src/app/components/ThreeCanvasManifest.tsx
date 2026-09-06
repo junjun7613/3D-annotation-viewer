@@ -39,6 +39,8 @@ interface ThreeCanvasProps {
   polygonColor?: string;
   /** ポリゴンアノテーションの不透明度（0.0〜1.0） */
   polygonOpacity?: number;
+  /** ライティング全体の輝度係数（1.0 が既定） */
+  lightIntensity?: number;
   onCapture?: (dataUrl: string) => void;
   onObjectClick?: () => void; // マーカー以外をクリックしたとき（オブジェクト全体選択）
 }
@@ -80,6 +82,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   focusRegionId = null,
   polygonColor = '#ffff00',
   polygonOpacity = 0.1,
+  lightIntensity = 1.0,
   onCapture,
   onObjectClick,
 }) => {
@@ -102,6 +105,8 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   const modelRef = useRef<THREE.Object3D | null>(null); // 3Dモデルへの参照
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null); // カメラへの参照
   const controlsRef = useRef<OrbitControls | null>(null); // コントロールへの参照
+  const ambientLightRef = useRef<THREE.AmbientLight | null>(null);
+  const directionalLightRef = useRef<THREE.DirectionalLight | null>(null);
   const frameCountRef = useRef(0); // フレームカウンタ
   const raycasterRef = useRef(new THREE.Raycaster()); // Raycasterのインスタンスを再利用
   const [annotationInputVisible, setAnnotationInputVisible] = useState(false);
@@ -125,6 +130,12 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   useEffect(() => { researchProjectIdRef.current = researchProjectId; }, [researchProjectId]);
   const showAllProjectsRef = useRef<boolean>(showAllProjects);
   useEffect(() => { showAllProjectsRef.current = showAllProjects; }, [showAllProjects]);
+
+  // lightIntensity が変わったら既存ライトの intensity を更新
+  useEffect(() => {
+    if (ambientLightRef.current) ambientLightRef.current.intensity = 0.5 * lightIntensity;
+    if (directionalLightRef.current) directionalLightRef.current.intensity = 1 * lightIntensity;
+  }, [lightIntensity]);
 
   // polygonColor / polygonOpacity が変わったら ref と既存ポリゴンマテリアルを更新
   useEffect(() => {
@@ -951,13 +962,15 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
     scene.add(boxMesh)
     */
 
-      // 照明
-      const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+      // 照明（intensity は lightIntensity prop の係数を掛ける）
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.5 * lightIntensity);
       scene.add(ambientLight);
+      ambientLightRef.current = ambientLight;
 
-      const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 1 * lightIntensity);
       directionalLight.position.set(5, 5, 5);
       scene.add(directionalLight);
+      directionalLightRef.current = directionalLight;
 
       // レイキャストの頻度を減らすためのカウンタ
       //const raycastCounter = 0;

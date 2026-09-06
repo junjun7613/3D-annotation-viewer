@@ -52,6 +52,7 @@ import {
 } from '@/app/components/dialogs';
 import RegionAnnotationList from '@/app/components/RegionAnnotationList';
 import PolygonStyleControl from '@/app/components/PolygonStyleControl';
+import LightIntensityControl from '@/app/components/LightIntensityControl';
 
 const Home: NextPage = () => {
   const [user] = useAuthState(auth);
@@ -77,6 +78,22 @@ const Home: NextPage = () => {
     setPolygonColor(next.color);
     setPolygonOpacity(next.opacity);
     try { localStorage.setItem('polygonStyle', JSON.stringify(next)); } catch { /* ignore */ }
+  };
+
+  // 3Dビューア照明の輝度係数（localStorage に永続化）
+  const [lightIntensity, setLightIntensity] = useState<number>(1.0);
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('lightIntensity');
+      if (saved) {
+        const v = Number(saved);
+        if (Number.isFinite(v) && v > 0) setLightIntensity(v);
+      }
+    } catch { /* ignore */ }
+  }, []);
+  const updateLightIntensity = (v: number) => {
+    setLightIntensity(v);
+    try { localStorage.setItem('lightIntensity', String(v)); } catch { /* ignore */ }
   };
 
   // Custom hooks
@@ -1810,6 +1827,7 @@ const Home: NextPage = () => {
               compactMarkers={compactMarkers}
               polygonColor={polygonColor}
               polygonOpacity={polygonOpacity}
+              lightIntensity={lightIntensity}
               onCapture={async (dataUrl) => {
                 if (!manifestUrl) return;
                 await objectMetadataService.updateThumbnailUrl(manifestUrl, dataUrl);
@@ -1854,6 +1872,12 @@ const Home: NextPage = () => {
                 >
                   <LuCircleDot className="w-4 h-4" />
                 </button>
+                <div className="border-t border-[var(--border)]">
+                  <LightIntensityControl
+                    intensity={lightIntensity}
+                    onChange={updateLightIntensity}
+                  />
+                </div>
                 <button
                   onClick={handleAnnotationListOpen}
                   className="p-2.5 transition-colors border-t border-[var(--border)] hover:bg-[var(--secondary-bg)] text-[var(--text-primary)]"
