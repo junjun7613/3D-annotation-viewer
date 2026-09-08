@@ -24,6 +24,7 @@ import {
   canEdit,
   canManageProject,
 } from '@/lib/services/projects';
+import { objectMetadataService } from '@/lib/services/objectMetadata';
 import { detectManifestType, type ManifestType } from '@/utils/manifestType';
 import type { Project, ProjectRole, ProjectVisibility } from '@/types/main';
 
@@ -32,7 +33,72 @@ type ManifestRow = {
   annotationCount: number;
   lastUpdatedAt: number | null;
   type: ManifestType;
+  label: string | null;
+  thumbnail: string | null;
 };
+
+function pickThumbnail(manifest: unknown): string | null {
+  const get = (o: unknown, ...path: (string | number)[]): unknown => {
+    let cur: unknown = o;
+    for (const k of path) {
+      if (cur == null || (typeof cur !== 'object' && !Array.isArray(cur))) return undefined;
+      cur = (cur as Record<string, unknown>)[String(k)];
+    }
+    return cur;
+  };
+  const asStr = (v: unknown): string | null => (typeof v === 'string' ? v : null);
+
+  // v3: manifest.thumbnail[0].id
+  const v3Root = asStr(get(manifest, 'thumbnail', 0, 'id'));
+  if (v3Root) return v3Root;
+  // v3: items[0].thumbnail[0].id
+  const v3Canvas = asStr(get(manifest, 'items', 0, 'thumbnail', 0, 'id'));
+  if (v3Canvas) return v3Canvas;
+  // v2: manifest.thumbnail['@id']
+  const v2Root = asStr(get(manifest, 'thumbnail', '@id'));
+  if (v2Root) return v2Root;
+  // v2: sequences[0].thumbnail['@id']
+  const v2Seq = asStr(get(manifest, 'sequences', 0, 'thumbnail', '@id'));
+  if (v2Seq) return v2Seq;
+  // v2: sequences[0].canvases[0].thumbnail['@id']
+  const v2Canvas = asStr(get(manifest, 'sequences', 0, 'canvases', 0, 'thumbnail', '@id'));
+  if (v2Canvas) return v2Canvas;
+  // v2 fallback: canvases[0].images[0].resource.service.@id から Image API URL を生成
+  let v2Svc: unknown = get(manifest, 'sequences', 0, 'canvases', 0, 'images', 0, 'resource', 'service');
+  if (Array.isArray(v2Svc)) v2Svc = v2Svc[0];
+  const v2SvcId = asStr(get(v2Svc, '@id')) ?? asStr(get(v2Svc, 'id'));
+  if (v2SvcId) return `${v2SvcId.replace(/\/$/, '')}/full/240,/0/default.jpg`;
+  // v3 fallback: items[0].items[0].items[0].body.service から生成
+  let v3Svc: unknown = get(manifest, 'items', 0, 'items', 0, 'items', 0, 'body', 'service');
+  if (Array.isArray(v3Svc)) v3Svc = v3Svc[0];
+  const v3SvcId = asStr(get(v3Svc, 'id')) ?? asStr(get(v3Svc, '@id'));
+  if (v3SvcId) return `${v3SvcId.replace(/\/$/, '')}/full/240,/0/default.jpg`;
+  return null;
+}
+
+async function fetchManifestLabelAndThumbnail(
+  manifestUrl: string
+): Promise<{ label: string | null; thumbnail: string | null }> {
+  try {
+    const res = await fetch(manifestUrl);
+    if (!res.ok) return { label: null, thumbnail: null };
+    const manifest = await res.json();
+
+    const raw = manifest.label;
+    let label: string | null = null;
+    if (typeof raw === 'string') label = raw;
+    else if (raw && typeof raw === 'object') {
+      const vals = Object.values(raw as Record<string, string[]>);
+      label = vals[0]?.[0] ?? null;
+    }
+
+    const thumbnail = pickThumbnail(manifest);
+
+    return { label, thumbnail };
+  } catch {
+    return { label: null, thumbnail: null };
+  }
+}
 
 function formatDate(ms: number | null): string {
   if (!ms) return '—';
@@ -79,10 +145,18 @@ export default function ProjectDetailPage() {
       }
       const rawManifests = await listProjectManifests(pid);
       const enriched: ManifestRow[] = await Promise.all(
-        rawManifests.map(async (m) => ({
-          ...m,
-          type: await detectManifestType(m.manifestUrl),
-        }))
+        rawManifests.map(async (m) => {
+          const [type, meta] = await Promise.all([
+            detectManifestType(m.manifestUrl),
+            objectMetadataService.getObjectMetadata(m.manifestUrl),
+          ]);
+          return {
+            ...m,
+            type,
+            label: meta?.manifest_label ?? null,
+            thumbnail: meta?.thumbnail_url ?? null,
+          };
+        })
       );
       enriched.sort(
         (a, b) => (b.lastUpdatedAt ?? 0) - (a.lastUpdatedAt ?? 0)
@@ -90,6 +164,36 @@ export default function ProjectDetailPage() {
       if (!cancelled) {
         setManifests(enriched);
         setLoading(false);
+      }
+
+      // Firestore に label / thumbnail 未保存のものについて manifest を fetch し補完
+      const missing = enriched.filter((m) => !m.label || !m.thumbnail);
+      if (missing.length > 0) {
+        const results = await Promise.all(
+          missing.map(async (m) => {
+            const { label, thumbnail } = await fetchManifestLabelAndThumbnail(m.manifestUrl);
+            if (label && !m.label) {
+              objectMetadataService.saveManifestLabel(m.manifestUrl, label).catch(() => {});
+            }
+            if (thumbnail && !m.thumbnail) {
+              objectMetadataService.saveThumbnailUrl(m.manifestUrl, thumbnail).catch(() => {});
+            }
+            return { manifestUrl: m.manifestUrl, label, thumbnail };
+          })
+        );
+        if (cancelled) return;
+        setManifests((prev) => {
+          const byUrl = new Map(results.map((r) => [r.manifestUrl, r]));
+          return prev.map((m) => {
+            const r = byUrl.get(m.manifestUrl);
+            if (!r) return m;
+            return {
+              ...m,
+              label: m.label ?? r.label,
+              thumbnail: m.thumbnail ?? r.thumbnail,
+            };
+          });
+        });
       }
     })();
     return () => {
@@ -347,19 +451,51 @@ export default function ProjectDetailPage() {
                         key={m.manifestUrl}
                         className="bg-[var(--card-bg)] border border-[var(--border)] rounded-lg p-4 flex items-center gap-4"
                       >
-                        <div className="flex-shrink-0 p-2 bg-blue-50 dark:bg-blue-900/30 rounded-md">
-                          {m.type === '3d' ? (
-                            <FaCube className="w-4 h-4 text-[var(--primary)]" />
-                          ) : m.type === '2d' ? (
-                            <FaImage className="w-4 h-4 text-[var(--primary)]" />
-                          ) : (
-                            <FaFileAlt className="w-4 h-4 text-[var(--text-secondary)]" />
-                          )}
-                        </div>
+                        {m.thumbnail ? (
+                          <div className="flex-shrink-0 w-16 h-16 rounded-md overflow-hidden bg-[var(--background)] border border-[var(--border)] relative">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={m.thumbnail}
+                              alt=""
+                              className="w-full h-full object-cover"
+                              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                            />
+                            <div className="absolute bottom-0 right-0 p-0.5 bg-black/50 rounded-tl-md">
+                              {m.type === '3d' ? (
+                                <FaCube className="w-2.5 h-2.5 text-white" />
+                              ) : m.type === '2d' ? (
+                                <FaImage className="w-2.5 h-2.5 text-white" />
+                              ) : (
+                                <FaFileAlt className="w-2.5 h-2.5 text-white" />
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex-shrink-0 w-16 h-16 flex items-center justify-center bg-blue-50 dark:bg-blue-900/30 rounded-md">
+                            {m.type === '3d' ? (
+                              <FaCube className="w-5 h-5 text-[var(--primary)]" />
+                            ) : m.type === '2d' ? (
+                              <FaImage className="w-5 h-5 text-[var(--primary)]" />
+                            ) : (
+                              <FaFileAlt className="w-5 h-5 text-[var(--text-secondary)]" />
+                            )}
+                          </div>
+                        )}
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm text-[var(--text-primary)] truncate font-mono">
-                            {m.manifestUrl}
-                          </p>
+                          {m.label ? (
+                            <>
+                              <p className="text-sm text-[var(--text-primary)] truncate font-medium">
+                                {m.label}
+                              </p>
+                              <p className="text-xs text-[var(--text-secondary)] truncate font-mono mt-0.5">
+                                {m.manifestUrl}
+                              </p>
+                            </>
+                          ) : (
+                            <p className="text-sm text-[var(--text-primary)] truncate font-mono">
+                              {m.manifestUrl}
+                            </p>
+                          )}
                           <p className="text-xs text-[var(--text-secondary)] mt-0.5">
                             アノテ {m.annotationCount} ・ 更新 {formatDate(m.lastUpdatedAt)}
                           </p>
