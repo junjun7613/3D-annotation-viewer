@@ -20,6 +20,13 @@ export interface CanvasInfo {
   id: string;
   label: string;
   thumbnail?: string;
+  /** Range (structures) or seeAlso view this canvas belongs to. Absent when the manifest has no grouping. */
+  groupId?: string;
+  groupLabel?: string;
+  /** Label within the group — the modality (VL / IR / …) when seeAlso provides one. */
+  memberLabel?: string;
+  /** Representative canvas of its group (seeAlso `is_default`). */
+  isGroupDefault?: boolean;
 }
 
 interface TwoDCanvasProps {
@@ -234,6 +241,68 @@ export default function TwoDCanvas({
       return t.id || t['@id'];
     };
 
+    /**
+     * Map canvasId -> group, from IIIF v3 `structures`.
+     * Walks the Range tree and treats the deepest Range that directly contains
+     * Canvases as that canvas's group, so a wrapper Range ("撮影対象") does not
+     * collapse every canvas into one group.
+     */
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const groupsFromStructures = (manifest: any) => {
+      const map = new Map<string, { id: string; label: string }>();
+      const structures = manifest?.structures;
+      if (!Array.isArray(structures)) return map;
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const walk = (range: any) => {
+        if (!range || range.type !== 'Range' || !Array.isArray(range.items)) return;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const canvasChildren = range.items.filter((it: any) => it?.type === 'Canvas' && it.id);
+        if (canvasChildren.length) {
+          const group = { id: range.id || '', label: pickLabel(range.label) };
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          canvasChildren.forEach((c: any) => {
+            if (!map.has(c.id)) map.set(c.id, group);
+          });
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        range.items.forEach((it: any) => { if (it?.type === 'Range') walk(it); });
+      };
+      structures.forEach(walk);
+      return map;
+    };
+
+    /**
+     * NIHU-specific companion dataset linked via `seeAlso`: a flat table of
+     * { canvas_id, view_id, modality_code, is_default }. Used only to enrich
+     * grouping that `structures` already established.
+     */
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fetchSeeAlsoImageTable = async (manifest: any) => {
+      const map = new Map<string, { viewId: string; modality: string; isDefault: boolean }>();
+      const seeAlso = manifest?.seeAlso;
+      const entries = Array.isArray(seeAlso) ? seeAlso : seeAlso ? [seeAlso] : [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const dataset = entries.find((s: any) => s?.format === 'application/json' && (s.id || s['@id']));
+      if (!dataset) return map;
+      try {
+        const res = await fetch(dataset.id || dataset['@id']);
+        if (!res.ok) return map;
+        const data = await res.json();
+        if (!Array.isArray(data?.images)) return map;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        data.images.forEach((img: any) => {
+          if (!img?.canvas_id) return;
+          map.set(img.canvas_id, {
+            viewId: String(img.view_id ?? ''),
+            modality: String(img.modality_code ?? ''),
+            isDefault: img.is_default === true,
+          });
+        });
+      } catch { /* the table is optional — fall back to structures alone */ }
+      return map;
+    };
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const openCanvas = (canvas: any) => {
       if (!canvas || !viewerRef.current) return;
@@ -273,11 +342,27 @@ export default function TwoDCanvas({
           // v3: items[], v2: sequences[0].canvases[]
           canvases = manifest.items || manifest.sequences?.[0]?.canvases || [];
           manifestCacheRef.current = { url: manifestUrl, canvases };
-          const infos: CanvasInfo[] = canvases.map((c, i) => ({
-            id: c.id || c['@id'] || `canvas-${i}`,
-            label: pickLabel(c.label) || `Canvas ${i + 1}`,
-            thumbnail: extractThumbnail(c),
-          }));
+
+          const groupMap = groupsFromStructures(manifest);
+          // Only worth fetching the companion table if structures gave us groups.
+          const imageTable = groupMap.size
+            ? await fetchSeeAlsoImageTable(manifest)
+            : new Map<string, { viewId: string; modality: string; isDefault: boolean }>();
+
+          const infos: CanvasInfo[] = canvases.map((c, i) => {
+            const id = c.id || c['@id'] || `canvas-${i}`;
+            const group = groupMap.get(id);
+            const extra = imageTable.get(id);
+            return {
+              id,
+              label: pickLabel(c.label) || `Canvas ${i + 1}`,
+              thumbnail: extractThumbnail(c),
+              groupId: group?.id,
+              groupLabel: group?.label,
+              memberLabel: extra?.modality || undefined,
+              isGroupDefault: extra?.isDefault,
+            };
+          });
           onCanvasesLoadedRef.current?.(infos);
         }
 

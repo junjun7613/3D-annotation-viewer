@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { auth } from '@/lib/firebase/firebase';
@@ -64,6 +64,32 @@ const Home: NextPage = () => {
   const [currentCanvasIndex, setCurrentCanvasIndex] = useState(0);
   const [canvasPage, setCanvasPage] = useState(0);
   const CANVAS_PAGE_SIZE = 5;
+
+  // Canvas groups from the manifest's `structures` (e.g. 表面 / 裏面, each holding
+  // the same subject shot under different imaging modalities). Empty when the
+  // manifest has no Range grouping — the switcher then stays a flat pager.
+  const canvasGroups = useMemo(() => {
+    const groups: { id: string; label: string; indices: number[] }[] = [];
+    const byId = new Map<string, number>();
+    canvases.forEach((c, i) => {
+      if (!c.groupId) return;
+      let pos = byId.get(c.groupId);
+      if (pos === undefined) {
+        pos = groups.length;
+        byId.set(c.groupId, pos);
+        groups.push({ id: c.groupId, label: c.groupLabel || `Group ${pos + 1}`, indices: [] });
+      }
+      groups[pos].indices.push(i);
+    });
+    // A single group conveys no more than the flat list does.
+    return groups.length > 1 && groups.every((g) => g.indices.length) ? groups : [];
+  }, [canvases]);
+
+  const activeGroupIndex = useMemo(() => {
+    if (!canvasGroups.length) return 0;
+    const found = canvasGroups.findIndex((g) => g.indices.includes(currentCanvasIndex));
+    return found >= 0 ? found : 0;
+  }, [canvasGroups, currentCanvasIndex]);
 
   // Keep the pager showing the page that contains the currently selected canvas.
   useEffect(() => {
@@ -1875,7 +1901,68 @@ const Home: NextPage = () => {
         ) : null}
         <div className="flex flex-1">
           <div className="flex-1 border-r border-[var(--border)] relative">
-            {canvases.length > 1 && (() => {
+            {canvases.length > 1 && canvasGroups.length > 0 && (() => {
+              const activeGroup = canvasGroups[activeGroupIndex];
+              return (
+                <div className="absolute left-1/2 -translate-x-1/2 top-2 z-10 flex flex-col items-center gap-1 bg-black/60 backdrop-blur-sm rounded-lg p-1">
+                  {/* Group tabs (e.g. 表面 / 裏面) */}
+                  <div className="flex items-center gap-1" role="tablist" aria-label="撮影対象">
+                    {canvasGroups.map((g, gi) => {
+                      const active = gi === activeGroupIndex;
+                      return (
+                        <button
+                          key={g.id || gi}
+                          role="tab"
+                          aria-selected={active}
+                          onClick={() => {
+                            // Prefer the group's representative image, else its first canvas.
+                            const preferred = g.indices.find((i) => canvases[i]?.isGroupDefault);
+                            setCurrentCanvasIndex(preferred ?? g.indices[0]);
+                          }}
+                          className={`px-3 py-1 rounded-md text-[11px] leading-tight transition ${
+                            active ? 'bg-white/20 text-white font-medium' : 'text-white/60 hover:bg-white/10'
+                          }`}
+                        >
+                          {g.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {/* Canvases within the active group (e.g. VL / IR / UVF / …) */}
+                  <div className="flex items-center gap-1">
+                    {activeGroup.indices.map((idx) => {
+                      const c = canvases[idx];
+                      const active = idx === currentCanvasIndex;
+                      return (
+                        <button
+                          key={c.id || idx}
+                          onClick={() => setCurrentCanvasIndex(idx)}
+                          title={c.label}
+                          className={`flex-shrink-0 flex flex-col items-center rounded-md px-2 py-1 text-[10px] leading-tight transition ${
+                            active ? 'bg-blue-500 text-white' : 'text-white/80 hover:bg-white/10'
+                          }`}
+                        >
+                          {c.thumbnail ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={c.thumbnail}
+                              alt={c.label}
+                              className={`h-10 w-10 object-cover rounded mb-0.5 ${active ? 'ring-2 ring-white' : ''}`}
+                            />
+                          ) : (
+                            <span className="h-10 w-10 flex items-center justify-center rounded bg-white/10 mb-0.5 text-sm">
+                              {idx + 1}
+                            </span>
+                          )}
+                          <span className="max-w-[80px] truncate">{c.memberLabel || c.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+            {canvases.length > 1 && canvasGroups.length === 0 && (() => {
               const totalPages = Math.ceil(canvases.length / CANVAS_PAGE_SIZE);
               const page = Math.min(canvasPage, totalPages - 1);
               const start = page * CANVAS_PAGE_SIZE;
