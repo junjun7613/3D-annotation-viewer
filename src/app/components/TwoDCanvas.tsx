@@ -16,17 +16,25 @@ export interface Annotation2D {
   points?: { x: number; y: number }[];
 }
 
+/**
+ * One selectable image body of a canvas whose painting body is a `Choice`
+ * (IIIF Cookbook recipe 0033) — e.g. the same subject shot under VL / IR / UVF.
+ * All choices paint the same canvas, so annotations are shared across them.
+ */
+export interface CanvasChoice {
+  label: string;
+  serviceId: string;
+}
+
 export interface CanvasInfo {
   id: string;
   label: string;
   thumbnail?: string;
-  /** Range (structures) or seeAlso view this canvas belongs to. Absent when the manifest has no grouping. */
+  /** Range (`structures`) this canvas belongs to. Absent when the manifest has no Range grouping. */
   groupId?: string;
   groupLabel?: string;
-  /** Label within the group — the modality (VL / IR / …) when seeAlso provides one. */
-  memberLabel?: string;
-  /** Representative canvas of its group (seeAlso `is_default`). */
-  isGroupDefault?: boolean;
+  /** Selectable image bodies. Length > 1 only when the painting body is a `Choice`. */
+  choices?: CanvasChoice[];
 }
 
 interface TwoDCanvasProps {
@@ -36,6 +44,8 @@ interface TwoDCanvasProps {
   annotationsVisible: boolean;
   focusAnnotationId?: string | null;
   currentCanvasIndex?: number;
+  /** Index into the current canvas's `choices` (Choice bodies only). */
+  currentChoiceIndex?: number;
   onRectAnnotation?: (x: number, y: number, width: number, height: number, canvasId: string) => void;
   onPolygonAnnotation?: (points: { x: number; y: number }[], canvasId: string) => void;
   onAnnotationClick?: (id: string) => void;
@@ -50,6 +60,7 @@ export default function TwoDCanvas({
   annotationsVisible,
   focusAnnotationId,
   currentCanvasIndex = 0,
+  currentChoiceIndex = 0,
   onRectAnnotation,
   onPolygonAnnotation,
   onAnnotationClick,
@@ -212,6 +223,8 @@ export default function TwoDCanvas({
   // Cache the fetched manifest per URL so canvas switching doesn't re-fetch
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const manifestCacheRef = useRef<{ url: string; canvases: any[] } | null>(null);
+  // Which canvas is currently open, so a choice switch can be told apart from a canvas switch.
+  const lastOpenedRef = useRef<{ url: string; canvasIndex: number } | null>(null);
 
   // Load IIIF manifest (fetches once per manifestUrl, then opens canvas at currentCanvasIndex)
   useEffect(() => {
@@ -272,61 +285,73 @@ export default function TwoDCanvas({
       return map;
     };
 
-    /**
-     * NIHU-specific companion dataset linked via `seeAlso`: a flat table of
-     * { canvas_id, view_id, modality_code, is_default }. Used only to enrich
-     * grouping that `structures` already established.
-     */
+    /** Image API service id of an image body, falling back to the body's own id. */
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const fetchSeeAlsoImageTable = async (manifest: any) => {
-      const map = new Map<string, { viewId: string; modality: string; isDefault: boolean }>();
-      const seeAlso = manifest?.seeAlso;
-      const entries = Array.isArray(seeAlso) ? seeAlso : seeAlso ? [seeAlso] : [];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const dataset = entries.find((s: any) => s?.format === 'application/json' && (s.id || s['@id']));
-      if (!dataset) return map;
-      try {
-        const res = await fetch(dataset.id || dataset['@id']);
-        if (!res.ok) return map;
-        const data = await res.json();
-        if (!Array.isArray(data?.images)) return map;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        data.images.forEach((img: any) => {
-          if (!img?.canvas_id) return;
-          map.set(img.canvas_id, {
-            viewId: String(img.view_id ?? ''),
-            modality: String(img.modality_code ?? ''),
-            isDefault: img.is_default === true,
-          });
-        });
-      } catch { /* the table is optional — fall back to structures alone */ }
-      return map;
+    const serviceIdOf = (body: any): string | undefined => {
+      if (!body) return undefined;
+      const svc = Array.isArray(body.service) ? body.service[0] : body.service;
+      return svc?.id || svc?.['@id'] || body.id || body['@id'];
     };
 
+    /**
+     * Selectable image bodies of a canvas. A `Choice` body yields one entry per
+     * alternative (recipe 0033); any other image body yields a single entry.
+     */
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const openCanvas = (canvas: any) => {
+    const extractChoices = (canvas: any): CanvasChoice[] => {
+      const body = canvas?.items?.[0]?.items?.[0]?.body;
+      if (!body) return [];
+      if (body.type === 'Choice' && Array.isArray(body.items)) {
+        return body.items
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .map((alt: any, i: number) => {
+            const serviceId = serviceIdOf(alt);
+            return serviceId ? { label: pickLabel(alt.label) || `Image ${i + 1}`, serviceId } : null;
+          })
+          .filter((c: CanvasChoice | null): c is CanvasChoice => c !== null);
+      }
+      const serviceId = serviceIdOf(body);
+      return serviceId ? [{ label: pickLabel(body.label) || '', serviceId }] : [];
+    };
+
+    /**
+     * Opens a canvas, optionally a specific `Choice` alternative. When
+     * `preserveView` is set the current zoom/pan is restored after the new image
+     * loads — choices of one canvas share a coordinate system, so the viewport
+     * carries over exactly.
+     */
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const openCanvas = (canvas: any, choiceIndex = 0, preserveView = false) => {
       if (!canvas || !viewerRef.current) return;
+      const viewer = viewerRef.current;
       canvasIdRef.current = canvas.id || canvas['@id'] || '';
 
-      // IIIF v3
-      const paintingAnno = canvas.items?.[0]?.items?.[0];
-      const imageBody = paintingAnno?.body;
-      if (imageBody) {
-        const svc = Array.isArray(imageBody.service) ? imageBody.service[0] : imageBody.service;
-        const serviceId = svc?.id || svc?.['@id'] || imageBody.id;
-        if (serviceId && (imageBody.type === 'Image' || imageBody.format?.startsWith('image/'))) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (viewerRef.current as any).open(`${serviceId}/info.json`);
-          return;
+      const bounds = preserveView && viewer.world.getItemCount()
+        ? viewer.viewport.getBounds()
+        : null;
+      const openWith = (serviceId: string) => {
+        if (bounds) {
+          viewer.addOnceHandler('open', () => {
+            // `true` = apply immediately, without the default spring animation.
+            viewer.viewport.fitBounds(bounds, true);
+          });
         }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (viewer as any).open(`${serviceId}/info.json`);
+      };
+
+      // IIIF v3 — including Choice bodies
+      const choices = extractChoices(canvas);
+      if (choices.length) {
+        const choice = choices[Math.max(0, Math.min(choiceIndex, choices.length - 1))];
+        openWith(choice.serviceId);
+        return;
       }
       // IIIF v2
       const resource = canvas.images?.[0]?.resource;
       if (resource) {
-        const svc = Array.isArray(resource.service) ? resource.service[0] : resource.service;
-        const serviceId = svc?.['@id'] || svc?.id;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if (serviceId) (viewerRef.current as any).open(`${serviceId}/info.json`);
+        const serviceId = serviceIdOf(resource);
+        if (serviceId) openWith(serviceId);
       }
     };
 
@@ -344,23 +369,18 @@ export default function TwoDCanvas({
           manifestCacheRef.current = { url: manifestUrl, canvases };
 
           const groupMap = groupsFromStructures(manifest);
-          // Only worth fetching the companion table if structures gave us groups.
-          const imageTable = groupMap.size
-            ? await fetchSeeAlsoImageTable(manifest)
-            : new Map<string, { viewId: string; modality: string; isDefault: boolean }>();
 
           const infos: CanvasInfo[] = canvases.map((c, i) => {
             const id = c.id || c['@id'] || `canvas-${i}`;
             const group = groupMap.get(id);
-            const extra = imageTable.get(id);
+            const choices = extractChoices(c);
             return {
               id,
               label: pickLabel(c.label) || `Canvas ${i + 1}`,
               thumbnail: extractThumbnail(c),
               groupId: group?.id,
               groupLabel: group?.label,
-              memberLabel: extra?.modality || undefined,
-              isGroupDefault: extra?.isDefault,
+              choices: choices.length > 1 ? choices : undefined,
             };
           });
           onCanvasesLoadedRef.current?.(infos);
@@ -368,11 +388,16 @@ export default function TwoDCanvas({
 
         if (!canvases.length) return;
         const idx = Math.max(0, Math.min(currentCanvasIndex, canvases.length - 1));
-        openCanvas(canvases[idx]);
+        // Switching between choices of the same canvas keeps zoom/pan; moving to
+        // a different canvas (or manifest) starts fresh.
+        const sameCanvas =
+          lastOpenedRef.current?.url === manifestUrl && lastOpenedRef.current.canvasIndex === idx;
+        openCanvas(canvases[idx], currentChoiceIndex, sameCanvas);
+        lastOpenedRef.current = { url: manifestUrl, canvasIndex: idx };
       } catch { /* ignore */ }
     };
     loadManifest();
-  }, [manifestUrl, currentCanvasIndex]);
+  }, [manifestUrl, currentCanvasIndex, currentChoiceIndex]);
 
   // Draw annotation overlays
   const drawOverlays = useCallback(() => {
