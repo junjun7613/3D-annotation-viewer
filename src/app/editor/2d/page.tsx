@@ -35,13 +35,15 @@ import { createWikidataItem } from '@/lib/services/wikidata';
 import { objectAnnotationService } from '@/lib/services/objectMetadata';
 import { deleteRegionIfUnused } from '@/lib/services/regions';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import type { MediaItem, WikidataItem, BibliographyItem, BibliographyRoleType, BibliographicRelationType, AuthorityRelationType, AuthorityEntityType, MediaRelationType, ReferenceLevel, MediaRoleType, LocationItem } from '@/types/main';
+import type { MediaItem, WikidataItem, BibliographyItem, BibliographyRoleType, BibliographicRelationType, AuthorityRelationType, AuthorityEntityType, MediaRelationType, ReferenceLevel, MediaRoleType, LocationItem, TagItem } from '@/types/main';
+import type { TagFormData } from '@/app/components/dialogs/TagDialog';
 
 // Custom hooks
 import { useManifestUrl } from '@/app/hooks/useManifestUrl';
 import { useObjectMetadata } from '@/app/hooks/useObjectMetadata';
 import { useAnnotationList } from '@/app/hooks/useAnnotationList';
 import { useIIIFThumbnails } from '@/app/hooks/useIIIFThumbnails';
+import { useTagVocabulary } from '@/app/hooks/useTagVocabulary';
 import { useCurrentProject } from '@/app/hooks/useCurrentProject';
 
 // Dialog components
@@ -52,6 +54,7 @@ import {
   TitleEditDialog,
   DescriptionDialog,
   AnnotationListDialog,
+  TagDialog,
 } from '@/app/components/dialogs';
 import RegionAnnotationList from '@/app/components/RegionAnnotationList';
 
@@ -146,6 +149,52 @@ const Home: NextPage = () => {
   // infoPanelContentという連想配列を作成
 
   const [infoTab, setInfoTab] = useState<'resources' | 'linkedData' | 'references' | 'location'>('resources');
+
+  // ----- タグ（key:value の軽量分類） -----
+  const [isTagDialogOpen, setIsTagDialogOpen] = useState(false);
+  const { keys: tagKeys, valuesFor: tagValuesFor, record: recordTagVocabulary } = useTagVocabulary(projectId);
+
+  const saveTag = async (data: TagFormData) => {
+    if (!infoPanelContent?.id || !user) return;
+    const docRef = doc(db, 'test', infoPanelContent.id);
+    const docSnap = await getDoc(docRef);
+    if (!docSnap.exists()) {
+      console.warn('No such document!');
+      return;
+    }
+    const existing = (docSnap.data().tags ?? []) as TagItem[];
+    const addedAt = Date.now();
+    // 同一 key:value の重複付与は無視する。同じ key に複数の値を付けるのは正常系
+    const newTags: TagItem[] = data.values
+      .filter((v) => !existing.some((t) => t.key === data.key && t.value === v))
+      .map((v) => ({
+        key: data.key,
+        value: v,
+        addedBy: user.uid,
+        addedAt,
+        ...(data.addedComment && { addedComment: data.addedComment }),
+      }));
+    if (newTags.length === 0) {
+      setIsTagDialogOpen(false);
+      return;
+    }
+    const tags = [...existing, ...newTags];
+    await updateDoc(docRef, { tags });
+    setInfoPanel({ ...infoPanelContent, tags });
+    await recordTagVocabulary(newTags);
+    setIsTagDialogOpen(false);
+  };
+
+  const deleteTag = async (index: number) => {
+    if (!infoPanelContent?.id) return;
+    const docRef = doc(db, 'test', infoPanelContent.id);
+    const docSnap = await getDoc(docRef);
+    if (!docSnap.exists()) return;
+    const existing = (docSnap.data().tags ?? []) as TagItem[];
+    const tags = existing.filter((_, i) => i !== index);
+    await updateDoc(docRef, { tags });
+    setInfoPanel({ ...infoPanelContent, tags });
+  };
 
   interface MediaItem {
     id: string;
@@ -428,6 +477,7 @@ const Home: NextPage = () => {
       media: (a as Record<string, unknown>).media as import('@/types/main').MediaItem[] ?? [],
       wikidata: (a as Record<string, unknown>).wikidata as import('@/types/main').WikidataItem[] ?? [],
       bibliography: (a as Record<string, unknown>).bibliography as import('@/types/main').BibliographyItem[] ?? [],
+      tags: (a as Record<string, unknown>).tags as TagItem[] ?? [],
     })));
   };
 
@@ -2098,6 +2148,7 @@ const Home: NextPage = () => {
                     media: a.media ?? [],
                     wikidata: a.wikidata ?? [],
                     bibliography: a.bibliography ?? [],
+                    tags: a.tags ?? [],
                     relatedAnnotations: a.relatedAnnotations ?? [],
                   };
                 });
@@ -2357,8 +2408,9 @@ const Home: NextPage = () => {
                 <span>このアノテーションは他プロジェクトのものです（読み取り専用）。</span>
               </div>
             )}
-            <div className="border-b border-[var(--border)] pb-3 mb-3 flex-shrink-0" style={{ minHeight: '220px', maxHeight: '300px' }}>
-              <div className="card h-full">
+            {/* Description（左 2）+ タグ（右 1）の 2 列。タグは 4 タブの外側に置き、常に一覧できるようにする */}
+            <div className="border-b border-[var(--border)] pb-3 mb-3 flex-shrink-0 flex gap-3 overflow-hidden" style={{ minHeight: '220px', maxHeight: '300px' }}>
+              <div className="card h-full flex-[2] min-w-0">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <h3 className="text-base font-semibold m-0 text-[var(--text-primary)]">
@@ -2389,6 +2441,41 @@ const Home: NextPage = () => {
                   onClick={handleDescriptionClick}
                   dangerouslySetInnerHTML={{ __html: desc || '' }}
                 ></div>
+              </div>
+              <div className="card h-full flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
+                <h3 className="text-base font-semibold m-0 mb-3 text-[var(--text-primary)] flex-shrink-0">Tags</h3>
+                <div className="flex flex-wrap items-start content-start gap-1.5 overflow-y-auto flex-1 min-h-0">
+                  {(infoPanelContent?.tags ?? []).map((tag, index) => (
+                    <span
+                      key={`${tag.key}-${tag.value}-${index}`}
+                      className="group inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-[var(--secondary-bg)] border border-[var(--border)] max-w-full"
+                      title={tag.addedComment || undefined}
+                    >
+                      <span className="text-[var(--text-secondary)] truncate">{tag.key}</span>
+                      <span className="text-[var(--text-secondary)] opacity-50">:</span>
+                      <span className="font-medium text-[var(--text-primary)] truncate">{tag.value}</span>
+                      {annotationCanEdit && (
+                        <button
+                          type="button"
+                          onClick={() => deleteTag(index)}
+                          className="ml-0.5 text-[var(--text-secondary)] opacity-0 group-hover:opacity-100 hover:text-red-500 transition-opacity flex-shrink-0"
+                          title="タグを削除"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </span>
+                  ))}
+                  {annotationCanEdit && (
+                    <button
+                      type="button"
+                      onClick={() => setIsTagDialogOpen(true)}
+                      className="px-2 py-0.5 rounded-full text-xs border border-dashed border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--primary)] hover:border-[var(--primary)] transition-colors"
+                    >
+                      + タグ
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
             <div className="flex-1 overflow-hidden flex flex-col">
@@ -3076,6 +3163,17 @@ const Home: NextPage = () => {
         wikidata={infoPanelContent?.wikidata}
         media={infoPanelContent?.media}
         iiifThumbnails={iiifThumbnails}
+      />
+
+      <TagDialog
+        isOpen={isTagDialogOpen}
+        onClose={() => setIsTagDialogOpen(false)}
+        onSave={saveTag}
+        knownKeys={tagKeys}
+        valuesFor={tagValuesFor}
+        existingValuesFor={(k) =>
+          (infoPanelContent?.tags ?? []).filter((t) => t.key === k).map((t) => t.value)
+        }
       />
 
       {selectedImage && (

@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { NewAnnotation, IIIFAnnotation, WikidataItem } from '@/types/main';
+import { NewAnnotation, IIIFAnnotation, IIIFTextualBody, WikidataItem } from '@/types/main';
 import { toWikidataEntityUri } from '@/lib/services/wikidata';
 import { renderMarkdown } from './markdown';
 
@@ -517,16 +517,31 @@ function convertAnnotationToIIIF(
   const bodyValue = descriptionHtml && descriptionHtml.trim().length > 0
     ? descriptionHtml
     : (doc.data.body.label ?? '');
+  const mainBody: IIIFTextualBody = {
+    type: 'TextualBody',
+    format: 'text/html',
+    value: bodyValue,
+    label: doc.data.body.label,
+  };
+
+  // タグを Web Annotation の tagging body として出力する。
+  //   Presentation 3.0 §3.5 は motivation について「Specific Resource または
+  //   Textual Body 上で使う場合は purpose」と述べており、purpose:'tagging' は
+  //   Web Annotation Data Model の定義に従う。
+  //   value には値のみを入れ、分類軸（key）は label の言語マップで保持する。
+  //   （value に "身分:武士" と連結すると、値自体が ':' を含む場合に曖昧になる）
+  const tagBodies: IIIFTextualBody[] = (doc.tags ?? []).map((tag) => ({
+    type: 'TextualBody',
+    value: tag.value,
+    purpose: 'tagging',
+    label: { none: [tag.key] },
+  }));
+
   const annotation: IIIFAnnotation = {
     id: `${newUrl}/annotation/${doc.id}`,
     type: 'Annotation',
-    motivation: 'commenting',
-    body: {
-      type: 'TextualBody',
-      format: 'text/html',
-      value: bodyValue,
-      label: doc.data.body.label,
-    },
+    motivation: tagBodies.length > 0 ? ['commenting', 'tagging'] : 'commenting',
+    body: tagBodies.length > 0 ? [mainBody, ...tagBodies] : mainBody,
     target,
   };
 

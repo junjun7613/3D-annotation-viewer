@@ -76,11 +76,13 @@ NewAnnotation.researchProjectId?: string  // 移行過渡期は optional
 
 ## Phase 2 次の作業（ルールデプロイ）
 
-1. `npm install -D @firebase/rules-unit-testing` でテスト依存を追加
-2. `firebase emulators:start --only firestore,auth` で Emulator 起動
+1. ~~`npm install -D @firebase/rules-unit-testing` でテスト依存を追加~~ 完了（`4.0.1`。最新の 5.x は firebase 12 を要求するため、本プロジェクトの firebase 11 に合わせて v4 系を固定）
+2. `npx firebase-tools emulators:start --only firestore,auth` で Emulator 起動
 3. `npx tsx test/rules/firestore.test.ts` でルールテスト通過確認
-4. `firestore.rules.draft` を `firestore.rules` にリネームしてデプロイ
+4. ~~`firestore.rules.draft` を `firestore.rules` にリネーム~~ 完了（[firebase.json](../firebase.json) も `firestore.rules` を参照）→ **デプロイは未実施**
 5. 本番動作確認後、過渡期データ（researchProjectId 欠落許容）の撤去を別タスク化
+
+> **注**: 本ドキュメント内の `firestore.rules.draft` という記述は旧ファイル名。現在は [firestore.rules](../firestore.rules) にリネーム済みで、旧ルールは [firestore.rules.legacy](../firestore.rules.legacy) に保管。
 
 ## Phase 2 設計（確定済み）
 

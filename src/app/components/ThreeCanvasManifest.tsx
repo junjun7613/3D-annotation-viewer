@@ -713,6 +713,7 @@ const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
                       media: a.media ?? [],
                       wikidata: a.wikidata ?? [],
                       bibliography: a.bibliography ?? [],
+                      tags: a.tags ?? [],
                       relatedAnnotations: a.relatedAnnotations ?? [],
                     };
                   });

@@ -5,3 +5,4 @@ export { default as BibliographyDialog } from './BibliographyDialog';
 export { default as TitleEditDialog } from './TitleEditDialog';
 export { default as AnnotationListDialog } from './AnnotationListDialog';
 export { default as DescriptionDialog } from './DescriptionDialog';
+export { default as TagDialog } from './TagDialog';

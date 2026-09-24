@@ -97,6 +97,24 @@ service cloud.firestore {
         allow delete: if isOwner(pid)
                       || (isSignedIn() && request.auth.uid == uid);
       }
+
+      // ------- タグ語彙（key ごとの値リスト・サジェスト用） -------
+      //   アノテーションへのタグ付与に伴って自動蓄積される。
+      //   実体は入力補完のキャッシュであり、これ自体は権限判断の根拠にならない。
+      match /tagVocabulary/{tagKey} {
+        // read: プロジェクトを閲覧できる者（メンバー or 公開プロジェクト）
+        //   タグは test の read が公開である以上、公開プロジェクトでは語彙も見えてよい
+        allow read: if isMember(pid) || projectIsPublic(pid);
+
+        // write: editor 以上。タグを付与できる権限と一致させる
+        //   （viewer が語彙だけ汚せる状態を作らない）
+        allow create, update: if isEditor(pid)
+                              && request.resource.data.key is string
+                              && request.resource.data.values is list;
+
+        // 語彙の削除は owner のみ（分類軸の廃止は影響が大きい）
+        allow delete: if isOwner(pid);
+      }
     }
 
     // ============================================================

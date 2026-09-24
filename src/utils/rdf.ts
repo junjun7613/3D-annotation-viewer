@@ -1,4 +1,4 @@
-import type { BibliographyItem, MediaItem, WikidataItem, ObjectMetadata, NewAnnotation, Project } from '@/types/main';
+import type { BibliographyItem, MediaItem, WikidataItem, ObjectMetadata, NewAnnotation, Project, TagItem } from '@/types/main';
 import { renderMarkdown, extractResourceRefs } from './markdown';
 
 const PREFIXES =
@@ -169,6 +169,19 @@ const VOCAB_DEFINITIONS =
   ':discovered_at a rdf:Property ;\n  rdfs:subPropertyOf :AuthorityConceptualRelation ;\n  rdfs:domain :AnnotationTarget ;\n  rdfs:range :Place ;\n  rdfs:subPropertyOf crm:P7_took_place_at ;\n  rdfs:comment "対象の発見場所・出土地を示す。" .\n' +
 
   // ----------------------------------------------------------
+  // 3.6 Project-local Tag（key:value 形式の軽量分類）
+  //
+  //   :classified_as との違い:
+  //     :classified_as は Wikidata URI に裏付けられた統制語彙への位置付け。
+  //     :has_tag は URI を持たず、プロジェクト内でのみ通用する分類。
+  //     key（分類軸）を :TagScheme、value を :Tag として E55_Type 階層で表現する。
+  // ----------------------------------------------------------
+  '\n# -- 3.6 Project-local Tag --\n' +
+  ':TagScheme a rdfs:Class ;\n  rdfs:subClassOf crm:E55_Type ;\n  rdfs:comment "タグの分類軸（key）。プロジェクト内で自動蓄積される非統制の語彙体系。" .\n' +
+  ':Tag a rdfs:Class ;\n  rdfs:subClassOf crm:E55_Type ;\n  rdfs:comment "タグの値（value）。所属する分類軸を crm:P127_has_broader_term で示す。" .\n' +
+  ':has_tag a rdf:Property ;\n  rdfs:domain oa:Annotation ;\n  rdfs:range :Tag ;\n  rdfs:subPropertyOf crm:P2_has_type ;\n  rdfs:comment "アノテーションにプロジェクト内のタグ（key:value）を付与する。統制語彙ではないため、典拠を伴う分類には :classified_as を用いる。" .\n' +
+
+  // ----------------------------------------------------------
   // 4. Deprecated relation properties (backward-compat only)
   //    現行 UI は :depicts / :mentions / :associated_with に集約済み。
   //    以下は旧データの読み取り互換のためのみ保持する。
@@ -222,8 +235,14 @@ export function buildTurtle(
   const annoBase = `${manifestBase}/annotation`;
   const mediaBase = `${manifestBase}/media`;
   const bibBase = `${manifestBase}/bibliography`;
+  const tagBase = `${manifestBase}/tag`;
 
   let ttl = PREFIXES;
+
+  // タグは複数アノテーションから共有されるため、同一 key/value の
+  // :Tag / :TagScheme 定義が重複出力されないよう既出を記録する。
+  const emittedTagSchemes = new Set<string>();
+  const emittedTags = new Set<string>();
 
   // ----- Research Project リソース（メンバー一覧は除外、createdBy のみ参照） -----
   projects.forEach((p) => {
@@ -454,6 +473,29 @@ export function buildTurtle(
         ttl += buildE13ForBib(item, `${annoBase}/${ann.id}`, bibUri, ann.creator, ann.createdAt, annEventBase);
       });
 
+      // タグ（key:value の軽量分類）
+      (ann.tags ?? []).forEach((item, idx) => {
+        const schemeUri = `${tagBase}/${encodeURIComponent(item.key)}`;
+        const tagUri = `${schemeUri}/${encodeURIComponent(item.value)}`;
+
+        // 分類軸（key）— 初出時のみ定義
+        if (!emittedTagSchemes.has(schemeUri)) {
+          emittedTagSchemes.add(schemeUri);
+          ttl += `\n<${schemeUri}> a :TagScheme ;\n`;
+          ttl += `  rdfs:label "${escapeLiteral(item.key)}" .\n`;
+        }
+        // タグ値（value）— 初出時のみ定義
+        if (!emittedTags.has(tagUri)) {
+          emittedTags.add(tagUri);
+          ttl += `\n<${tagUri}> a :Tag ;\n`;
+          ttl += `  crm:P127_has_broader_term <${schemeUri}> ;\n`;
+          ttl += `  rdfs:label "${escapeLiteral(item.value)}" .\n`;
+        }
+
+        ttl += `\n<${annoBase}/${ann.id}> :has_tag <${tagUri}> .\n`;
+        ttl += buildE13ForTag(item, `${annoBase}/${ann.id}`, tagUri, ann.creator, ann.createdAt, annEventBase, idx);
+      });
+
       // アノテーション間関係（:supports / :challenges / :supplements）
       const relatedAnnotations = (ann as unknown as Record<string, unknown>).relatedAnnotations as
         Array<{ annotationId: string; relation: string; comment?: string; createdBy?: string; createdAt?: number }> | undefined;
@@ -624,4 +666,32 @@ function buildE13ForMedia(
     ttl += ' .\n';
     return ttl;
   }).join('');
+}
+
+/**
+ * タグ付与の来歴。
+ * 他リソースと異なり relationTypes を持たず、プロパティは常に :has_tag。
+ * 同一アノテーション内にタグは複数付くため、配列上の位置でイベント URI を一意化する。
+ */
+function buildE13ForTag(
+  item: TagItem,
+  annotationUri: string,
+  tagUri: string,
+  fallbackCreator: string | undefined,
+  fallbackCreatedAt: number | undefined,
+  eventBase: string,
+  index: number
+): string {
+  const by = item.addedBy ?? fallbackCreator;
+  const at = item.addedAt ?? fallbackCreatedAt;
+  const eventUri = `${eventBase}/tag-${index}`;
+  let ttl = `\n<${eventUri}> a crm:E13_Attribute_Assignment ;\n`;
+  ttl += `  crm:P140_assigned_attribute_to <${annotationUri}> ;\n`;
+  ttl += `  crm:P141_assigned <${tagUri}> ;\n`;
+  ttl += '  crm:P177_assigned_property_of_type :has_tag';
+  if (by) ttl += ` ;\n  crm:P14_carried_out_by <urn:uid:${by}>`;
+  if (at) ttl += ` ;\n  crm:P4_has_time-span "${new Date(at).toISOString()}"^^xsd:dateTime`;
+  if (item.addedComment) ttl += ` ;\n  crm:P3_has_note "${escapeLiteral(item.addedComment)}"`;
+  ttl += ' .\n';
+  return ttl;
 }

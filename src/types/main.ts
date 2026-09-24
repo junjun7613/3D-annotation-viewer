@@ -77,6 +77,21 @@ export interface AnnotationRelation {
   createdAt?: number;             // 付与日時（ms）
 }
 
+// タグ — key:value 形式の軽量分類（例: 身分:武士）
+//
+// 典拠（WikidataItem + :classified_as）との棲み分け:
+//   典拠は Wikidata URI による統制語彙。タグは URI を持たず、
+//   プロジェクト内でのみ通用する分類軸を軽量に付与する。
+//   key が分類軸（crm:E55_Type の体系）、value がその値。
+//   語彙は projects/{pid}/tagVocabulary に自動蓄積される。
+export interface TagItem {
+  key: string;            // 分類軸（例: '身分'）
+  value: string;          // 値（例: '武士'）
+  addedBy?: string;       // E13: 付与者 UID
+  addedAt?: number;       // E13: 付与日時（ms）
+  addedComment?: string;  // 付与者コメント（crm:P3_has_note）
+}
+
 export interface NewAnnotation {
   id: string;
   creator: string;                // 来歴：作成者 UID（権限判定には researchProjectId を使う）
@@ -85,6 +100,7 @@ export interface NewAnnotation {
   regionId?: string;              // 領域ノードへの参照（部分領域アノテーション）
   isObjectLevel?: boolean;        // オブジェクト全体を対象とするアノテーション
   relatedAnnotations?: AnnotationRelation[]; // アノテーション間関係
+  tags?: TagItem[];               // key:value 形式のタグ
   title: string;
   description: string;
   media: MediaItem[];
@@ -133,11 +149,24 @@ export interface Region {
   };
 }
 
+// IIIF Presentation 3.0 / Web Annotation の TextualBody
+// purpose は Presentation 3.0 が「Specific Resource または Textual Body 上で使う
+// Web Annotation のプロパティ」として明示的に認めている（tagging は WA 側の定義）。
+export interface IIIFTextualBody {
+  type: string;
+  value: string;
+  format?: string;
+  label?: string | Record<string, string[]>;  // v3 の言語マップも許容
+  purpose?: string;
+}
+
 export interface IIIFAnnotation {
   id: string;
   type: string;
-  motivation: string;
-  body: { type: string; value: string; format?: string; label?: string };
+  // タグを含む場合は ['commenting', 'tagging'] のように配列になる
+  motivation: string | string[];
+  // 本文のみなら単一、タグを伴う場合は配列
+  body: IIIFTextualBody | IIIFTextualBody[];
   target: Record<string, unknown>;
   seeAlso?: Record<string, unknown>[];
 }
@@ -349,6 +378,7 @@ export interface InfoPanelContent {
   bibliography: BibliographyItem[];
   location?: LocationItem;
   relatedAnnotations?: AnnotationRelation[];
+  tags?: TagItem[];
 }
 
 // 領域ノード選択時のパネル状態（アノテーション一覧モード）

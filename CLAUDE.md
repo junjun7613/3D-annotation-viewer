@@ -18,6 +18,7 @@ IIIF Semantic Editor — 文化遺産資料（2D画像・3Dモデル）に対す
 | `regions` | 領域ノード（座標情報のみ・プロジェクト横断の公開資産） |
 | `manifest_metadata` | オブジェクトメタデータ（location・thumbnail・label・TEI） |
 | `projects` + `projects/{pid}/members` | プロジェクト・メンバー |
+| `projects/{pid}/tagVocabulary` | タグ語彙（key ごとの値リスト・サジェスト用） |
 
 ### アノテーション構造
 
@@ -79,6 +80,12 @@ public/ontology/relation-hierarchy.json  # 関係性プロパティ階層
 
 同一領域ノードのアノテーション間：`supports` / `challenges` / `supplements`（`oa:motivatedBy` の下位）。`rdf:Statement` リフィケーションで付与者・日時・コメントを記述。
 
+### タグ（key:value）
+
+`身分:武士` 形式の軽量分類。典拠（Wikidata URI による統制語彙）と違い URI を持たず、プロジェクト内で語彙を自動蓄積（`projects/{pid}/tagVocabulary`）。付与先はアノテーション（`test`）のみ。RDF では `:has_tag` + `:TagScheme` / `:Tag`（`crm:E55_Type` 下位）。IIIF では `purpose: "tagging"` の TextualBody（`value` に値、`label` に分類軸）。
+
+詳細: [docs/tags.md](docs/tags.md)
+
 ---
 
 ## UI フロー
@@ -119,6 +126,7 @@ TEI XML と領域ノードのリンク管理。詳細: [docs/textual-editor.md](
   - 3D 点 → `PointSelector` / 3D ポリゴン → `PolygonZSelector`（WKT）
   - 2D 矩形 → `FragmentSelector`（xywh=percent）/ 2D ポリゴン → `SvgSelector`
 - Linked Resource 詳細は IIIF に含めず RDF に委ねる（共通 URI で相互参照）
+- 例外：タグは `purpose: "tagging"` の TextualBody として出力（URI を持たない短い文字列で、外部ビューアでもそのまま意味を持つため）。タグを持つアノテーションのみ `motivation` / `body` が配列になる
 
 ---
 

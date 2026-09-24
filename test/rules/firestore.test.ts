@@ -33,7 +33,7 @@ async function withEnv(fn: (env: RulesTestEnvironment) => Promise<void>) {
   const env = await initializeTestEnvironment({
     projectId: PROJECT_ID,
     firestore: {
-      rules: readFileSync('firestore.rules.draft', 'utf-8'),
+      rules: readFileSync('firestore.rules', 'utf-8'),
       host: '127.0.0.1',
       port: 8080,
     },
@@ -131,6 +131,13 @@ async function main() {
 
     console.log('— members self-leave —');
     await assertSucceeds(deleteDoc(doc(viewerDb, 'projects/p1/members/viewer-uid')));
+    // 以降で viewer 権限を試すため、退会させた viewer とは別の viewer を登録し直す
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'projects/p1/members/viewer2-uid'), {
+        uid: 'viewer2-uid', role: 'viewer', joinedAt: 0,
+      });
+    });
+    const viewerDb2 = env.authenticatedContext('viewer2-uid').firestore();
 
     console.log('— test create —');
     await assertSucceeds(
@@ -158,9 +165,12 @@ async function main() {
     await assertFails(updateDoc(doc(editorDb, 'test/ann-legacy'), { creator: 'editor-uid' }));
 
     console.log('— test read —');
-    await assertSucceeds(getDoc(doc(anonDb, 'test/ann-pub')));    // public プロジェクト
-    await assertFails(getDoc(doc(strangerDb, 'test/ann-p1')));    // private プロジェクト
-    await assertSucceeds(getDoc(doc(anonDb, 'test/ann-legacy'))); // 過渡期データ
+    // 注意: test の read は旧ルール（allow read: if true）との後方互換のため公開に据え置いている。
+    //   private プロジェクトのアノテーションも現状は読める。所有モデルは create/update/delete で担保する。
+    //   将来プロジェクト非公開アノテーションを実装する際、ここを assertFails に変えること。
+    await assertSucceeds(getDoc(doc(anonDb, 'test/ann-pub')));      // public プロジェクト
+    await assertSucceeds(getDoc(doc(strangerDb, 'test/ann-p1')));   // private だが read は公開
+    await assertSucceeds(getDoc(doc(anonDb, 'test/ann-legacy')));   // 過渡期データ
 
     console.log('— regions —');
     await assertSucceeds(
@@ -179,6 +189,33 @@ async function main() {
     // 削除は creator のみ
     await assertFails(deleteDoc(doc(strangerDb, 'regions/r1')));
     await assertSucceeds(deleteDoc(doc(editorDb, 'regions/r1')));
+
+    console.log('— tagVocabulary —');
+    // editor 以上は語彙を書ける（タグ付与権限と一致）
+    await assertSucceeds(
+      setDoc(doc(editorDb, 'projects/p1/tagVocabulary/%E8%BA%AB%E5%88%86'), {
+        key: '身分', values: ['武士'], updatedAt: 0,
+      })
+    );
+    // viewer は書けない（語彙だけ汚せる状態を作らない）
+    await assertFails(
+      setDoc(doc(viewerDb2, 'projects/p1/tagVocabulary/forbidden'), {
+        key: 'x', values: ['y'], updatedAt: 0,
+      })
+    );
+    // 非メンバーは読めない（private プロジェクト）
+    await assertFails(getDoc(doc(strangerDb, 'projects/p1/tagVocabulary/%E8%BA%AB%E5%88%86')));
+    // メンバーは読める
+    await assertSucceeds(getDoc(doc(editorDb, 'projects/p1/tagVocabulary/%E8%BA%AB%E5%88%86')));
+    // 型チェック: values が list でなければ拒否
+    await assertFails(
+      setDoc(doc(editorDb, 'projects/p1/tagVocabulary/bad'), {
+        key: 'k', values: 'not-a-list', updatedAt: 0,
+      })
+    );
+    // 削除は owner のみ
+    await assertFails(deleteDoc(doc(editorDb, 'projects/p1/tagVocabulary/%E8%BA%AB%E5%88%86')));
+    await assertSucceeds(deleteDoc(doc(ownerDb, 'projects/p1/tagVocabulary/%E8%BA%AB%E5%88%86')));
 
     console.log('— manifest_metadata —');
     await assertSucceeds(setDoc(doc(editorDb, 'manifest_metadata/m1'), {
